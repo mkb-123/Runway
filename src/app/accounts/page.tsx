@@ -1,0 +1,138 @@
+import { getHouseholdData } from "@/lib/data";
+import { formatCurrency } from "@/lib/format";
+import { ACCOUNT_TYPE_LABELS } from "@/types";
+import type { Person, Account } from "@/types";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableFooter,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default function AccountsPage() {
+  const { persons, accounts } = getHouseholdData();
+
+  // Group accounts by person
+  const accountsByPerson = persons.map((person) => {
+    const personAccounts = accounts.filter((a) => a.personId === person.id);
+    const totalValue = personAccounts.reduce(
+      (sum, a) => sum + a.currentValue,
+      0
+    );
+    return { person, accounts: personAccounts, totalValue };
+  });
+
+  const grandTotal = accounts.reduce((sum, a) => sum + a.currentValue, 0);
+
+  return (
+    <div className="space-y-8 p-4 md:p-8">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight">Accounts</h1>
+        <p className="text-muted-foreground">
+          Overview of all accounts grouped by person.
+        </p>
+      </div>
+
+      {accountsByPerson.map(({ person, accounts: personAccounts, totalValue }) => (
+        <section key={person.id} className="space-y-4">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-xl font-semibold">{person.name}</h2>
+            <span className="text-lg font-medium text-muted-foreground">
+              Total: {formatCurrency(totalValue)}
+            </span>
+          </div>
+
+          {/* Desktop table view */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Account Name</TableHead>
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Current Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {personAccounts.map((account) => (
+                  <TableRow key={account.id}>
+                    <TableCell className="font-medium">
+                      {account.name}
+                    </TableCell>
+                    <TableCell>{account.provider}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {ACCOUNT_TYPE_LABELS[account.type]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(account.currentValue)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="font-semibold">
+                    Subtotal
+                  </TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {formatCurrency(totalValue)}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </div>
+
+          {/* Mobile card view */}
+          <div className="grid grid-cols-1 gap-3 md:hidden">
+            {personAccounts.map((account) => (
+              <Card key={account.id}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">{account.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Provider
+                    </span>
+                    <span className="text-sm font-medium">
+                      {account.provider}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Type</span>
+                    <Badge variant="secondary">
+                      {ACCOUNT_TYPE_LABELS[account.type]}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Value</span>
+                    <span className="text-base font-semibold">
+                      {formatCurrency(account.currentValue)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      {/* Grand total */}
+      <div className="rounded-lg border bg-muted/50 p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-lg font-semibold">Grand Total</span>
+          <span className="text-2xl font-bold">
+            {formatCurrency(grandTotal)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}

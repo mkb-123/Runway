@@ -1,0 +1,124 @@
+{
+  "snapshots": [
+    {
+      "date": "2024-01-01",
+      "totalNetWorth": 580000,
+      "byPerson": [
+        { "personId": "person-1", "value": 365000 },
+        { "personId": "person-2", "value": 215000 }
+      ],
+      "byType": [
+        { "type": "workplace_pension", "value": 195000 },
+        { "type": "sipp", "value": 35000 },
+        { "type": "stocks_and_shares_isa", "value": 150000 },
+        { "type": "gia", "value": 95000 },
+        { "type": "cash_savings", "value": 35000 },
+        { "type": "premium_bonds", "value": 45000 },
+        { "type": "lifetime_isa", "value": 18000 }
+      ],
+      "byWrapper": [
+        { "wrapper": "pension", "value": 230000 },
+        { "wrapper": "isa", "value": 168000 },
+        { "wrapper": "gia", "value": 95000 },
+        { "wrapper": "cash", "value": 35000 },
+        { "wrapper": "premium_bonds", "value": 45000 }
+      ]
+    },
+    {
+      "date": "2024-04-01",
+      "totalNetWorth": 610000,
+      "byPerson": [
+        { "personId": "person-1", "value": 382000 },
+        { "personId": "person-2", "value": 228000 }
+      ],
+      "byType": [
+        { "type": "workplace_pension", "value": 205000 },
+        { "type": "sipp", "value": 37000 },
+        { "type": "stocks_and_shares_isa", "value": 160000 },
+        { "type": "gia", "value": 100000 },
+        { "type": "cash_savings", "value": 36000 },
+        { "type": "premium_bonds", "value": 46000 },
+        { "type": "lifetime_isa", "value": 19000 }
+      ],
+      "byWrapper": [
+        { "wrapper": "pension", "value": 242000 },
+        { "wrapper": "isa", "value": 179000 },
+        { "wrapper": "gia", "value": 100000 },
+        { "wrapper": "cash", "value": 36000 },
+        { "wrapper": "premium_bonds", "value": 46000 }
+      ]
+    },
+    {
+      "date": "2024-07-01",
+      "totalNetWorth": 650000,
+      "byPerson": [
+        { "personId": "person-1", "value": 405000 },
+        { "personId": "person-2", "value": 245000 }
+      ],
+      "byType": [
+        { "type": "workplace_pension", "value": 218000 },
+        { "type": "sipp", "value": 39500 },
+        { "type": "stocks_and_shares_isa", "value": 172000 },
+        { "type": "gia", "value": 108000 },
+        { "type": "cash_savings", "value": 37500 },
+        { "type": "premium_bonds", "value": 47500 },
+        { "type": "lifetime_isa", "value": 20000 }
+      ],
+      "byWrapper": [
+        { "wrapper": "pension", "value": 257500 },
+        { "wrapper": "isa", "value": 192000 },
+        { "wrapper": "gia", "value": 108000 },
+        { "wrapper": "cash", "value": 37500 },
+        { "wrapper": "premium_bonds", "value": 47500 }
+      ]
+    },
+    {
+      "date": "2024-10-01",
+      "totalNetWorth": 690000,
+      "byPerson": [
+        { "personId": "person-1", "value": 430000 },
+        { "personId": "person-2", "value": 260000 }
+      ],
+      "byType": [
+        { "type": "workplace_pension", "value": 232000 },
+        { "type": "sipp", "value": 42000 },
+        { "type": "stocks_and_shares_isa", "value": 185000 },
+        { "type": "gia", "value": 115000 },
+        { "type": "cash_savings", "value": 38000 },
+        { "type": "premium_bonds", "value": 48500 },
+        { "type": "lifetime_isa", "value": 21000 }
+      ],
+      "byWrapper": [
+        { "wrapper": "pension", "value": 274000 },
+        { "wrapper": "isa", "value": 206000 },
+        { "wrapper": "gia", "value": 115000 },
+        { "wrapper": "cash", "value": 38000 },
+        { "wrapper": "premium_bonds", "value": 48500 }
+      ]
+    },
+    {
+      "date": "2025-01-01",
+      "totalNetWorth": 732000,
+      "byPerson": [
+        { "personId": "person-1", "value": 458000 },
+        { "personId": "person-2", "value": 274000 }
+      ],
+      "byType": [
+        { "type": "workplace_pension", "value": 245000 },
+        { "type": "sipp", "value": 44000 },
+        { "type": "stocks_and_shares_isa", "value": 196000 },
+        { "type": "gia", "value": 122000 },
+        { "type": "cash_savings", "value": 39500 },
+        { "type": "premium_bonds", "value": 49500 },
+        { "type": "lifetime_isa", "value": 21500 }
+      ],
+      "byWrapper": [
+        { "wrapper": "pension", "value": 289000 },
+        { "wrapper": "isa", "value": 217500 },
+        { "wrapper": "gia", "value": 122000 },
+        { "wrapper": "cash", "value": 39500 },
+        { "wrapper": "premium_bonds", "value": 49500 }
+      ]
+    }
+  ]
+}
