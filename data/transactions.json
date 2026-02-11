@@ -1,0 +1,108 @@
+{
+  "transactions": [
+    {
+      "id": "tx-1",
+      "accountId": "acc-4",
+      "fundId": "fund-1",
+      "type": "buy",
+      "date": "2022-01-15",
+      "units": 200,
+      "pricePerUnit": 55.0,
+      "amount": 11000,
+      "notes": "Initial GIA investment"
+    },
+    {
+      "id": "tx-2",
+      "accountId": "acc-4",
+      "fundId": "fund-1",
+      "type": "buy",
+      "date": "2022-06-01",
+      "units": 300,
+      "pricePerUnit": 52.0,
+      "amount": 15600,
+      "notes": "Additional purchase during dip"
+    },
+    {
+      "id": "tx-3",
+      "accountId": "acc-4",
+      "fundId": "fund-1",
+      "type": "buy",
+      "date": "2023-03-01",
+      "units": 200,
+      "pricePerUnit": 65.0,
+      "amount": 13000
+    },
+    {
+      "id": "tx-4",
+      "accountId": "acc-4",
+      "fundId": "fund-4",
+      "type": "buy",
+      "date": "2022-09-01",
+      "units": 300,
+      "pricePerUnit": 105.0,
+      "amount": 31500
+    },
+    {
+      "id": "tx-5",
+      "accountId": "acc-4",
+      "fundId": "fund-4",
+      "type": "buy",
+      "date": "2023-06-01",
+      "units": 200,
+      "pricePerUnit": 115.0,
+      "amount": 23000
+    },
+    {
+      "id": "tx-6",
+      "accountId": "acc-4",
+      "fundId": "fund-1",
+      "type": "sell",
+      "date": "2024-10-15",
+      "units": 50,
+      "pricePerUnit": 72.0,
+      "amount": 3600,
+      "notes": "Partial sale for Bed & ISA"
+    },
+    {
+      "id": "tx-7",
+      "accountId": "acc-9",
+      "fundId": "fund-1",
+      "type": "buy",
+      "date": "2022-04-10",
+      "units": 250,
+      "pricePerUnit": 58.0,
+      "amount": 14500
+    },
+    {
+      "id": "tx-8",
+      "accountId": "acc-9",
+      "fundId": "fund-1",
+      "type": "buy",
+      "date": "2023-09-20",
+      "units": 150,
+      "pricePerUnit": 63.0,
+      "amount": 9450
+    },
+    {
+      "id": "tx-9",
+      "accountId": "acc-9",
+      "fundId": "fund-3",
+      "type": "buy",
+      "date": "2023-01-05",
+      "units": 300,
+      "pricePerUnit": 38.0,
+      "amount": 11400
+    },
+    {
+      "id": "tx-10",
+      "accountId": "acc-4",
+      "fundId": "fund-1",
+      "type": "dividend",
+      "date": "2024-06-15",
+      "units": 0,
+      "pricePerUnit": 0,
+      "amount": 350,
+      "notes": "Annual dividend"
+    }
+  ]
+}

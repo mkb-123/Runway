@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="248" fill="#0a0a0a" stroke="#22c55e" stroke-width="8"/>
+
+  <!-- Grid lines (subtle) -->
+  <line x1="100" y1="380" x2="412" y2="380" stroke="#333" stroke-width="2"/>
+  <line x1="100" y1="320" x2="412" y2="320" stroke="#222" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="100" y1="260" x2="412" y2="260" stroke="#222" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="100" y1="200" x2="412" y2="200" stroke="#222" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="100" y1="140" x2="412" y2="140" stroke="#222" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <!-- Rising line graph -->
+  <polyline
+    points="120,350 180,330 220,310 260,270 300,220 340,180 390,130"
+    stroke="#22c55e"
+    stroke-width="6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+
+  <!-- Area under the line -->
+  <polygon
+    points="120,350 180,330 220,310 260,270 300,220 340,180 390,130 390,380 120,380"
+    fill="#22c55e"
+    opacity="0.15"
+  />
+
+  <!-- Data points -->
+  <circle cx="120" cy="350" r="6" fill="#22c55e"/>
+  <circle cx="180" cy="330" r="6" fill="#22c55e"/>
+  <circle cx="220" cy="310" r="6" fill="#22c55e"/>
+  <circle cx="260" cy="270" r="6" fill="#22c55e"/>
+  <circle cx="300" cy="220" r="6" fill="#22c55e"/>
+  <circle cx="340" cy="180" r="6" fill="#22c55e"/>
+  <circle cx="390" cy="130" r="8" fill="#22c55e"/>
+
+  <!-- Arrow tip on last point -->
+  <polygon points="390,115 400,135 380,135" fill="#22c55e"/>
+</svg>
