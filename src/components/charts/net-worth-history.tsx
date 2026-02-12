@@ -25,11 +25,11 @@ const WRAPPER_ORDER: TaxWrapper[] = [
 ];
 
 const WRAPPER_COLORS: Record<TaxWrapper, string> = {
-  pension: "hsl(var(--chart-1))",
-  isa: "hsl(var(--chart-2))",
-  gia: "hsl(var(--chart-3))",
-  cash: "hsl(var(--chart-4))",
-  premium_bonds: "hsl(var(--chart-5))",
+  pension: "var(--chart-1)",
+  isa: "var(--chart-2)",
+  gia: "var(--chart-3)",
+  cash: "var(--chart-4)",
+  premium_bonds: "var(--chart-5)",
 };
 
 function formatCompactValue(value: number): string {
@@ -106,8 +106,8 @@ export function NetWorthHistoryChart({
               return "";
             }}
             contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
+              backgroundColor: "var(--card)",
+              border: "1px solid var(--border)",
               borderRadius: "8px",
             }}
           />

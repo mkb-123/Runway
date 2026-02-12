@@ -1,4 +1,7 @@
-import { getHouseholdData, getFundById, getAccountById, getPersonById } from "@/lib/data";
+"use client";
+
+import { useMemo } from "react";
+import { useData } from "@/context/data-context";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import {
   ASSET_CLASS_LABELS,
@@ -37,66 +40,77 @@ interface FundGroup {
 }
 
 export default function HoldingsPage() {
-  const { accounts, funds } = getHouseholdData();
+  const { household, getPersonById, getFundById } = useData();
+  const { accounts, funds } = household;
 
   // Build a map of fund ID -> all holdings across accounts
-  const fundGroupMap = new Map<string, FundGroup>();
+  const { fundGroups, grandTotalInvested, grandTotalCurrent, grandTotalGainLoss } =
+    useMemo(() => {
+      const fundGroupMap = new Map<string, FundGroup>();
 
-  for (const account of accounts) {
-    const person = getPersonById(account.personId);
-    for (const holding of account.holdings) {
-      const fund = getFundById(holding.fundId);
-      if (!fund) continue;
+      for (const account of accounts) {
+        const person = getPersonById(account.personId);
+        for (const holding of account.holdings) {
+          const fund = getFundById(holding.fundId);
+          if (!fund) continue;
 
-      const investedValue = holding.units * holding.purchasePrice;
-      const currentValue = holding.units * holding.currentPrice;
-      const unrealisedGainLoss = currentValue - investedValue;
+          const investedValue = holding.units * holding.purchasePrice;
+          const currentValue = holding.units * holding.currentPrice;
+          const unrealisedGainLoss = currentValue - investedValue;
 
-      const row: FundHoldingRow = {
-        accountId: account.id,
-        accountName: account.name,
-        personName: person?.name ?? "Unknown",
-        units: holding.units,
-        purchasePrice: holding.purchasePrice,
-        currentPrice: holding.currentPrice,
-        investedValue,
-        currentValue,
-        unrealisedGainLoss,
-      };
+          const row: FundHoldingRow = {
+            accountId: account.id,
+            accountName: account.name,
+            personName: person?.name ?? "Unknown",
+            units: holding.units,
+            purchasePrice: holding.purchasePrice,
+            currentPrice: holding.currentPrice,
+            investedValue,
+            currentValue,
+            unrealisedGainLoss,
+          };
 
-      if (!fundGroupMap.has(fund.id)) {
-        fundGroupMap.set(fund.id, {
-          fund,
-          rows: [],
-          totalInvested: 0,
-          totalCurrent: 0,
-          totalGainLoss: 0,
-        });
+          if (!fundGroupMap.has(fund.id)) {
+            fundGroupMap.set(fund.id, {
+              fund,
+              rows: [],
+              totalInvested: 0,
+              totalCurrent: 0,
+              totalGainLoss: 0,
+            });
+          }
+
+          const group = fundGroupMap.get(fund.id)!;
+          group.rows.push(row);
+          group.totalInvested += investedValue;
+          group.totalCurrent += currentValue;
+          group.totalGainLoss += unrealisedGainLoss;
+        }
       }
 
-      const group = fundGroupMap.get(fund.id)!;
-      group.rows.push(row);
-      group.totalInvested += investedValue;
-      group.totalCurrent += currentValue;
-      group.totalGainLoss += unrealisedGainLoss;
-    }
-  }
+      const groups = Array.from(fundGroupMap.values());
 
-  const fundGroups = Array.from(fundGroupMap.values());
+      // Calculate grand totals
+      const totalInvested = groups.reduce(
+        (sum, g) => sum + g.totalInvested,
+        0
+      );
+      const totalCurrent = groups.reduce(
+        (sum, g) => sum + g.totalCurrent,
+        0
+      );
+      const totalGainLoss = groups.reduce(
+        (sum, g) => sum + g.totalGainLoss,
+        0
+      );
 
-  // Calculate grand totals
-  const grandTotalInvested = fundGroups.reduce(
-    (sum, g) => sum + g.totalInvested,
-    0
-  );
-  const grandTotalCurrent = fundGroups.reduce(
-    (sum, g) => sum + g.totalCurrent,
-    0
-  );
-  const grandTotalGainLoss = fundGroups.reduce(
-    (sum, g) => sum + g.totalGainLoss,
-    0
-  );
+      return {
+        fundGroups: groups,
+        grandTotalInvested: totalInvested,
+        grandTotalCurrent: totalCurrent,
+        grandTotalGainLoss: totalGainLoss,
+      };
+    }, [accounts, getPersonById, getFundById]);
 
   return (
     <div className="space-y-8 p-4 md:p-8">
@@ -181,65 +195,67 @@ export default function HoldingsPage() {
             <CardContent>
               {/* Desktop table */}
               <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Account</TableHead>
-                      <TableHead>Person</TableHead>
-                      <TableHead className="text-right">Units</TableHead>
-                      <TableHead className="text-right">
-                        Purchase Price
-                      </TableHead>
-                      <TableHead className="text-right">
-                        Current Price
-                      </TableHead>
-                      <TableHead className="text-right">
-                        Invested Value
-                      </TableHead>
-                      <TableHead className="text-right">
-                        Current Value
-                      </TableHead>
-                      <TableHead className="text-right">
-                        Gain/Loss
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((row) => (
-                      <TableRow key={row.accountId}>
-                        <TableCell className="font-medium">
-                          {row.accountName}
-                        </TableCell>
-                        <TableCell>{row.personName}</TableCell>
-                        <TableCell className="text-right">
-                          {row.units.toLocaleString("en-GB")}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(row.purchasePrice)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(row.currentPrice)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(row.investedValue)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(row.currentValue)}
-                        </TableCell>
-                        <TableCell
-                          className={`text-right font-medium ${
-                            row.unrealisedGainLoss >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {row.unrealisedGainLoss >= 0 ? "+" : ""}
-                          {formatCurrency(row.unrealisedGainLoss)}
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account</TableHead>
+                        <TableHead>Person</TableHead>
+                        <TableHead className="text-right">Units</TableHead>
+                        <TableHead className="text-right">
+                          Purchase Price
+                        </TableHead>
+                        <TableHead className="text-right">
+                          Current Price
+                        </TableHead>
+                        <TableHead className="text-right">
+                          Invested Value
+                        </TableHead>
+                        <TableHead className="text-right">
+                          Current Value
+                        </TableHead>
+                        <TableHead className="text-right">
+                          Gain/Loss
+                        </TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((row) => (
+                        <TableRow key={row.accountId}>
+                          <TableCell className="font-medium">
+                            {row.accountName}
+                          </TableCell>
+                          <TableCell>{row.personName}</TableCell>
+                          <TableCell className="text-right">
+                            {row.units.toLocaleString("en-GB")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(row.purchasePrice)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(row.currentPrice)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(row.investedValue)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(row.currentValue)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-medium ${
+                              row.unrealisedGainLoss >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {row.unrealisedGainLoss >= 0 ? "+" : ""}
+                            {formatCurrency(row.unrealisedGainLoss)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
 
               {/* Mobile card view */}

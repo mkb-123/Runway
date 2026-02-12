@@ -132,12 +132,12 @@ export function CashFlowWaterfall({ data }: CashFlowWaterfallProps) {
             }}
             labelFormatter={(label) => String(label)}
             contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
+              backgroundColor: "var(--card)",
+              border: "1px solid var(--border)",
               borderRadius: "8px",
             }}
           />
-          <ReferenceLine y={0} stroke="hsl(var(--border))" />
+          <ReferenceLine y={0} stroke="var(--border)" />
           {/* Invisible base bar */}
           <Bar dataKey="base" stackId="waterfall" fill="transparent" isAnimationActive={false} />
           {/* Visible portion */}

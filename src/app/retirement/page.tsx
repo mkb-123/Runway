@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -9,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getHouseholdData, getTotalNetWorth } from "@/lib/data";
+import { useData } from "@/context/data-context";
 import { getAccountTaxWrapper } from "@/types";
 import {
   formatCurrency,
@@ -26,7 +29,7 @@ import {
 import { RetirementProgress } from "@/components/charts/retirement-progress";
 
 export default function RetirementPage() {
-  const household = getHouseholdData();
+  const { household, getTotalNetWorth } = useData();
   const { retirement, annualContributions, accounts, income, persons } =
     household;
 
@@ -34,43 +37,61 @@ export default function RetirementPage() {
   const currentPot = getTotalNetWorth();
 
   // Required pot
-  const requiredPot = calculateRequiredPot(
-    retirement.targetAnnualIncome,
-    retirement.withdrawalRate
+  const requiredPot = useMemo(
+    () =>
+      calculateRequiredPot(
+        retirement.targetAnnualIncome,
+        retirement.withdrawalRate
+      ),
+    [retirement.targetAnnualIncome, retirement.withdrawalRate]
   );
 
   // Progress
   const progressPercent = (currentPot / requiredPot) * 100;
 
   // Total annual contributions
-  const totalAnnualContributions = annualContributions.reduce(
-    (sum, c) =>
-      sum + c.isaContribution + c.pensionContribution + c.giaContribution,
-    0
+  const totalAnnualContributions = useMemo(
+    () =>
+      annualContributions.reduce(
+        (sum, c) =>
+          sum + c.isaContribution + c.pensionContribution + c.giaContribution,
+        0
+      ),
+    [annualContributions]
   );
 
   // Total gross income
-  const totalGrossIncome = income.reduce((sum, i) => sum + i.grossSalary, 0);
+  const totalGrossIncome = useMemo(
+    () => income.reduce((sum, i) => sum + i.grossSalary, 0),
+    [income]
+  );
 
   // Savings rate
   const savingsRate = (totalAnnualContributions / totalGrossIncome) * 100;
 
   // Calculate accessible vs locked wealth
-  const accessibleWrappers = new Set(["isa", "gia", "cash", "premium_bonds"]);
-  let accessibleWealth = 0;
-  let lockedWealth = 0;
+  const { accessibleWealth, lockedWealth } = useMemo(() => {
+    const accessibleWrappers = new Set(["isa", "gia", "cash", "premium_bonds"]);
+    let accessible = 0;
+    let locked = 0;
 
-  for (const account of accounts) {
-    const wrapper = getAccountTaxWrapper(account.type);
-    if (accessibleWrappers.has(wrapper)) {
-      accessibleWealth += account.currentValue;
-    } else {
-      lockedWealth += account.currentValue;
+    for (const account of accounts) {
+      const wrapper = getAccountTaxWrapper(account.type);
+      if (accessibleWrappers.has(wrapper)) {
+        accessible += account.currentValue;
+      } else {
+        locked += account.currentValue;
+      }
     }
-  }
+
+    return { accessibleWealth: accessible, lockedWealth: locked };
+  }, [accounts]);
 
   // Get primary person (self) for age calculations
-  const primaryPerson = persons.find((p) => p.relationship === "self");
+  const primaryPerson = useMemo(
+    () => persons.find((p) => p.relationship === "self"),
+    [persons]
+  );
   const currentAge = primaryPerson
     ? Math.floor(
         (Date.now() - new Date(primaryPerson.dateOfBirth).getTime()) /
@@ -84,29 +105,41 @@ export default function RetirementPage() {
     retirement.scenarioRates[
       Math.floor(retirement.scenarioRates.length / 2)
     ] ?? 0.07;
-  const coastFIRE = calculateCoastFIRE(
-    currentPot,
-    requiredPot,
-    pensionAccessAge,
-    currentAge,
-    midRate
+  const coastFIRE = useMemo(
+    () =>
+      calculateCoastFIRE(
+        currentPot,
+        requiredPot,
+        pensionAccessAge,
+        currentAge,
+        midRate
+      ),
+    [currentPot, requiredPot, pensionAccessAge, currentAge, midRate]
   );
 
   // Required monthly savings for different time horizons
   const savingsTimeframes = [10, 15, 20];
-  const requiredMonthlySavings = savingsTimeframes.map((years) => ({
-    years,
-    monthly: calculateRequiredSavings(requiredPot, currentPot, years, midRate),
-  }));
+  const requiredMonthlySavings = useMemo(
+    () =>
+      savingsTimeframes.map((years) => ({
+        years,
+        monthly: calculateRequiredSavings(requiredPot, currentPot, years, midRate),
+      })),
+    [requiredPot, currentPot, midRate]
+  );
 
   // Pension Bridge Analysis
   // Assume early retirement = when countdown is 0 at mid rate, or use current age + countdown
   const earlyRetirementAge = currentAge + 10; // Aspirational: retire in ~10 years
-  const bridgeResult = calculatePensionBridge(
-    earlyRetirementAge,
-    pensionAccessAge,
-    retirement.targetAnnualIncome,
-    accessibleWealth
+  const bridgeResult = useMemo(
+    () =>
+      calculatePensionBridge(
+        earlyRetirementAge,
+        pensionAccessAge,
+        retirement.targetAnnualIncome,
+        accessibleWealth
+      ),
+    [earlyRetirementAge, pensionAccessAge, retirement.targetAnnualIncome, accessibleWealth]
   );
 
   // Max bar width calculation for stacked bar
@@ -290,28 +323,30 @@ export default function RetirementPage() {
             <p className="text-xs text-muted-foreground mb-3">
               At {formatPercent(midRate)} annual return
             </p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timeframe</TableHead>
-                  <TableHead className="text-right">Monthly Savings</TableHead>
-                  <TableHead className="text-right">Annual Savings</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {requiredMonthlySavings.map(({ years, monthly }) => (
-                  <TableRow key={years}>
-                    <TableCell>{years} years</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(monthly)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(monthly * 12)}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Timeframe</TableHead>
+                    <TableHead className="text-right">Monthly Savings</TableHead>
+                    <TableHead className="text-right">Annual Savings</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {requiredMonthlySavings.map(({ years, monthly }) => (
+                    <TableRow key={years}>
+                      <TableCell>{years} years</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(monthly)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(monthly * 12)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </CardContent>
       </Card>

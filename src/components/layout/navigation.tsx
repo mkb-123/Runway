@@ -15,6 +15,7 @@ import {
   PieChart,
   Shield,
   Download,
+  Settings,
   Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ const navLinks = [
   { href: "/allocation", label: "Allocation", icon: PieChart },
   { href: "/iht", label: "IHT", icon: Shield },
   { href: "/export", label: "Export", icon: Download },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Navigation() {
@@ -60,7 +62,7 @@ export function Navigation() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden flex-1 items-center gap-1 lg:flex">
+        <nav className="hidden flex-1 items-center gap-0.5 overflow-x-auto lg:flex">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const active = isActive(link.href);
@@ -69,13 +71,13 @@ export function Navigation() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors xl:px-2.5 xl:text-sm",
                   active
                     ? "bg-accent text-accent-foreground"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 )}
               >
-                <Icon className="size-4" />
+                <Icon className="size-3.5" />
                 <span>{link.label}</span>
               </Link>
             );

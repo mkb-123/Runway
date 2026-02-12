@@ -23,11 +23,11 @@ interface AllocationPieProps {
 }
 
 const DEFAULT_COLORS = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
   "hsl(210, 70%, 50%)",
   "hsl(280, 60%, 55%)",
   "hsl(30, 80%, 55%)",
@@ -85,8 +85,8 @@ export function AllocationPie({
           <Tooltip
             formatter={(value: number | undefined) => formatTooltipValue(value ?? 0)}
             contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
+              backgroundColor: "var(--card)",
+              border: "1px solid var(--border)",
               borderRadius: "8px",
             }}
           />

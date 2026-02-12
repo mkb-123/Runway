@@ -1,4 +1,7 @@
-import { getHouseholdData } from "@/lib/data";
+"use client";
+
+import { useMemo } from "react";
+import { useData } from "@/context/data-context";
 import { formatCurrency } from "@/lib/format";
 import { ACCOUNT_TYPE_LABELS } from "@/types";
 import type { Person, Account } from "@/types";
@@ -15,19 +18,27 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AccountsPage() {
-  const { persons, accounts } = getHouseholdData();
+  const { household } = useData();
+  const { persons, accounts } = household;
 
   // Group accounts by person
-  const accountsByPerson = persons.map((person) => {
-    const personAccounts = accounts.filter((a) => a.personId === person.id);
-    const totalValue = personAccounts.reduce(
-      (sum, a) => sum + a.currentValue,
-      0
-    );
-    return { person, accounts: personAccounts, totalValue };
-  });
+  const accountsByPerson = useMemo(
+    () =>
+      persons.map((person) => {
+        const personAccounts = accounts.filter((a) => a.personId === person.id);
+        const totalValue = personAccounts.reduce(
+          (sum, a) => sum + a.currentValue,
+          0
+        );
+        return { person, accounts: personAccounts, totalValue };
+      }),
+    [persons, accounts]
+  );
 
-  const grandTotal = accounts.reduce((sum, a) => sum + a.currentValue, 0);
+  const grandTotal = useMemo(
+    () => accounts.reduce((sum, a) => sum + a.currentValue, 0),
+    [accounts]
+  );
 
   return (
     <div className="space-y-8 p-4 md:p-8">
@@ -49,44 +60,46 @@ export default function AccountsPage() {
 
           {/* Desktop table view */}
           <div className="hidden md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Account Name</TableHead>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Current Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {personAccounts.map((account) => (
-                  <TableRow key={account.id}>
-                    <TableCell className="font-medium">
-                      {account.name}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account Name</TableHead>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Current Value</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {personAccounts.map((account) => (
+                    <TableRow key={account.id}>
+                      <TableCell className="font-medium">
+                        {account.name}
+                      </TableCell>
+                      <TableCell>{account.provider}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {ACCOUNT_TYPE_LABELS[account.type]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(account.currentValue)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={3} className="font-semibold">
+                      Subtotal
                     </TableCell>
-                    <TableCell>{account.provider}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {ACCOUNT_TYPE_LABELS[account.type]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(account.currentValue)}
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(totalValue)}
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={3} className="font-semibold">
-                    Subtotal
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {formatCurrency(totalValue)}
-                  </TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
+                </TableFooter>
+              </Table>
+            </div>
           </div>
 
           {/* Mobile card view */}

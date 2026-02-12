@@ -1,4 +1,7 @@
-import { getHouseholdData, getFundById } from "@/lib/data";
+"use client";
+
+import { useMemo } from "react";
+import { useData } from "@/context/data-context";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import {
   calculateIncomeTax,
@@ -57,97 +60,115 @@ function studentLoanLabel(plan: string): string {
 }
 
 export default function IncomePage() {
-  const data = getHouseholdData();
-  const { persons, income, bonusStructures, annualContributions, estimatedAnnualExpenses } = data;
+  const { household, getFundById } = useData();
+  const { persons, income, bonusStructures, annualContributions, estimatedAnnualExpenses } = household;
 
   // Build per-person income analysis
-  const personAnalysis = persons.map((person) => {
-    const personIncome = income.find((i) => i.personId === person.id)!;
-    const bonus = bonusStructures.find((b) => b.personId === person.id);
-    const contributions = annualContributions.find((c) => c.personId === person.id);
+  const personAnalysis = useMemo(
+    () =>
+      persons.map((person) => {
+        const personIncome = income.find((i) => i.personId === person.id)!;
+        const bonus = bonusStructures.find((b) => b.personId === person.id);
+        const contributions = annualContributions.find((c) => c.personId === person.id);
 
-    const incomeTaxResult = calculateIncomeTax(
-      personIncome.grossSalary,
-      personIncome.employeePensionContribution,
-      personIncome.pensionContributionMethod
-    );
+        const incomeTaxResult = calculateIncomeTax(
+          personIncome.grossSalary,
+          personIncome.employeePensionContribution,
+          personIncome.pensionContributionMethod
+        );
 
-    const niResult = calculateNI(
-      personIncome.grossSalary,
-      personIncome.employeePensionContribution,
-      personIncome.pensionContributionMethod
-    );
+        const niResult = calculateNI(
+          personIncome.grossSalary,
+          personIncome.employeePensionContribution,
+          personIncome.pensionContributionMethod
+        );
 
-    // For student loan, use adjusted gross if salary sacrifice
-    const studentLoanGross =
-      personIncome.pensionContributionMethod === "salary_sacrifice"
-        ? personIncome.grossSalary - personIncome.employeePensionContribution
-        : personIncome.grossSalary;
-    const studentLoan = calculateStudentLoan(studentLoanGross, person.studentLoanPlan);
+        // For student loan, use adjusted gross if salary sacrifice
+        const studentLoanGross =
+          personIncome.pensionContributionMethod === "salary_sacrifice"
+            ? personIncome.grossSalary - personIncome.employeePensionContribution
+            : personIncome.grossSalary;
+        const studentLoan = calculateStudentLoan(studentLoanGross, person.studentLoanPlan);
 
-    const takeHome = calculateTakeHomePayWithStudentLoan(personIncome, person.studentLoanPlan);
+        const takeHome = calculateTakeHomePayWithStudentLoan(personIncome, person.studentLoanPlan);
 
-    return {
-      person,
-      personIncome,
-      bonus,
-      contributions,
-      incomeTaxResult,
-      niResult,
-      studentLoan,
-      takeHome,
-    };
-  });
+        return {
+          person,
+          personIncome,
+          bonus,
+          contributions,
+          incomeTaxResult,
+          niResult,
+          studentLoan,
+          takeHome,
+        };
+      }),
+    [persons, income, bonusStructures, annualContributions]
+  );
 
   // Compute combined waterfall data
-  const combinedGross = personAnalysis.reduce((sum, p) => sum + p.personIncome.grossSalary, 0);
-  const combinedTax = personAnalysis.reduce((sum, p) => sum + p.incomeTaxResult.tax, 0);
-  const combinedNI = personAnalysis.reduce((sum, p) => sum + p.niResult.ni, 0);
-  const combinedStudentLoan = personAnalysis.reduce((sum, p) => sum + p.studentLoan, 0);
-  const combinedPension = personAnalysis.reduce(
-    (sum, p) => sum + p.personIncome.employeePensionContribution,
-    0
-  );
-  const combinedTakeHome = personAnalysis.reduce((sum, p) => sum + p.takeHome.takeHome, 0);
-  const combinedISA = personAnalysis.reduce(
-    (sum, p) => sum + (p.contributions?.isaContribution ?? 0),
-    0
-  );
-  const combinedGIA = personAnalysis.reduce(
-    (sum, p) => sum + (p.contributions?.giaContribution ?? 0),
-    0
-  );
-  const afterISA = combinedTakeHome - combinedISA;
-  const afterExpenses = afterISA - estimatedAnnualExpenses;
-  // GIA overflow is whatever is directed to GIA from what remains
-  const giaOverflow = combinedGIA;
+  const {
+    waterfallData,
+    totalSavings,
+    taxAdvantagedSavings,
+    taxEfficiencyScore,
+  } = useMemo(() => {
+    const combinedGross = personAnalysis.reduce((sum, p) => sum + p.personIncome.grossSalary, 0);
+    const combinedTax = personAnalysis.reduce((sum, p) => sum + p.incomeTaxResult.tax, 0);
+    const combinedNI = personAnalysis.reduce((sum, p) => sum + p.niResult.ni, 0);
+    const combinedStudentLoan = personAnalysis.reduce((sum, p) => sum + p.studentLoan, 0);
+    const combinedPension = personAnalysis.reduce(
+      (sum, p) => sum + p.personIncome.employeePensionContribution,
+      0
+    );
+    const combinedTakeHome = personAnalysis.reduce((sum, p) => sum + p.takeHome.takeHome, 0);
+    const combinedISA = personAnalysis.reduce(
+      (sum, p) => sum + (p.contributions?.isaContribution ?? 0),
+      0
+    );
+    const combinedGIA = personAnalysis.reduce(
+      (sum, p) => sum + (p.contributions?.giaContribution ?? 0),
+      0
+    );
+    const afterISA = combinedTakeHome - combinedISA;
+    const afterExpenses = afterISA - estimatedAnnualExpenses;
+    // GIA overflow is whatever is directed to GIA from what remains
+    const giaOverflow = combinedGIA;
 
-  const waterfallData: WaterfallDataPoint[] = [
-    { name: "Gross Income", value: combinedGross, type: "income" },
-    { name: "Income Tax", value: combinedTax, type: "deduction" },
-    { name: "National Insurance", value: combinedNI, type: "deduction" },
-    ...(combinedStudentLoan > 0
-      ? [{ name: "Student Loan", value: combinedStudentLoan, type: "deduction" as const }]
-      : []),
-    { name: "Employee Pension", value: combinedPension, type: "deduction" },
-    { name: "Take-Home Pay", value: combinedTakeHome, type: "subtotal" },
-    { name: "ISA Contributions", value: combinedISA, type: "deduction" },
-    { name: "Expenses", value: estimatedAnnualExpenses, type: "deduction" },
-    { name: "GIA Overflow", value: giaOverflow, type: "subtotal" },
-  ];
+    const wfData: WaterfallDataPoint[] = [
+      { name: "Gross Income", value: combinedGross, type: "income" },
+      { name: "Income Tax", value: combinedTax, type: "deduction" },
+      { name: "National Insurance", value: combinedNI, type: "deduction" },
+      ...(combinedStudentLoan > 0
+        ? [{ name: "Student Loan", value: combinedStudentLoan, type: "deduction" as const }]
+        : []),
+      { name: "Employee Pension", value: combinedPension, type: "deduction" },
+      { name: "Take-Home Pay", value: combinedTakeHome, type: "subtotal" },
+      { name: "ISA Contributions", value: combinedISA, type: "deduction" },
+      { name: "Expenses", value: estimatedAnnualExpenses, type: "deduction" },
+      { name: "GIA Overflow", value: giaOverflow, type: "subtotal" },
+    ];
 
-  // Tax Efficiency Score
-  const totalSavings = personAnalysis.reduce((sum, p) => {
-    const c = p.contributions;
-    if (!c) return sum;
-    return sum + c.isaContribution + c.pensionContribution + c.giaContribution;
-  }, 0);
-  const taxAdvantagedSavings = personAnalysis.reduce((sum, p) => {
-    const c = p.contributions;
-    if (!c) return sum;
-    return sum + c.isaContribution + c.pensionContribution;
-  }, 0);
-  const taxEfficiencyScore = totalSavings > 0 ? taxAdvantagedSavings / totalSavings : 0;
+    // Tax Efficiency Score
+    const totSavings = personAnalysis.reduce((sum, p) => {
+      const c = p.contributions;
+      if (!c) return sum;
+      return sum + c.isaContribution + c.pensionContribution + c.giaContribution;
+    }, 0);
+    const taxAdvSavings = personAnalysis.reduce((sum, p) => {
+      const c = p.contributions;
+      if (!c) return sum;
+      return sum + c.isaContribution + c.pensionContribution;
+    }, 0);
+    const taxEffScore = totSavings > 0 ? taxAdvSavings / totSavings : 0;
+
+    return {
+      waterfallData: wfData,
+      totalSavings: totSavings,
+      taxAdvantagedSavings: taxAdvSavings,
+      taxEfficiencyScore: taxEffScore,
+    };
+  }, [personAnalysis, estimatedAnnualExpenses]);
 
   return (
     <div className="space-y-8 p-4 md:p-8">
@@ -201,43 +222,45 @@ export default function IncomePage() {
                 <CardTitle>Income Tax Breakdown</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Band</TableHead>
-                      <TableHead className="text-right">Rate</TableHead>
-                      <TableHead className="text-right">Taxable Amount</TableHead>
-                      <TableHead className="text-right">Tax</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {incomeTaxResult.breakdown.map((band) => (
-                      <TableRow key={band.band}>
-                        <TableCell className="font-medium">{band.band}</TableCell>
-                        <TableCell className="text-right">
-                          {formatPercent(band.rate)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(band.taxableAmount)}
-                        </TableCell>
-                        <TableCell className="text-right">{formatCurrency(band.tax)}</TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Band</TableHead>
+                        <TableHead className="text-right">Rate</TableHead>
+                        <TableHead className="text-right">Taxable Amount</TableHead>
+                        <TableHead className="text-right">Tax</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell colSpan={2} className="font-semibold">
-                        Total Income Tax
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        Effective: {formatPercent(incomeTaxResult.effectiveRate)}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {formatCurrency(incomeTaxResult.tax)}
-                      </TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {incomeTaxResult.breakdown.map((band) => (
+                        <TableRow key={band.band}>
+                          <TableCell className="font-medium">{band.band}</TableCell>
+                          <TableCell className="text-right">
+                            {formatPercent(band.rate)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(band.taxableAmount)}
+                          </TableCell>
+                          <TableCell className="text-right">{formatCurrency(band.tax)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell colSpan={2} className="font-semibold">
+                          Total Income Tax
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          Effective: {formatPercent(incomeTaxResult.effectiveRate)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatCurrency(incomeTaxResult.tax)}
+                        </TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -247,38 +270,40 @@ export default function IncomePage() {
                 <CardTitle>National Insurance Breakdown</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Band</TableHead>
-                      <TableHead className="text-right">Rate</TableHead>
-                      <TableHead className="text-right">Earnings</TableHead>
-                      <TableHead className="text-right">NI</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {niResult.breakdown.map((band) => (
-                      <TableRow key={band.band}>
-                        <TableCell className="font-medium">{band.band}</TableCell>
-                        <TableCell className="text-right">{formatPercent(band.rate)}</TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(band.earnings)}
-                        </TableCell>
-                        <TableCell className="text-right">{formatCurrency(band.ni)}</TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Band</TableHead>
+                        <TableHead className="text-right">Rate</TableHead>
+                        <TableHead className="text-right">Earnings</TableHead>
+                        <TableHead className="text-right">NI</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell colSpan={3} className="font-semibold">
-                        Total National Insurance
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {formatCurrency(niResult.ni)}
-                      </TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {niResult.breakdown.map((band) => (
+                        <TableRow key={band.band}>
+                          <TableCell className="font-medium">{band.band}</TableCell>
+                          <TableCell className="text-right">{formatPercent(band.rate)}</TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(band.earnings)}
+                          </TableCell>
+                          <TableCell className="text-right">{formatCurrency(band.ni)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell colSpan={3} className="font-semibold">
+                          Total National Insurance
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatCurrency(niResult.ni)}
+                        </TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -421,69 +446,71 @@ export default function IncomePage() {
                   {bonus.deferredTranches.length > 0 && (
                     <div className="space-y-3">
                       <h4 className="font-medium">Deferred Bonus Tranches</h4>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Grant Date</TableHead>
-                            <TableHead>Vesting Date</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
-                            <TableHead>Fund</TableHead>
-                            <TableHead className="text-right">Est. Return</TableHead>
-                            <TableHead className="text-right">Projected Value</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {bonus.deferredTranches.map((tranche, idx) => {
-                            const fund = tranche.fundId
-                              ? getFundById(tranche.fundId)
-                              : undefined;
-                            const projected = projectedValue(tranche);
-                            return (
-                              <TableRow key={idx}>
-                                <TableCell>{formatDate(tranche.grantDate)}</TableCell>
-                                <TableCell>{formatDate(tranche.vestingDate)}</TableCell>
-                                <TableCell className="text-right">
-                                  {formatCurrency(tranche.amount)}
-                                </TableCell>
-                                <TableCell>
-                                  {fund ? (
-                                    <Badge variant="secondary">{fund.ticker}</Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground">-</span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {formatPercent(tranche.estimatedAnnualReturn)}
-                                </TableCell>
-                                <TableCell className="text-right font-medium">
-                                  {formatCurrency(projected)}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                        <TableFooter>
-                          <TableRow>
-                            <TableCell colSpan={2} className="font-semibold">
-                              Total Deferred
-                            </TableCell>
-                            <TableCell className="text-right font-semibold">
-                              {formatCurrency(
-                                bonus.deferredTranches.reduce((s, t) => s + t.amount, 0)
-                              )}
-                            </TableCell>
-                            <TableCell colSpan={2} />
-                            <TableCell className="text-right font-semibold">
-                              {formatCurrency(
-                                bonus.deferredTranches.reduce(
-                                  (s, t) => s + projectedValue(t),
-                                  0
-                                )
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        </TableFooter>
-                      </Table>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Grant Date</TableHead>
+                              <TableHead>Vesting Date</TableHead>
+                              <TableHead className="text-right">Amount</TableHead>
+                              <TableHead>Fund</TableHead>
+                              <TableHead className="text-right">Est. Return</TableHead>
+                              <TableHead className="text-right">Projected Value</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {bonus.deferredTranches.map((tranche, idx) => {
+                              const fund = tranche.fundId
+                                ? getFundById(tranche.fundId)
+                                : undefined;
+                              const projected = projectedValue(tranche);
+                              return (
+                                <TableRow key={idx}>
+                                  <TableCell>{formatDate(tranche.grantDate)}</TableCell>
+                                  <TableCell>{formatDate(tranche.vestingDate)}</TableCell>
+                                  <TableCell className="text-right">
+                                    {formatCurrency(tranche.amount)}
+                                  </TableCell>
+                                  <TableCell>
+                                    {fund ? (
+                                      <Badge variant="secondary">{fund.ticker}</Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {formatPercent(tranche.estimatedAnnualReturn)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-medium">
+                                    {formatCurrency(projected)}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                          <TableFooter>
+                            <TableRow>
+                              <TableCell colSpan={2} className="font-semibold">
+                                Total Deferred
+                              </TableCell>
+                              <TableCell className="text-right font-semibold">
+                                {formatCurrency(
+                                  bonus.deferredTranches.reduce((s, t) => s + t.amount, 0)
+                                )}
+                              </TableCell>
+                              <TableCell colSpan={2} />
+                              <TableCell className="text-right font-semibold">
+                                {formatCurrency(
+                                  bonus.deferredTranches.reduce(
+                                    (s, t) => s + projectedValue(t),
+                                    0
+                                  )
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          </TableFooter>
+                        </Table>
+                      </div>
                     </div>
                   )}
                 </CardContent>
