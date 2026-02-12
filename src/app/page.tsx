@@ -1,16 +1,13 @@
+"use client";
+
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   formatCurrency,
   formatCurrencyCompact,
   formatPercent,
 } from "@/lib/format";
-import {
-  getHouseholdData,
-  getSnapshotsData,
-  getTotalNetWorth,
-  getNetWorthByPerson,
-  getNetWorthByWrapper,
-} from "@/lib/data";
+import { useData } from "@/context/data-context";
 import { projectScenarios } from "@/lib/projections";
 import { TAX_WRAPPER_LABELS } from "@/types";
 import type { TaxWrapper } from "@/types";
@@ -21,108 +18,146 @@ import { ByPersonChart } from "@/components/charts/by-person-chart";
 
 export default function Home() {
   // --- Data Loading ---
-  const household = getHouseholdData();
-  const { snapshots } = getSnapshotsData();
+  const {
+    household,
+    snapshots: snapshotsData,
+    getTotalNetWorth,
+    getNetWorthByPerson,
+    getNetWorthByWrapper,
+  } = useData();
+
+  const { snapshots } = snapshotsData;
   const totalNetWorth = getTotalNetWorth();
   const byPerson = getNetWorthByPerson();
   const byWrapper = getNetWorthByWrapper();
 
   // --- Snapshot Change Calculations ---
-  const latestSnapshot = snapshots[snapshots.length - 1];
-  const previousSnapshot =
-    snapshots.length >= 2 ? snapshots[snapshots.length - 2] : null;
+  const {
+    monthOnMonthChange,
+    monthOnMonthPercent,
+    yearOnYearChange,
+    yearOnYearPercent,
+    latestSnapshot,
+  } = useMemo(() => {
+    const latest = snapshots[snapshots.length - 1];
+    const previous =
+      snapshots.length >= 2 ? snapshots[snapshots.length - 2] : null;
 
-  const monthOnMonthChange =
-    latestSnapshot && previousSnapshot
-      ? latestSnapshot.totalNetWorth - previousSnapshot.totalNetWorth
-      : 0;
-  const monthOnMonthPercent =
-    previousSnapshot && previousSnapshot.totalNetWorth > 0
-      ? monthOnMonthChange / previousSnapshot.totalNetWorth
-      : 0;
+    const moMChange =
+      latest && previous
+        ? latest.totalNetWorth - previous.totalNetWorth
+        : 0;
+    const moMPercent =
+      previous && previous.totalNetWorth > 0
+        ? moMChange / previous.totalNetWorth
+        : 0;
 
-  // Year-on-year: find a snapshot roughly 12 months before the latest
-  const latestDate = new Date(latestSnapshot?.date ?? new Date());
-  const oneYearAgo = new Date(latestDate);
-  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    // Year-on-year: find a snapshot roughly 12 months before the latest
+    const latestDate = new Date(latest?.date ?? new Date());
+    const oneYearAgo = new Date(latestDate);
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-  const yearAgoSnapshot = snapshots.reduce<(typeof snapshots)[number] | null>(
-    (closest, snap) => {
-      const snapDate = new Date(snap.date);
-      if (!closest) return snap;
-      const closestDiff = Math.abs(
-        new Date(closest.date).getTime() - oneYearAgo.getTime()
-      );
-      const snapDiff = Math.abs(snapDate.getTime() - oneYearAgo.getTime());
-      return snapDiff < closestDiff ? snap : closest;
-    },
-    null
-  );
+    const yearAgoSnapshot = snapshots.reduce<(typeof snapshots)[number] | null>(
+      (closest, snap) => {
+        const snapDate = new Date(snap.date);
+        if (!closest) return snap;
+        const closestDiff = Math.abs(
+          new Date(closest.date).getTime() - oneYearAgo.getTime()
+        );
+        const snapDiff = Math.abs(snapDate.getTime() - oneYearAgo.getTime());
+        return snapDiff < closestDiff ? snap : closest;
+      },
+      null
+    );
 
-  const yearOnYearChange =
-    latestSnapshot && yearAgoSnapshot
-      ? latestSnapshot.totalNetWorth - yearAgoSnapshot.totalNetWorth
-      : 0;
-  const yearOnYearPercent =
-    yearAgoSnapshot && yearAgoSnapshot.totalNetWorth > 0
-      ? yearOnYearChange / yearAgoSnapshot.totalNetWorth
-      : 0;
+    const yoYChange =
+      latest && yearAgoSnapshot
+        ? latest.totalNetWorth - yearAgoSnapshot.totalNetWorth
+        : 0;
+    const yoYPercent =
+      yearAgoSnapshot && yearAgoSnapshot.totalNetWorth > 0
+        ? yoYChange / yearAgoSnapshot.totalNetWorth
+        : 0;
+
+    return {
+      monthOnMonthChange: moMChange,
+      monthOnMonthPercent: moMPercent,
+      yearOnYearChange: yoYChange,
+      yearOnYearPercent: yoYPercent,
+      latestSnapshot: latest,
+    };
+  }, [snapshots]);
 
   // --- Projections ---
-  const totalMonthlyContributions = household.annualContributions.reduce(
-    (sum, c) =>
-      sum + (c.isaContribution + c.pensionContribution + c.giaContribution) / 12,
-    0
-  );
+  const { scenarios, scenarioRates, projectionYears, milestones } = useMemo(() => {
+    const totalMonthlyContributions = household.annualContributions.reduce(
+      (sum, c) =>
+        sum + (c.isaContribution + c.pensionContribution + c.giaContribution) / 12,
+      0
+    );
 
-  const scenarioRates = household.retirement.scenarioRates;
-  const projectionYears = 30;
-  const scenarios = projectScenarios(
-    totalNetWorth,
-    totalMonthlyContributions,
-    scenarioRates,
-    projectionYears
-  );
+    const rates = household.retirement.scenarioRates;
+    const years = 30;
+    const projScenarios = projectScenarios(
+      totalNetWorth,
+      totalMonthlyContributions,
+      rates,
+      years
+    );
 
-  // --- Milestones ---
-  const targetPot =
-    household.retirement.withdrawalRate > 0
-      ? household.retirement.targetAnnualIncome /
-        household.retirement.withdrawalRate
-      : 0;
+    // --- Milestones ---
+    const targetPot =
+      household.retirement.withdrawalRate > 0
+        ? household.retirement.targetAnnualIncome /
+          household.retirement.withdrawalRate
+        : 0;
 
-  const milestones = [
-    { label: "FIRE Target", value: targetPot },
-    { label: "\u00A31m", value: 1_000_000 },
-    { label: "\u00A32m", value: 2_000_000 },
-  ].filter((m) => m.value > 0);
+    const ms = [
+      { label: "FIRE Target", value: targetPot },
+      { label: "\u00A31m", value: 1_000_000 },
+      { label: "\u00A32m", value: 2_000_000 },
+    ].filter((m) => m.value > 0);
+
+    return {
+      scenarios: projScenarios,
+      scenarioRates: rates,
+      projectionYears: years,
+      milestones: ms,
+    };
+  }, [household, totalNetWorth]);
 
   // --- Per-person data for donut chart ---
-  const personChartData = byPerson.map((p) => ({
-    name: p.name,
-    value: p.value,
-  }));
+  const personChartData = useMemo(
+    () =>
+      byPerson.map((p) => ({
+        name: p.name,
+        value: p.value,
+      })),
+    [byPerson]
+  );
 
   // --- Wrapper order for consistent display ---
-  const wrapperOrder: TaxWrapper[] = [
-    "pension",
-    "isa",
-    "gia",
-    "cash",
-    "premium_bonds",
-  ];
+  const wrapperData = useMemo(() => {
+    const wrapperOrder: TaxWrapper[] = [
+      "pension",
+      "isa",
+      "gia",
+      "cash",
+      "premium_bonds",
+    ];
 
-  const wrapperData = wrapperOrder
-    .map((wrapper) => {
-      const found = byWrapper.find((bw) => bw.wrapper === wrapper);
-      return {
-        wrapper,
-        label: TAX_WRAPPER_LABELS[wrapper],
-        value: found?.value ?? 0,
-        percent: found && totalNetWorth > 0 ? found.value / totalNetWorth : 0,
-      };
-    })
-    .filter((w) => w.value > 0);
+    return wrapperOrder
+      .map((wrapper) => {
+        const found = byWrapper.find((bw) => bw.wrapper === wrapper);
+        return {
+          wrapper,
+          label: TAX_WRAPPER_LABELS[wrapper],
+          value: found?.value ?? 0,
+          percent: found && totalNetWorth > 0 ? found.value / totalNetWorth : 0,
+        };
+      })
+      .filter((w) => w.value > 0);
+  }, [byWrapper, totalNetWorth]);
 
   const changeIndicator = (value: number) =>
     value >= 0 ? "text-emerald-600" : "text-red-600";

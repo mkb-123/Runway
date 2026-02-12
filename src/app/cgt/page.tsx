@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -15,14 +18,7 @@ import {
   TableRow,
   TableFooter,
 } from "@/components/ui/table";
-import {
-  getHouseholdData,
-  getTransactionsData,
-  getFundById,
-  getAccountById,
-  getPersonById,
-  getAccountsForPerson,
-} from "@/lib/data";
+import { useData } from "@/context/data-context";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 import {
   calculateGainsForTaxYear,
@@ -33,81 +29,103 @@ import {
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 
 export default function CGTPage() {
-  const household = getHouseholdData();
-  const { transactions } = getTransactionsData();
+  const { household, transactions: transactionsData, getFundById, getAccountById } = useData();
+  const { transactions } = transactionsData;
   const { persons, accounts } = household;
 
   const currentTaxYear = "2024/25";
   const annualAllowance = UK_TAX_CONSTANTS.cgt.annualExemptAmount;
 
   // Filter transactions for GIA accounts only (CGT only applies to GIA)
-  const giaAccounts = accounts.filter((a) => a.type === "gia");
-  const giaAccountIds = new Set(giaAccounts.map((a) => a.id));
-  const giaTransactions = transactions.filter((tx) =>
-    giaAccountIds.has(tx.accountId)
+  const giaAccounts = useMemo(
+    () => accounts.filter((a) => a.type === "gia"),
+    [accounts]
   );
 
+  const giaTransactions = useMemo(() => {
+    const giaAccountIds = new Set(giaAccounts.map((a) => a.id));
+    return transactions.filter((tx) => giaAccountIds.has(tx.accountId));
+  }, [giaAccounts, transactions]);
+
   // Calculate gains for the current tax year
-  const taxYearGains = calculateGainsForTaxYear(giaTransactions, currentTaxYear);
-  const allowanceRemaining = Math.max(
-    0,
-    annualAllowance - Math.max(0, taxYearGains.netGain)
+  const taxYearGains = useMemo(
+    () => calculateGainsForTaxYear(giaTransactions, currentTaxYear),
+    [giaTransactions]
+  );
+
+  const allowanceRemaining = useMemo(
+    () => Math.max(0, annualAllowance - Math.max(0, taxYearGains.netGain)),
+    [annualAllowance, taxYearGains.netGain]
   );
 
   // Section 104 pools
-  const section104Pools = calculateSection104Pool(giaTransactions);
+  const section104Pools = useMemo(
+    () => calculateSection104Pool(giaTransactions),
+    [giaTransactions]
+  );
 
   // Unrealised gains across all GIA accounts
-  const unrealisedGains = getUnrealisedGains(giaAccounts, giaTransactions);
+  const unrealisedGains = useMemo(
+    () => getUnrealisedGains(giaAccounts, giaTransactions),
+    [giaAccounts, giaTransactions]
+  );
 
   // Sell transactions in the current tax year
-  const currentYearSells = giaTransactions.filter(
-    (tx) => tx.type === "sell" && getTaxYear(tx.date) === currentTaxYear
+  const currentYearSells = useMemo(
+    () =>
+      giaTransactions.filter(
+        (tx) => tx.type === "sell" && getTaxYear(tx.date) === currentTaxYear
+      ),
+    [giaTransactions]
   );
 
   // Group unrealised gains and allowance usage by person
-  const personGains = persons.map((person) => {
-    const personGiaAccounts = giaAccounts.filter(
-      (a) => a.personId === person.id
-    );
-    const personGiaAccountIds = new Set(personGiaAccounts.map((a) => a.id));
-    const personGiaTransactions = giaTransactions.filter((tx) =>
-      personGiaAccountIds.has(tx.accountId)
-    );
+  const personGains = useMemo(
+    () =>
+      persons.map((person) => {
+        const personGiaAccounts = giaAccounts.filter(
+          (a) => a.personId === person.id
+        );
+        const personGiaAccountIds = new Set(personGiaAccounts.map((a) => a.id));
+        const personGiaTransactions = giaTransactions.filter((tx) =>
+          personGiaAccountIds.has(tx.accountId)
+        );
 
-    const personTaxYearGains = calculateGainsForTaxYear(
-      personGiaTransactions,
-      currentTaxYear
-    );
+        const personTaxYearGains = calculateGainsForTaxYear(
+          personGiaTransactions,
+          currentTaxYear
+        );
 
-    const personUnrealisedGains = unrealisedGains.filter((ug) =>
-      personGiaAccountIds.has(ug.accountId)
-    );
+        const personUnrealisedGains = unrealisedGains.filter((ug) =>
+          personGiaAccountIds.has(ug.accountId)
+        );
 
-    const totalUnrealised = personUnrealisedGains.reduce(
-      (sum, ug) => sum + ug.unrealisedGain,
-      0
-    );
+        const totalUnrealised = personUnrealisedGains.reduce(
+          (sum, ug) => sum + ug.unrealisedGain,
+          0
+        );
 
-    const usedAllowance = Math.max(0, personTaxYearGains.netGain);
-    const remainingAllowance = Math.max(0, annualAllowance - usedAllowance);
+        const usedAllowance = Math.max(0, personTaxYearGains.netGain);
+        const remainingAllowance = Math.max(0, annualAllowance - usedAllowance);
 
-    // Optimal crystallisation: crystallise gains up to the remaining allowance
-    const optimalCrystallise = Math.min(
-      Math.max(0, totalUnrealised),
-      remainingAllowance
-    );
+        // Optimal crystallisation: crystallise gains up to the remaining allowance
+        const optimalCrystallise = Math.min(
+          Math.max(0, totalUnrealised),
+          remainingAllowance
+        );
 
-    return {
-      person,
-      personTaxYearGains,
-      personUnrealisedGains,
-      totalUnrealised,
-      usedAllowance,
-      remainingAllowance,
-      optimalCrystallise,
-    };
-  });
+        return {
+          person,
+          personTaxYearGains,
+          personUnrealisedGains,
+          totalUnrealised,
+          usedAllowance,
+          remainingAllowance,
+          optimalCrystallise,
+        };
+      }),
+    [persons, giaAccounts, giaTransactions, unrealisedGains, annualAllowance]
+  );
 
   return (
     <div className="space-y-8 p-6">
@@ -194,90 +212,92 @@ export default function CGTPage() {
         </CardHeader>
         <CardContent>
           {taxYearGains.disposals.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Fund</TableHead>
-                  <TableHead>Rule</TableHead>
-                  <TableHead className="text-right">Units Sold</TableHead>
-                  <TableHead className="text-right">Proceeds</TableHead>
-                  <TableHead className="text-right">Cost Basis</TableHead>
-                  <TableHead className="text-right">Gain / Loss</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {taxYearGains.disposals.map((disposal, idx) => {
-                  const fund = getFundById(disposal.fundId);
-                  return (
-                    <TableRow key={`${disposal.date}-${disposal.fundId}-${idx}`}>
-                      <TableCell>{formatDate(disposal.date)}</TableCell>
-                      <TableCell className="font-medium">
-                        {fund?.name ?? disposal.fundId}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {disposal.rule === "same_day"
-                            ? "Same Day"
-                            : disposal.rule === "bed_and_breakfast"
-                            ? "30-Day B&B"
-                            : "Section 104"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatNumber(disposal.units)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(disposal.proceeds)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(disposal.costBasis)}
-                      </TableCell>
-                      <TableCell
-                        className={`text-right font-medium ${
-                          disposal.gain >= 0
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {disposal.gain >= 0 ? "+" : ""}
-                        {formatCurrency(disposal.gain)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={4} className="font-medium">
-                    Total
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(
-                      taxYearGains.disposals.reduce((s, d) => s + d.proceeds, 0)
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(
-                      taxYearGains.disposals.reduce(
-                        (s, d) => s + d.costBasis,
-                        0
-                      )
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className={`text-right font-bold ${
-                      taxYearGains.netGain >= 0
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {taxYearGains.netGain >= 0 ? "+" : ""}
-                    {formatCurrency(taxYearGains.netGain)}
-                  </TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Fund</TableHead>
+                    <TableHead>Rule</TableHead>
+                    <TableHead className="text-right">Units Sold</TableHead>
+                    <TableHead className="text-right">Proceeds</TableHead>
+                    <TableHead className="text-right">Cost Basis</TableHead>
+                    <TableHead className="text-right">Gain / Loss</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {taxYearGains.disposals.map((disposal, idx) => {
+                    const fund = getFundById(disposal.fundId);
+                    return (
+                      <TableRow key={`${disposal.date}-${disposal.fundId}-${idx}`}>
+                        <TableCell>{formatDate(disposal.date)}</TableCell>
+                        <TableCell className="font-medium">
+                          {fund?.name ?? disposal.fundId}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {disposal.rule === "same_day"
+                              ? "Same Day"
+                              : disposal.rule === "bed_and_breakfast"
+                              ? "30-Day B&B"
+                              : "Section 104"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatNumber(disposal.units)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(disposal.proceeds)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(disposal.costBasis)}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right font-medium ${
+                            disposal.gain >= 0
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {disposal.gain >= 0 ? "+" : ""}
+                          {formatCurrency(disposal.gain)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={4} className="font-medium">
+                      Total
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(
+                        taxYearGains.disposals.reduce((s, d) => s + d.proceeds, 0)
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(
+                        taxYearGains.disposals.reduce(
+                          (s, d) => s + d.costBasis,
+                          0
+                        )
+                      )}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right font-bold ${
+                        taxYearGains.netGain >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {taxYearGains.netGain >= 0 ? "+" : ""}
+                      {formatCurrency(taxYearGains.netGain)}
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
           ) : (
             <p className="text-muted-foreground py-8 text-center">
               No disposals recorded in the {currentTaxYear} tax year.
@@ -296,44 +316,46 @@ export default function CGTPage() {
         </CardHeader>
         <CardContent>
           {section104Pools.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Account</TableHead>
-                  <TableHead>Fund</TableHead>
-                  <TableHead className="text-right">Pool Units</TableHead>
-                  <TableHead className="text-right">Pooled Cost</TableHead>
-                  <TableHead className="text-right">
-                    Avg Cost per Unit
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {section104Pools.map((pool) => {
-                  const fund = getFundById(pool.fundId);
-                  const account = getAccountById(pool.accountId);
-                  return (
-                    <TableRow
-                      key={`${pool.accountId}-${pool.fundId}`}
-                    >
-                      <TableCell className="font-medium">
-                        {account?.name ?? pool.accountId}
-                      </TableCell>
-                      <TableCell>{fund?.name ?? pool.fundId}</TableCell>
-                      <TableCell className="text-right">
-                        {formatNumber(pool.totalUnits)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(pool.pooledCost)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(pool.averageCost)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Fund</TableHead>
+                    <TableHead className="text-right">Pool Units</TableHead>
+                    <TableHead className="text-right">Pooled Cost</TableHead>
+                    <TableHead className="text-right">
+                      Avg Cost per Unit
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {section104Pools.map((pool) => {
+                    const fund = getFundById(pool.fundId);
+                    const account = getAccountById(pool.accountId);
+                    return (
+                      <TableRow
+                        key={`${pool.accountId}-${pool.fundId}`}
+                      >
+                        <TableCell className="font-medium">
+                          {account?.name ?? pool.accountId}
+                        </TableCell>
+                        <TableCell>{fund?.name ?? pool.fundId}</TableCell>
+                        <TableCell className="text-right">
+                          {formatNumber(pool.totalUnits)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(pool.pooledCost)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(pool.averageCost)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <p className="text-muted-foreground py-8 text-center">
               No Section 104 pools found.
@@ -353,66 +375,68 @@ export default function CGTPage() {
         </CardHeader>
         <CardContent>
           {unrealisedGains.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Account</TableHead>
-                  <TableHead>Fund</TableHead>
-                  <TableHead className="text-right">Units</TableHead>
-                  <TableHead className="text-right">Avg Cost</TableHead>
-                  <TableHead className="text-right">Current Price</TableHead>
-                  <TableHead className="text-right">Unrealised Gain</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {unrealisedGains.map((ug) => {
-                  const fund = getFundById(ug.fundId);
-                  const account = getAccountById(ug.accountId);
-                  const withinAllowance = ug.unrealisedGain <= allowanceRemaining;
-                  return (
-                    <TableRow key={`${ug.accountId}-${ug.fundId}`}>
-                      <TableCell className="font-medium">
-                        {account?.name ?? ug.accountId}
-                      </TableCell>
-                      <TableCell>{fund?.name ?? ug.fundId}</TableCell>
-                      <TableCell className="text-right">
-                        {formatNumber(ug.units)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(ug.averageCost)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(ug.currentPrice)}
-                      </TableCell>
-                      <TableCell
-                        className={`text-right font-medium ${
-                          ug.unrealisedGain >= 0
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {ug.unrealisedGain >= 0 ? "+" : ""}
-                        {formatCurrency(ug.unrealisedGain)}
-                      </TableCell>
-                      <TableCell>
-                        {ug.unrealisedGain > 0 && withinAllowance ? (
-                          <Badge className="bg-green-600">
-                            Within allowance
-                          </Badge>
-                        ) : ug.unrealisedGain > 0 ? (
-                          <Badge variant="outline">
-                            Exceeds allowance
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">Loss</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Fund</TableHead>
+                    <TableHead className="text-right">Units</TableHead>
+                    <TableHead className="text-right">Avg Cost</TableHead>
+                    <TableHead className="text-right">Current Price</TableHead>
+                    <TableHead className="text-right">Unrealised Gain</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {unrealisedGains.map((ug) => {
+                    const fund = getFundById(ug.fundId);
+                    const account = getAccountById(ug.accountId);
+                    const withinAllowance = ug.unrealisedGain <= allowanceRemaining;
+                    return (
+                      <TableRow key={`${ug.accountId}-${ug.fundId}`}>
+                        <TableCell className="font-medium">
+                          {account?.name ?? ug.accountId}
+                        </TableCell>
+                        <TableCell>{fund?.name ?? ug.fundId}</TableCell>
+                        <TableCell className="text-right">
+                          {formatNumber(ug.units)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(ug.averageCost)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(ug.currentPrice)}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right font-medium ${
+                            ug.unrealisedGain >= 0
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {ug.unrealisedGain >= 0 ? "+" : ""}
+                          {formatCurrency(ug.unrealisedGain)}
+                        </TableCell>
+                        <TableCell>
+                          {ug.unrealisedGain > 0 && withinAllowance ? (
+                            <Badge className="bg-green-600">
+                              Within allowance
+                            </Badge>
+                          ) : ug.unrealisedGain > 0 ? (
+                            <Badge variant="outline">
+                              Exceeds allowance
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">Loss</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <p className="text-muted-foreground py-8 text-center">
               No unrealised gains to display.

@@ -1,7 +1,12 @@
 // ============================================================
-// Data Loading & Lookup Functions
+// Data Loading & Lookup Functions (Server-side / Test use only)
 // ============================================================
 // Static imports of JSON data files for compatibility with Next.js static export.
+//
+// NOTE: These functions operate on the static JSON defaults and are intended
+// for server-side rendering, server components, and tests only.
+// Client components should use the useData() hook from @/context/data-context
+// instead, which provides the same helpers backed by editable localStorage state.
 
 import type {
   HouseholdData,

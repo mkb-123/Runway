@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -8,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getHouseholdData, getTotalNetWorth } from "@/lib/data";
+import { useData } from "@/context/data-context";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/format";
 import { projectScenarios, calculateRequiredPot } from "@/lib/projections";
 import { ProjectionChart } from "@/components/charts/projection-chart";
@@ -17,33 +20,45 @@ const PROJECTION_YEARS = 30;
 const SNAPSHOT_INTERVALS = [5, 10, 15, 20, 25, 30];
 
 export default function ProjectionsPage() {
-  const household = getHouseholdData();
+  const { household, getTotalNetWorth } = useData();
   const { retirement, annualContributions } = household;
 
   // Calculate total current pot
   const currentPot = getTotalNetWorth();
 
   // Calculate total annual contributions across all persons
-  const totalAnnualContributions = annualContributions.reduce(
-    (sum, c) => sum + c.isaContribution + c.pensionContribution + c.giaContribution,
-    0
+  const totalAnnualContributions = useMemo(
+    () =>
+      annualContributions.reduce(
+        (sum, c) => sum + c.isaContribution + c.pensionContribution + c.giaContribution,
+        0
+      ),
+    [annualContributions]
   );
 
   // Monthly contributions
   const monthlyContributions = totalAnnualContributions / 12;
 
   // Required pot from retirement config
-  const requiredPot = calculateRequiredPot(
-    retirement.targetAnnualIncome,
-    retirement.withdrawalRate
+  const requiredPot = useMemo(
+    () =>
+      calculateRequiredPot(
+        retirement.targetAnnualIncome,
+        retirement.withdrawalRate
+      ),
+    [retirement.targetAnnualIncome, retirement.withdrawalRate]
   );
 
   // Run projections for configured scenario rates
-  const scenarios = projectScenarios(
-    currentPot,
-    monthlyContributions,
-    retirement.scenarioRates,
-    PROJECTION_YEARS
+  const scenarios = useMemo(
+    () =>
+      projectScenarios(
+        currentPot,
+        monthlyContributions,
+        retirement.scenarioRates,
+        PROJECTION_YEARS
+      ),
+    [currentPot, monthlyContributions, retirement.scenarioRates]
   );
 
   return (
@@ -123,48 +138,50 @@ export default function ProjectionsPage() {
           <CardTitle>Sensitivity Analysis</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Return Rate</TableHead>
-                {SNAPSHOT_INTERVALS.map((year) => (
-                  <TableHead key={year} className="text-right">
-                    Year {year}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {scenarios.map((scenario) => (
-                <TableRow key={scenario.rate}>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {formatPercent(scenario.rate)}
-                    </Badge>
-                  </TableCell>
-                  {SNAPSHOT_INTERVALS.map((year) => {
-                    const projection = scenario.projections.find(
-                      (p) => p.year === year
-                    );
-                    const value = projection?.value ?? 0;
-                    const meetsTarget = value >= requiredPot;
-                    return (
-                      <TableCell
-                        key={year}
-                        className={`text-right font-mono ${
-                          meetsTarget
-                            ? "text-green-600 dark:text-green-400"
-                            : ""
-                        }`}
-                      >
-                        {formatCurrencyCompact(value)}
-                      </TableCell>
-                    );
-                  })}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Return Rate</TableHead>
+                  {SNAPSHOT_INTERVALS.map((year) => (
+                    <TableHead key={year} className="text-right">
+                      Year {year}
+                    </TableHead>
+                  ))}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {scenarios.map((scenario) => (
+                  <TableRow key={scenario.rate}>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {formatPercent(scenario.rate)}
+                      </Badge>
+                    </TableCell>
+                    {SNAPSHOT_INTERVALS.map((year) => {
+                      const projection = scenario.projections.find(
+                        (p) => p.year === year
+                      );
+                      const value = projection?.value ?? 0;
+                      const meetsTarget = value >= requiredPot;
+                      return (
+                        <TableCell
+                          key={year}
+                          className={`text-right font-mono ${
+                            meetsTarget
+                              ? "text-green-600 dark:text-green-400"
+                              : ""
+                          }`}
+                        >
+                          {formatCurrencyCompact(value)}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
           <p className="text-xs text-muted-foreground mt-4">
             Values highlighted in green indicate the projected pot exceeds the required pot of{" "}
             {formatCurrencyCompact(requiredPot)}.

@@ -1,8 +1,7 @@
-import {
-  getHouseholdData,
-  getNetWorthByWrapper,
-  getTotalNetWorth,
-} from "@/lib/data";
+"use client";
+
+import { useMemo } from "react";
+import { useData } from "@/context/data-context";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { getAccountTaxWrapper } from "@/types";
@@ -30,136 +29,129 @@ function yearsSince(dateStr: string): number {
   return diffMs / (1000 * 60 * 60 * 24 * 365.25);
 }
 
-// ---------------------------------------------------------------------------
-// Compute IHT data on the server
-// ---------------------------------------------------------------------------
-
-function computeIHTData() {
-  const household = getHouseholdData();
-  const ihtConfig = household.iht;
-  const totalNetWorth = getTotalNetWorth();
-  const ihtConstants = UK_TAX_CONSTANTS.iht;
-
-  // --- Estate breakdown by wrapper type ---
-  const wrapperTotals = new Map<TaxWrapper, number>();
-  for (const account of household.accounts) {
-    const wrapper = getAccountTaxWrapper(account.type);
-    wrapperTotals.set(
-      wrapper,
-      (wrapperTotals.get(wrapper) ?? 0) + account.currentValue,
-    );
-  }
-
-  const pensionValue = wrapperTotals.get("pension") ?? 0;
-  const isaValue = wrapperTotals.get("isa") ?? 0;
-  const giaValue = wrapperTotals.get("gia") ?? 0;
-  const cashValue = wrapperTotals.get("cash") ?? 0;
-  const premiumBondsValue = wrapperTotals.get("premium_bonds") ?? 0;
-  const propertyValue = ihtConfig.estimatedPropertyValue;
-
-  // Pensions are normally outside the estate
-  const inEstate =
-    propertyValue + isaValue + giaValue + cashValue + premiumBondsValue;
-  const outsideEstate = pensionValue;
-
-  // --- IHT Thresholds ---
-  const numberOfPersons = household.persons.length;
-  const nilRateBandPerPerson = ihtConstants.nilRateBand;
-  const residenceNilRateBandPerPerson = ihtConfig.passingToDirectDescendants
-    ? ihtConstants.residenceNilRateBand
-    : 0;
-  const totalNilRateBand = nilRateBandPerPerson * numberOfPersons;
-  const totalResidenceNilRateBand =
-    residenceNilRateBandPerPerson * numberOfPersons;
-  const combinedThreshold = totalNilRateBand + totalResidenceNilRateBand;
-
-  // --- IHT Liability ---
-  const taxableAmount = Math.max(0, inEstate - combinedThreshold);
-  const ihtLiability = taxableAmount * ihtConstants.rate;
-
-  // --- Sheltered vs Exposed ---
-  const shelteredPct =
-    totalNetWorth > 0 ? outsideEstate / totalNetWorth : 0;
-  const exposedPct =
-    totalNetWorth > 0 ? inEstate / totalNetWorth : 0;
-
-  // --- 7-Year Gift Tracker ---
-  const giftsWithStatus = ihtConfig.gifts.map((gift) => {
-    const years = yearsSince(gift.date);
-    const fallenOut = years >= 7;
-    return { ...gift, yearsSinceGift: years, fallenOut };
-  });
-
-  // --- Estate Growth Projection ---
-  // Total annual contributions going to non-pension accounts (in estate)
-  const annualSavingsInEstate = household.annualContributions.reduce(
-    (sum, c) => sum + c.isaContribution + c.giaContribution,
-    0,
-  );
-  // How many years until the estate exceeds the combined threshold?
-  let yearsUntilExceeded: number | null = null;
-  if (inEstate < combinedThreshold && annualSavingsInEstate > 0) {
-    const gap = combinedThreshold - inEstate;
-    yearsUntilExceeded = Math.ceil(gap / annualSavingsInEstate);
-  } else if (inEstate >= combinedThreshold) {
-    yearsUntilExceeded = 0;
-  }
-
-  // Data for the sheltered vs exposed pie chart
-  const shelteredVsExposedData = [
-    {
-      name: "Sheltered (Pensions)",
-      value: outsideEstate,
-      color: "hsl(var(--chart-2))",
-    },
-    {
-      name: "Exposed (In Estate)",
-      value: inEstate,
-      color: "hsl(var(--chart-3))",
-    },
-  ];
-
-  // Breakdown for estate composition
-  const estateBreakdown = [
-    { label: "Property", value: propertyValue, inEstate: true },
-    { label: "ISA", value: isaValue, inEstate: true },
-    { label: "GIA", value: giaValue, inEstate: true },
-    { label: "Cash Savings", value: cashValue, inEstate: true },
-    { label: "Premium Bonds", value: premiumBondsValue, inEstate: true },
-    { label: "Pensions", value: pensionValue, inEstate: false },
-  ];
-
-  return {
-    ihtConfig,
-    totalNetWorth,
-    propertyValue,
-    pensionValue,
-    inEstate,
-    outsideEstate,
-    nilRateBandPerPerson,
-    residenceNilRateBandPerPerson,
-    totalNilRateBand,
-    totalResidenceNilRateBand,
-    combinedThreshold,
-    taxableAmount,
-    ihtLiability,
-    ihtRate: ihtConstants.rate,
-    shelteredPct,
-    exposedPct,
-    giftsWithStatus,
-    annualSavingsInEstate,
-    yearsUntilExceeded,
-    shelteredVsExposedData,
-    estateBreakdown,
-    numberOfPersons,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Page Component
-// ---------------------------------------------------------------------------
-
 export default function IHTPage() {
+  const { household, getTotalNetWorth, getNetWorthByWrapper } = useData();
+
+  const ihtData = useMemo(() => {
+    const ihtConfig = household.iht;
+    const totalNetWorth = getTotalNetWorth();
+    const ihtConstants = UK_TAX_CONSTANTS.iht;
+
+    // --- Estate breakdown by wrapper type ---
+    const wrapperTotals = new Map<TaxWrapper, number>();
+    for (const account of household.accounts) {
+      const wrapper = getAccountTaxWrapper(account.type);
+      wrapperTotals.set(
+        wrapper,
+        (wrapperTotals.get(wrapper) ?? 0) + account.currentValue,
+      );
+    }
+
+    const pensionValue = wrapperTotals.get("pension") ?? 0;
+    const isaValue = wrapperTotals.get("isa") ?? 0;
+    const giaValue = wrapperTotals.get("gia") ?? 0;
+    const cashValue = wrapperTotals.get("cash") ?? 0;
+    const premiumBondsValue = wrapperTotals.get("premium_bonds") ?? 0;
+    const propertyValue = ihtConfig.estimatedPropertyValue;
+
+    // Pensions are normally outside the estate
+    const inEstate =
+      propertyValue + isaValue + giaValue + cashValue + premiumBondsValue;
+    const outsideEstate = pensionValue;
+
+    // --- IHT Thresholds ---
+    const numberOfPersons = household.persons.length;
+    const nilRateBandPerPerson = ihtConstants.nilRateBand;
+    const residenceNilRateBandPerPerson = ihtConfig.passingToDirectDescendants
+      ? ihtConstants.residenceNilRateBand
+      : 0;
+    const totalNilRateBand = nilRateBandPerPerson * numberOfPersons;
+    const totalResidenceNilRateBand =
+      residenceNilRateBandPerPerson * numberOfPersons;
+    const combinedThreshold = totalNilRateBand + totalResidenceNilRateBand;
+
+    // --- IHT Liability ---
+    const taxableAmount = Math.max(0, inEstate - combinedThreshold);
+    const ihtLiability = taxableAmount * ihtConstants.rate;
+
+    // --- Sheltered vs Exposed ---
+    const shelteredPct =
+      totalNetWorth > 0 ? outsideEstate / totalNetWorth : 0;
+    const exposedPct =
+      totalNetWorth > 0 ? inEstate / totalNetWorth : 0;
+
+    // --- 7-Year Gift Tracker ---
+    const giftsWithStatus = ihtConfig.gifts.map((gift) => {
+      const years = yearsSince(gift.date);
+      const fallenOut = years >= 7;
+      return { ...gift, yearsSinceGift: years, fallenOut };
+    });
+
+    // --- Estate Growth Projection ---
+    // Total annual contributions going to non-pension accounts (in estate)
+    const annualSavingsInEstate = household.annualContributions.reduce(
+      (sum, c) => sum + c.isaContribution + c.giaContribution,
+      0,
+    );
+    // How many years until the estate exceeds the combined threshold?
+    let yearsUntilExceeded: number | null = null;
+    if (inEstate < combinedThreshold && annualSavingsInEstate > 0) {
+      const gap = combinedThreshold - inEstate;
+      yearsUntilExceeded = Math.ceil(gap / annualSavingsInEstate);
+    } else if (inEstate >= combinedThreshold) {
+      yearsUntilExceeded = 0;
+    }
+
+    // Data for the sheltered vs exposed pie chart
+    const shelteredVsExposedData = [
+      {
+        name: "Sheltered (Pensions)",
+        value: outsideEstate,
+        color: "var(--chart-2)",
+      },
+      {
+        name: "Exposed (In Estate)",
+        value: inEstate,
+        color: "var(--chart-3)",
+      },
+    ];
+
+    // Breakdown for estate composition
+    const estateBreakdown = [
+      { label: "Property", value: propertyValue, inEstate: true },
+      { label: "ISA", value: isaValue, inEstate: true },
+      { label: "GIA", value: giaValue, inEstate: true },
+      { label: "Cash Savings", value: cashValue, inEstate: true },
+      { label: "Premium Bonds", value: premiumBondsValue, inEstate: true },
+      { label: "Pensions", value: pensionValue, inEstate: false },
+    ];
+
+    return {
+      ihtConfig,
+      totalNetWorth,
+      propertyValue,
+      pensionValue,
+      inEstate,
+      outsideEstate,
+      nilRateBandPerPerson,
+      residenceNilRateBandPerPerson,
+      totalNilRateBand,
+      totalResidenceNilRateBand,
+      combinedThreshold,
+      taxableAmount,
+      ihtLiability,
+      ihtRate: ihtConstants.rate,
+      shelteredPct,
+      exposedPct,
+      giftsWithStatus,
+      annualSavingsInEstate,
+      yearsUntilExceeded,
+      shelteredVsExposedData,
+      estateBreakdown,
+      numberOfPersons,
+    };
+  }, [household, getTotalNetWorth, getNetWorthByWrapper]);
+
   const {
     ihtConfig,
     totalNetWorth,
@@ -182,7 +174,7 @@ export default function IHTPage() {
     shelteredVsExposedData,
     estateBreakdown,
     numberOfPersons,
-  } = computeIHTData();
+  } = ihtData;
 
   return (
     <div className="space-y-8">
@@ -227,32 +219,34 @@ export default function IHTPage() {
             </div>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Asset Category</TableHead>
-                <TableHead className="text-right">Value</TableHead>
-                <TableHead className="text-right">In Estate?</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {estateBreakdown.map((item) => (
-                <TableRow key={item.label}>
-                  <TableCell className="font-medium">{item.label}</TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(item.value)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {item.inEstate ? (
-                      <Badge variant="destructive">In Estate</Badge>
-                    ) : (
-                      <Badge variant="secondary">Outside Estate</Badge>
-                    )}
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Asset Category</TableHead>
+                  <TableHead className="text-right">Value</TableHead>
+                  <TableHead className="text-right">In Estate?</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {estateBreakdown.map((item) => (
+                  <TableRow key={item.label}>
+                    <TableCell className="font-medium">{item.label}</TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(item.value)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {item.inEstate ? (
+                        <Badge variant="destructive">In Estate</Badge>
+                      ) : (
+                        <Badge variant="secondary">Outside Estate</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -388,44 +382,46 @@ export default function IHTPage() {
         </CardHeader>
         <CardContent>
           {giftsWithStatus.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Recipient</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Years Ago</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {giftsWithStatus.map((gift) => (
-                  <TableRow key={gift.id}>
-                    <TableCell>{formatDate(gift.date)}</TableCell>
-                    <TableCell>{gift.recipient}</TableCell>
-                    <TableCell>{gift.description}</TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(gift.amount)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {gift.yearsSinceGift.toFixed(1)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {gift.fallenOut ? (
-                        <Badge variant="secondary">
-                          Fallen out of estate
-                        </Badge>
-                      ) : (
-                        <Badge variant="destructive">
-                          Within 7-year window
-                        </Badge>
-                      )}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Recipient</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Years Ago</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {giftsWithStatus.map((gift) => (
+                    <TableRow key={gift.id}>
+                      <TableCell>{formatDate(gift.date)}</TableCell>
+                      <TableCell>{gift.recipient}</TableCell>
+                      <TableCell>{gift.description}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(gift.amount)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {gift.yearsSinceGift.toFixed(1)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {gift.fallenOut ? (
+                          <Badge variant="secondary">
+                            Fallen out of estate
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">
+                            Within 7-year window
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">
               No gifts recorded. Gifts made more than 7 years before death are

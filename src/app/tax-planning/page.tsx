@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -15,14 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  getHouseholdData,
-  getTransactionsData,
-  getPersonById,
-  getFundById,
-  getAccountsForPerson,
-  getNetWorthByWrapper,
-} from "@/lib/data";
+import { useData } from "@/context/data-context";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import {
   getUnrealisedGains,
@@ -35,8 +31,8 @@ import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
 import type { PersonIncome } from "@/types";
 
 export default function TaxPlanningPage() {
-  const household = getHouseholdData();
-  const { transactions } = getTransactionsData();
+  const { household, transactions: transactionsData, getAccountsForPerson, getNetWorthByWrapper } = useData();
+  const { transactions } = transactionsData;
   const { persons, accounts, income, annualContributions } = household;
 
   const currentTaxYear = "2024/25";
@@ -44,164 +40,181 @@ export default function TaxPlanningPage() {
   const pensionAllowance = UK_TAX_CONSTANTS.pensionAnnualAllowance;
   const cgtAnnualExempt = UK_TAX_CONSTANTS.cgt.annualExemptAmount;
 
-  const wrapperData = getNetWorthByWrapper();
-  const totalNetWorth = wrapperData.reduce((sum, w) => sum + w.value, 0);
+  const wrapperData = useMemo(() => getNetWorthByWrapper(), [getNetWorthByWrapper]);
+  const totalNetWorth = useMemo(
+    () => wrapperData.reduce((sum, w) => sum + w.value, 0),
+    [wrapperData]
+  );
 
   // Per-person data
-  const personData = persons.map((person) => {
-    const personIncome = income.find((i) => i.personId === person.id);
-    const personContributions = annualContributions.find(
-      (c) => c.personId === person.id
-    );
-    const personAccounts = getAccountsForPerson(person.id);
-    const personGiaAccounts = personAccounts.filter((a) => a.type === "gia");
-    const personGiaAccountIds = new Set(personGiaAccounts.map((a) => a.id));
-    const personGiaTransactions = transactions.filter((tx) =>
-      personGiaAccountIds.has(tx.accountId)
-    );
+  const personData = useMemo(
+    () =>
+      persons.map((person) => {
+        const personIncome = income.find((i) => i.personId === person.id);
+        const personContributions = annualContributions.find(
+          (c) => c.personId === person.id
+        );
+        const personAccounts = getAccountsForPerson(person.id);
+        const personGiaAccounts = personAccounts.filter((a) => a.type === "gia");
+        const personGiaAccountIds = new Set(personGiaAccounts.map((a) => a.id));
+        const personGiaTransactions = transactions.filter((tx) =>
+          personGiaAccountIds.has(tx.accountId)
+        );
 
-    // GIA value
-    const giaValue = personGiaAccounts.reduce(
-      (sum, a) => sum + a.currentValue,
-      0
-    );
+        // GIA value
+        const giaValue = personGiaAccounts.reduce(
+          (sum, a) => sum + a.currentValue,
+          0
+        );
 
-    // ISA remaining
-    const isaUsed = personContributions?.isaContribution ?? 0;
-    const isaRemaining = Math.max(0, isaAllowance - isaUsed);
+        // ISA remaining
+        const isaUsed = personContributions?.isaContribution ?? 0;
+        const isaRemaining = Math.max(0, isaAllowance - isaUsed);
 
-    // Pension remaining
-    const pensionUsed = personContributions?.pensionContribution ?? 0;
-    const pensionRemaining = Math.max(0, pensionAllowance - pensionUsed);
+        // Pension remaining
+        const pensionUsed = personContributions?.pensionContribution ?? 0;
+        const pensionRemaining = Math.max(0, pensionAllowance - pensionUsed);
 
-    // Unrealised gains in GIA
-    const unrealisedGains = getUnrealisedGains(
-      personGiaAccounts,
-      personGiaTransactions
-    );
-    const totalUnrealisedGain = unrealisedGains.reduce(
-      (sum, ug) => sum + ug.unrealisedGain,
-      0
-    );
+        // Unrealised gains in GIA
+        const unrealisedGains = getUnrealisedGains(
+          personGiaAccounts,
+          personGiaTransactions
+        );
+        const totalUnrealisedGain = unrealisedGains.reduce(
+          (sum, ug) => sum + ug.unrealisedGain,
+          0
+        );
 
-    // Calculate realised gains for this person
-    const personTaxYearGains = calculateGainsForTaxYear(
-      personGiaTransactions,
-      currentTaxYear
-    );
-    const usedAllowance = Math.max(0, personTaxYearGains.netGain);
-    const remainingCgtAllowance = Math.max(0, cgtAnnualExempt - usedAllowance);
+        // Calculate realised gains for this person
+        const personTaxYearGains = calculateGainsForTaxYear(
+          personGiaTransactions,
+          currentTaxYear
+        );
+        const usedAllowance = Math.max(0, personTaxYearGains.netGain);
+        const remainingCgtAllowance = Math.max(0, cgtAnnualExempt - usedAllowance);
 
-    // Determine CGT rate based on income
-    const isHigherRate =
-      personIncome && personIncome.grossSalary > UK_TAX_CONSTANTS.incomeTax.basicRateUpperLimit;
-    const cgtRate = isHigherRate
-      ? UK_TAX_CONSTANTS.cgt.higherRate
-      : UK_TAX_CONSTANTS.cgt.basicRate;
+        // Determine CGT rate based on income
+        const isHigherRate =
+          personIncome && personIncome.grossSalary > UK_TAX_CONSTANTS.incomeTax.basicRateUpperLimit;
+        const cgtRate = isHigherRate
+          ? UK_TAX_CONSTANTS.cgt.higherRate
+          : UK_TAX_CONSTANTS.cgt.basicRate;
 
-    // Bed & ISA calculation
-    const bedAndISA = calculateBedAndISA(
-      totalUnrealisedGain,
-      remainingCgtAllowance,
-      cgtRate
-    );
+        // Bed & ISA calculation
+        const bedAndISA = calculateBedAndISA(
+          totalUnrealisedGain,
+          remainingCgtAllowance,
+          cgtRate
+        );
 
-    // Break-even analysis: how many years until the CGT cost is recouped
-    // by ISA tax savings on future gains
-    // Assume 7% average annual return in the ISA
-    const assumedReturn = 0.07;
-    const annualFutureTaxSaved = giaValue * assumedReturn * cgtRate;
-    const breakEvenYears =
-      annualFutureTaxSaved > 0
-        ? Math.ceil((bedAndISA.cgtCost / annualFutureTaxSaved) * 10) / 10
-        : 0;
-
-    return {
-      person,
-      personIncome,
-      personContributions,
-      giaValue,
-      isaUsed,
-      isaRemaining,
-      pensionUsed,
-      pensionRemaining,
-      unrealisedGains,
-      totalUnrealisedGain,
-      usedAllowance,
-      remainingCgtAllowance,
-      cgtRate,
-      bedAndISA,
-      breakEvenYears,
-      isHigherRate,
-    };
-  });
-
-  // Pension modelling scenarios
-  const pensionScenarios = personData.map(
-    ({ person, personIncome, pensionUsed, pensionRemaining }) => {
-      if (!personIncome) return { person, scenarios: [] };
-
-      const currentEmployeePension =
-        personIncome.employeePensionContribution;
-      const maxAdditional = pensionRemaining;
-
-      const increments = [
-        { label: "Current", additional: 0 },
-        { label: "+\u00A310k", additional: Math.min(10000, maxAdditional) },
-        { label: "+\u00A320k", additional: Math.min(20000, maxAdditional) },
-        { label: "Max", additional: maxAdditional },
-      ];
-
-      const scenarios = increments.map(({ label, additional }) => {
-        const newPensionContribution = currentEmployeePension + additional;
-
-        const modifiedIncome: PersonIncome = {
-          ...personIncome,
-          employeePensionContribution: newPensionContribution,
-        };
-
-        const takeHome = calculateTakeHomePay(modifiedIncome);
-
-        // NI saving from salary sacrifice
-        const baseTakeHome = calculateTakeHomePay(personIncome);
-        const niSaving =
-          personIncome.pensionContributionMethod === "salary_sacrifice"
-            ? baseTakeHome.ni - takeHome.ni
+        // Break-even analysis: how many years until the CGT cost is recouped
+        // by ISA tax savings on future gains
+        // Assume 7% average annual return in the ISA
+        const assumedReturn = 0.07;
+        const annualFutureTaxSaved = giaValue * assumedReturn * cgtRate;
+        const breakEvenYears =
+          annualFutureTaxSaved > 0
+            ? Math.ceil((bedAndISA.cgtCost / annualFutureTaxSaved) * 10) / 10
             : 0;
 
-        // Effective cost = reduction in take-home
-        const effectiveCost = baseTakeHome.takeHome - takeHome.takeHome;
-
-        // Tax relief value = additional contribution - effective cost
-        const taxRelief = additional - effectiveCost;
-
         return {
-          label,
-          additional,
-          totalPensionContribution:
-            newPensionContribution +
-            personIncome.employerPensionContribution,
-          takeHome: takeHome.takeHome,
-          monthlyTakeHome: takeHome.monthlyTakeHome,
-          niSaving,
-          effectiveCost,
-          taxRelief,
-          incomeTax: takeHome.incomeTax,
+          person,
+          personIncome,
+          personContributions,
+          giaValue,
+          isaUsed,
+          isaRemaining,
+          pensionUsed,
+          pensionRemaining,
+          unrealisedGains,
+          totalUnrealisedGain,
+          usedAllowance,
+          remainingCgtAllowance,
+          cgtRate,
+          bedAndISA,
+          breakEvenYears,
+          isHigherRate,
         };
-      });
+      }),
+    [persons, income, annualContributions, accounts, transactions, getAccountsForPerson, isaAllowance, pensionAllowance, cgtAnnualExempt]
+  );
 
-      return { person, scenarios };
-    }
+  // Pension modelling scenarios
+  const pensionScenarios = useMemo(
+    () =>
+      personData.map(
+        ({ person, personIncome, pensionUsed, pensionRemaining }) => {
+          if (!personIncome) return { person, scenarios: [] };
+
+          const currentEmployeePension =
+            personIncome.employeePensionContribution;
+          const maxAdditional = pensionRemaining;
+
+          const increments = [
+            { label: "Current", additional: 0 },
+            { label: "+\u00A310k", additional: Math.min(10000, maxAdditional) },
+            { label: "+\u00A320k", additional: Math.min(20000, maxAdditional) },
+            { label: "Max", additional: maxAdditional },
+          ];
+
+          const scenarios = increments.map(({ label, additional }) => {
+            const newPensionContribution = currentEmployeePension + additional;
+
+            const modifiedIncome: PersonIncome = {
+              ...personIncome,
+              employeePensionContribution: newPensionContribution,
+            };
+
+            const takeHome = calculateTakeHomePay(modifiedIncome);
+
+            // NI saving from salary sacrifice
+            const baseTakeHome = calculateTakeHomePay(personIncome);
+            const niSaving =
+              personIncome.pensionContributionMethod === "salary_sacrifice"
+                ? baseTakeHome.ni - takeHome.ni
+                : 0;
+
+            // Effective cost = reduction in take-home
+            const effectiveCost = baseTakeHome.takeHome - takeHome.takeHome;
+
+            // Tax relief value = additional contribution - effective cost
+            const taxRelief = additional - effectiveCost;
+
+            return {
+              label,
+              additional,
+              totalPensionContribution:
+                newPensionContribution +
+                personIncome.employerPensionContribution,
+              takeHome: takeHome.takeHome,
+              monthlyTakeHome: takeHome.monthlyTakeHome,
+              niSaving,
+              effectiveCost,
+              taxRelief,
+              incomeTax: takeHome.incomeTax,
+            };
+          });
+
+          return { person, scenarios };
+        }
+      ),
+    [personData]
   );
 
   // Wrapper efficiency: compute percentages
-  const wrapperPercentages = wrapperData.map((w) => ({
-    ...w,
-    percentage: totalNetWorth > 0 ? w.value / totalNetWorth : 0,
-  }));
+  const wrapperPercentages = useMemo(
+    () =>
+      wrapperData.map((w) => ({
+        ...w,
+        percentage: totalNetWorth > 0 ? w.value / totalNetWorth : 0,
+      })),
+    [wrapperData, totalNetWorth]
+  );
 
-  const giaPercentage =
-    wrapperPercentages.find((w) => w.wrapper === "gia")?.percentage ?? 0;
+  const giaPercentage = useMemo(
+    () => wrapperPercentages.find((w) => w.wrapper === "gia")?.percentage ?? 0,
+    [wrapperPercentages]
+  );
 
   return (
     <div className="space-y-8 p-6">
@@ -436,70 +449,72 @@ export default function TaxPlanningPage() {
                     </div>
                   </div>
 
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Scenario</TableHead>
-                        <TableHead className="text-right">
-                          Additional
-                        </TableHead>
-                        <TableHead className="text-right">
-                          Total Pension (p.a.)
-                        </TableHead>
-                        <TableHead className="text-right">
-                          Income Tax
-                        </TableHead>
-                        {isSalarySacrifice && (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Scenario</TableHead>
                           <TableHead className="text-right">
-                            NI Saving
+                            Additional
                           </TableHead>
-                        )}
-                        <TableHead className="text-right">
-                          Effective Cost
-                        </TableHead>
-                        <TableHead className="text-right">
-                          Take-Home (monthly)
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {scenarios.map((scenario) => (
-                        <TableRow key={scenario.label}>
-                          <TableCell className="font-medium">
-                            {scenario.label}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {scenario.additional > 0
-                              ? formatCurrency(scenario.additional)
-                              : "--"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(
-                              scenario.totalPensionContribution
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(scenario.incomeTax)}
-                          </TableCell>
+                          <TableHead className="text-right">
+                            Total Pension (p.a.)
+                          </TableHead>
+                          <TableHead className="text-right">
+                            Income Tax
+                          </TableHead>
                           {isSalarySacrifice && (
-                            <TableCell className="text-right text-green-600">
-                              {scenario.niSaving > 0
-                                ? formatCurrency(scenario.niSaving)
+                            <TableHead className="text-right">
+                              NI Saving
+                            </TableHead>
+                          )}
+                          <TableHead className="text-right">
+                            Effective Cost
+                          </TableHead>
+                          <TableHead className="text-right">
+                            Take-Home (monthly)
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {scenarios.map((scenario) => (
+                          <TableRow key={scenario.label}>
+                            <TableCell className="font-medium">
+                              {scenario.label}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {scenario.additional > 0
+                                ? formatCurrency(scenario.additional)
                                 : "--"}
                             </TableCell>
-                          )}
-                          <TableCell className="text-right">
-                            {scenario.effectiveCost > 0
-                              ? formatCurrency(scenario.effectiveCost)
-                              : "--"}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {formatCurrency(scenario.monthlyTakeHome)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                            <TableCell className="text-right">
+                              {formatCurrency(
+                                scenario.totalPensionContribution
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(scenario.incomeTax)}
+                            </TableCell>
+                            {isSalarySacrifice && (
+                              <TableCell className="text-right text-green-600">
+                                {scenario.niSaving > 0
+                                  ? formatCurrency(scenario.niSaving)
+                                  : "--"}
+                              </TableCell>
+                            )}
+                            <TableCell className="text-right">
+                              {scenario.effectiveCost > 0
+                                ? formatCurrency(scenario.effectiveCost)
+                                : "--"}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {formatCurrency(scenario.monthlyTakeHome)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
 
                   {isSalarySacrifice && (
                     <p className="text-muted-foreground mt-2 text-xs">

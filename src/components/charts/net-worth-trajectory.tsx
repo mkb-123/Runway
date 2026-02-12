@@ -25,11 +25,11 @@ interface NetWorthTrajectoryChartProps {
 }
 
 const SCENARIO_COLORS = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
 ];
 
 function formatCompactValue(value: number): string {
@@ -142,8 +142,8 @@ export function NetWorthTrajectoryChart({
             ]}
             labelFormatter={(label) => `Year: ${label}`}
             contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
+              backgroundColor: "var(--card)",
+              border: "1px solid var(--border)",
               borderRadius: "8px",
             }}
           />
@@ -154,13 +154,13 @@ export function NetWorthTrajectoryChart({
             <ReferenceLine
               key={m.label}
               y={m.value}
-              stroke="hsl(var(--muted-foreground))"
+              stroke="var(--muted-foreground)"
               strokeDasharray="4 4"
               label={{
                 value: `${m.label} (${formatCompactValue(m.value)})`,
                 position: "insideTopRight",
                 fontSize: 11,
-                fill: "hsl(var(--muted-foreground))",
+                fill: "var(--muted-foreground)",
               }}
             />
           ))}
@@ -170,7 +170,7 @@ export function NetWorthTrajectoryChart({
             type="monotone"
             dataKey="historical"
             name="Historical"
-            stroke="hsl(var(--chart-1))"
+            stroke="var(--chart-1)"
             strokeWidth={2.5}
             dot={{ r: 4 }}
             connectNulls={false}

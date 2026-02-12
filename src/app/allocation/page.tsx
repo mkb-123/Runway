@@ -1,9 +1,7 @@
-import {
-  getHouseholdData,
-  getFundById,
-  getNetWorthByWrapper,
-  getTotalNetWorth,
-} from "@/lib/data";
+"use client";
+
+import { useMemo } from "react";
+import { useData } from "@/context/data-context";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import {
   getAccountTaxWrapper,
@@ -17,151 +15,143 @@ import { Badge } from "@/components/ui/badge";
 import { AllocationPie } from "@/components/charts/allocation-pie";
 import { AllocationBar } from "@/components/charts/allocation-bar";
 
-// ---------------------------------------------------------------------------
-// Compute allocation data on the server
-// ---------------------------------------------------------------------------
+export default function AllocationPage() {
+  const { household, getFundById, getNetWorthByWrapper, getTotalNetWorth } = useData();
 
-function computeAllocations() {
-  const household = getHouseholdData();
-  const totalNetWorth = getTotalNetWorth();
+  const totalNetWorth = useMemo(() => getTotalNetWorth(), [getTotalNetWorth]);
 
-  // Maps for accumulation
-  const byAssetClass = new Map<AssetClass, number>();
-  const byRegion = new Map<Region, number>();
-  const byFund = new Map<string, { name: string; value: number }>();
-  const byProvider = new Map<string, number>();
+  const allocations = useMemo(() => {
+    // Maps for accumulation
+    const byAssetClass = new Map<AssetClass, number>();
+    const byRegion = new Map<Region, number>();
+    const byFund = new Map<string, { name: string; value: number }>();
+    const byProvider = new Map<string, number>();
 
-  for (const account of household.accounts) {
-    const wrapper = getAccountTaxWrapper(account.type);
+    for (const account of household.accounts) {
+      const wrapper = getAccountTaxWrapper(account.type);
 
-    // Accumulate by provider
-    byProvider.set(
-      account.provider,
-      (byProvider.get(account.provider) ?? 0) + account.currentValue,
-    );
-
-    if (account.holdings.length === 0) {
-      // Cash accounts / premium bonds -- no holdings with units
-      // Map to the appropriate asset class and region
-      const assetClass: AssetClass = "cash";
-      const region: Region = "uk";
-
-      byAssetClass.set(
-        assetClass,
-        (byAssetClass.get(assetClass) ?? 0) + account.currentValue,
-      );
-      byRegion.set(
-        region,
-        (byRegion.get(region) ?? 0) + account.currentValue,
+      // Accumulate by provider
+      byProvider.set(
+        account.provider,
+        (byProvider.get(account.provider) ?? 0) + account.currentValue,
       );
 
-      // By fund -- group under a descriptive name
-      const cashLabel =
-        wrapper === "premium_bonds" ? "Premium Bonds" : "Cash Savings";
-      const existing = byFund.get(cashLabel);
-      if (existing) {
-        existing.value += account.currentValue;
-      } else {
-        byFund.set(cashLabel, { name: cashLabel, value: account.currentValue });
-      }
-    } else {
-      for (const holding of account.holdings) {
-        const fund = getFundById(holding.fundId);
-        if (!fund) continue;
-
-        const holdingValue = holding.currentPrice * holding.units;
+      if (account.holdings.length === 0) {
+        // Cash accounts / premium bonds -- no holdings with units
+        // Map to the appropriate asset class and region
+        const assetClass: AssetClass = "cash";
+        const region: Region = "uk";
 
         byAssetClass.set(
-          fund.assetClass,
-          (byAssetClass.get(fund.assetClass) ?? 0) + holdingValue,
+          assetClass,
+          (byAssetClass.get(assetClass) ?? 0) + account.currentValue,
         );
-
         byRegion.set(
-          fund.region,
-          (byRegion.get(fund.region) ?? 0) + holdingValue,
+          region,
+          (byRegion.get(region) ?? 0) + account.currentValue,
         );
 
-        const existingFund = byFund.get(fund.id);
-        if (existingFund) {
-          existingFund.value += holdingValue;
+        // By fund -- group under a descriptive name
+        const cashLabel =
+          wrapper === "premium_bonds" ? "Premium Bonds" : "Cash Savings";
+        const existing = byFund.get(cashLabel);
+        if (existing) {
+          existing.value += account.currentValue;
         } else {
-          byFund.set(fund.id, { name: fund.name, value: holdingValue });
+          byFund.set(cashLabel, { name: cashLabel, value: account.currentValue });
+        }
+      } else {
+        for (const holding of account.holdings) {
+          const fund = getFundById(holding.fundId);
+          if (!fund) continue;
+
+          const holdingValue = holding.currentPrice * holding.units;
+
+          byAssetClass.set(
+            fund.assetClass,
+            (byAssetClass.get(fund.assetClass) ?? 0) + holdingValue,
+          );
+
+          byRegion.set(
+            fund.region,
+            (byRegion.get(fund.region) ?? 0) + holdingValue,
+          );
+
+          const existingFund = byFund.get(fund.id);
+          if (existingFund) {
+            existingFund.value += holdingValue;
+          } else {
+            byFund.set(fund.id, { name: fund.name, value: holdingValue });
+          }
         }
       }
     }
-  }
 
-  // Convert maps to sorted arrays
-  const assetClassData = Array.from(byAssetClass.entries())
-    .map(([key, value]) => ({
-      name: ASSET_CLASS_LABELS[key],
-      value: Math.round(value * 100) / 100,
-    }))
-    .sort((a, b) => b.value - a.value);
+    // Convert maps to sorted arrays
+    const assetClassData = Array.from(byAssetClass.entries())
+      .map(([key, value]) => ({
+        name: ASSET_CLASS_LABELS[key],
+        value: Math.round(value * 100) / 100,
+      }))
+      .sort((a, b) => b.value - a.value);
 
-  const regionData = Array.from(byRegion.entries())
-    .map(([key, value]) => ({
-      name: REGION_LABELS[key],
-      value: Math.round(value * 100) / 100,
-    }))
-    .sort((a, b) => b.value - a.value);
+    const regionData = Array.from(byRegion.entries())
+      .map(([key, value]) => ({
+        name: REGION_LABELS[key],
+        value: Math.round(value * 100) / 100,
+      }))
+      .sort((a, b) => b.value - a.value);
 
-  const fundData = Array.from(byFund.values())
-    .map((f) => ({
-      name: f.name,
-      value: Math.round(f.value * 100) / 100,
-    }))
-    .sort((a, b) => b.value - a.value);
+    const fundData = Array.from(byFund.values())
+      .map((f) => ({
+        name: f.name,
+        value: Math.round(f.value * 100) / 100,
+      }))
+      .sort((a, b) => b.value - a.value);
 
-  const wrapperData = getNetWorthByWrapper().map((w) => ({
-    name: TAX_WRAPPER_LABELS[w.wrapper],
-    value: w.value,
-  }));
+    const wrapperData = getNetWorthByWrapper().map((w) => ({
+      name: TAX_WRAPPER_LABELS[w.wrapper],
+      value: w.value,
+    }));
 
-  const providerData = Array.from(byProvider.entries())
-    .map(([name, value]) => ({
-      name,
-      value: Math.round(value * 100) / 100,
-    }))
-    .sort((a, b) => b.value - a.value);
+    const providerData = Array.from(byProvider.entries())
+      .map(([name, value]) => ({
+        name,
+        value: Math.round(value * 100) / 100,
+      }))
+      .sort((a, b) => b.value - a.value);
 
-  // Concentration risk: any single fund > 25% of total
-  const concentrationRisks = fundData.filter(
-    (f) => f.value / totalNetWorth > 0.25,
-  );
+    // Concentration risk: any single fund > 25% of total
+    const concentrationRisks = fundData.filter(
+      (f) => f.value / totalNetWorth > 0.25,
+    );
 
-  // Wrapper efficiency: pension + ISA vs GIA
-  const wrapperByType = getNetWorthByWrapper();
-  const taxAdvantaged = wrapperByType
-    .filter((w) => w.wrapper === "pension" || w.wrapper === "isa")
-    .reduce((sum, w) => sum + w.value, 0);
-  const taxExposed = wrapperByType
-    .filter(
-      (w) =>
-        w.wrapper === "gia" ||
-        w.wrapper === "cash" ||
-        w.wrapper === "premium_bonds",
-    )
-    .reduce((sum, w) => sum + w.value, 0);
+    // Wrapper efficiency: pension + ISA vs GIA
+    const wrapperByType = getNetWorthByWrapper();
+    const taxAdvantaged = wrapperByType
+      .filter((w) => w.wrapper === "pension" || w.wrapper === "isa")
+      .reduce((sum, w) => sum + w.value, 0);
+    const taxExposed = wrapperByType
+      .filter(
+        (w) =>
+          w.wrapper === "gia" ||
+          w.wrapper === "cash" ||
+          w.wrapper === "premium_bonds",
+      )
+      .reduce((sum, w) => sum + w.value, 0);
 
-  return {
-    assetClassData,
-    regionData,
-    fundData,
-    wrapperData,
-    providerData,
-    concentrationRisks,
-    totalNetWorth,
-    taxAdvantaged,
-    taxExposed,
-  };
-}
+    return {
+      assetClassData,
+      regionData,
+      fundData,
+      wrapperData,
+      providerData,
+      concentrationRisks,
+      taxAdvantaged,
+      taxExposed,
+    };
+  }, [household, getFundById, getNetWorthByWrapper, totalNetWorth]);
 
-// ---------------------------------------------------------------------------
-// Page Component
-// ---------------------------------------------------------------------------
-
-export default function AllocationPage() {
   const {
     assetClassData,
     regionData,
@@ -169,10 +159,9 @@ export default function AllocationPage() {
     wrapperData,
     providerData,
     concentrationRisks,
-    totalNetWorth,
     taxAdvantaged,
     taxExposed,
-  } = computeAllocations();
+  } = allocations;
 
   const taxAdvantagedPct = totalNetWorth > 0 ? taxAdvantaged / totalNetWorth : 0;
   const taxExposedPct = totalNetWorth > 0 ? taxExposed / totalNetWorth : 0;
