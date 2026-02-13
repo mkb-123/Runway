@@ -17,7 +17,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 
 - `src/app/` — Pages: dashboard, accounts, holdings, projections, retirement, income, tax-planning, allocation, iht, export, settings
 - `src/components/ui/` — 26 shadcn/ui components
-- `src/components/charts/` — 9 financial visualization charts (Recharts)
+- `src/components/charts/` — 15 financial visualization charts (Recharts)
 - `src/components/layout/` — Navigation
 - `src/lib/` — Financial calculation engines (tax, CGT, projections, formatting)
 - `src/context/` — Global data context (localStorage persistence)
@@ -39,10 +39,11 @@ This project uses a **Finance Agent Team** for design and architecture decisions
 
 | Role | File | Expertise |
 |------|------|-----------|
-| UX Designer (Apple) | `.claude/agents/ux-designer.md` | Human-centred design, information hierarchy, interaction patterns |
+| Mobile Web Designer | `.claude/agents/ux-designer.md` | Responsive design, mobile-first layouts, touch interactions, performance |
 | Charting Expert | `.claude/agents/charting-expert.md` | Financial data visualisation, chart type selection, Recharts |
 | Financial Advisor | `.claude/agents/financial-advisor.md` | Client needs, regulatory context, what matters to real users |
 | Devil's Advocate | `.claude/agents/devils-advocate.md` | Challenges assumptions, identifies risks, stress-tests ideas |
+| HNW Customer (James) | `.claude/agents/hnw-customer.md` | Real user perspective, retirement planning, tax optimisation, couple's finances |
 
 ### Decision Process
 

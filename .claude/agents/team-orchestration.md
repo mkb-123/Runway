@@ -3,17 +3,18 @@
 ## Team Structure
 
 ```
-                    ┌─────────────────────┐
-                    │   TEAM LEAD (Claude) │
-                    │  Final decision maker│
-                    └─────────┬───────────┘
-                              │
-          ┌───────────┬───────┴───────┬───────────┐
-          │           │               │           │
-    ┌─────┴─────┐ ┌───┴────┐ ┌───────┴──┐ ┌──────┴──────┐
-    │ UX Design │ │Charting│ │Financial │ │   Devil's   │
-    │  (Apple)  │ │ Expert │ │ Advisor  │ │  Advocate   │
-    └───────────┘ └────────┘ └──────────┘ └─────────────┘
+                       ┌─────────────────────┐
+                       │   TEAM LEAD (Claude) │
+                       │  Final decision maker│
+                       └─────────┬───────────┘
+                                 │
+     ┌───────────┬───────────┬───┴────┬───────────┬───────────┐
+     │           │           │        │           │           │
+┌────┴─────┐ ┌──┴────┐ ┌────┴───┐ ┌──┴──────┐ ┌──┴──────────┐
+│  Mobile  │ │Chart- │ │Finan-  │ │Devil's  │ │ HNW Customer│
+│  Web     │ │  ing  │ │ cial   │ │Advocate │ │  (James)    │
+│ Designer │ │Expert │ │Advisor │ │         │ │             │
+└──────────┘ └───────┘ └────────┘ └─────────┘ └─────────────┘
 ```
 
 ## When to Convene the Team
@@ -55,22 +56,27 @@ Present the proposal clearly:
 
 Each agent responds in character, using their defined response format:
 
-**1. Financial Advisor speaks first**
+**1. HNW Customer (James) speaks first**
+   - Reacts as a real user. Would he actually use this feature?
+   - Tests it against his and Sarah's financial situation.
+   - Flags if it answers a question he actually has.
+
+**2. Financial Advisor speaks second**
    - Validates the user need. Is this something real clients care about?
    - Provides priority ranking (Priority 1-5).
    - Flags any regulatory or accuracy concerns.
 
-**2. UX Designer speaks second**
-   - Evaluates the proposed interaction and layout.
-   - Assesses information hierarchy and cognitive load.
-   - Proposes specific design approach (components, layout, states).
+**3. Mobile Web Designer speaks third**
+   - Evaluates the responsive design — does it work at 375px AND 1440px?
+   - Assesses touch targets, thumb zones, and interaction patterns.
+   - Proposes specific responsive implementation (breakpoints, layout, components).
 
-**3. Charting Expert speaks third** (if charts are involved)
+**4. Charting Expert speaks fourth** (if charts are involved)
    - Audits chart type selection.
    - Recommends specific Recharts implementation.
    - Warns about visualisation anti-patterns.
 
-**4. Devil's Advocate speaks last**
+**5. Devil's Advocate speaks last**
    - Challenges the consensus.
    - Identifies failure modes and edge cases.
    - Delivers the "kill question" and risk rating.
@@ -100,8 +106,9 @@ As Team Lead, I (Claude) will:
 [2-3 sentences on what we're doing and why]
 
 ### Agent Consensus
+- HNW Customer (James): [WANT / NEUTRAL / DON'T NEED] — [one line]
 - Financial Advisor: [SUPPORT / CONCERN / OPPOSE] — [one line]
-- UX Designer: [SUPPORT / CONCERN / OPPOSE] — [one line]
+- Mobile Web Designer: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Charting Expert: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Devil's Advocate: [SUPPORT / CONCERN / OPPOSE] — [one line]
 
@@ -121,13 +128,15 @@ As Team Lead, I (Claude) will:
 
 When agents disagree:
 
-1. **Financial Advisor vs UX Designer** — If the advisor says users need it but the designer says it's cluttered: find a progressive disclosure solution (show summary, let users drill in).
+1. **HNW Customer vs anyone** — If James says "I wouldn't use this", that's a strong signal. Features should solve real user problems. If the team wants it but the user doesn't, justify why or cut it.
 
-2. **Charting Expert vs UX Designer** — If the chart expert wants more data density but the designer wants simplicity: default to the simpler view with an option to expand.
+2. **Financial Advisor vs Mobile Web Designer** — If the advisor says users need it but the designer says it's cluttered: find a progressive disclosure solution (show summary, let users drill in).
 
-3. **Anyone vs Devil's Advocate** — The Devil's Advocate can be overruled, but their "kill question" must be answered. If nobody can answer it, the feature is blocked.
+3. **Charting Expert vs Mobile Web Designer** — If the chart expert wants more data density but the designer wants simplicity: default to the simpler view with an option to expand. On mobile, the designer wins.
 
-4. **Unanimous opposition** — If 3+ agents oppose, the Team Lead should not override without exceptional justification.
+4. **Anyone vs Devil's Advocate** — The Devil's Advocate can be overruled, but their "kill question" must be answered. If nobody can answer it, the feature is blocked.
+
+5. **Unanimous opposition** — If 3+ agents oppose, the Team Lead should not override without exceptional justification.
 
 ## Standing Team Policies
 
