@@ -10,7 +10,6 @@ import {
   TrendingUp,
   Sunset,
   Wallet,
-  Receipt,
   Calculator,
   PieChart,
   Shield,
@@ -30,17 +29,16 @@ import {
 
 const navLinks = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/settings", label: "Settings", icon: Settings },
   { href: "/accounts", label: "Accounts", icon: Landmark },
   { href: "/holdings", label: "Holdings", icon: Briefcase },
   { href: "/projections", label: "Projections", icon: TrendingUp },
   { href: "/retirement", label: "Retirement", icon: Sunset },
   { href: "/income", label: "Income", icon: Wallet },
-  { href: "/cgt", label: "CGT", icon: Receipt },
   { href: "/tax-planning", label: "Tax Planning", icon: Calculator },
   { href: "/allocation", label: "Allocation", icon: PieChart },
   { href: "/iht", label: "IHT", icon: Shield },
   { href: "/export", label: "Export", icon: Download },
-  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Navigation() {
