@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
+import { Settings } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -166,6 +169,27 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Getting Started Banner */}
+        <div className="mb-6 rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground sm:text-xl">
+                Getting Started
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Head to <strong>Settings</strong> first to enter your personal financial data — accounts, income, holdings, and goals.
+                All other pages compute from the data you provide there.
+              </p>
+            </div>
+            <Link href="/settings">
+              <Button size="lg" className="w-full gap-2 sm:w-auto">
+                <Settings className="size-4" />
+                Open Settings
+              </Button>
+            </Link>
+          </div>
+        </div>
+
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
