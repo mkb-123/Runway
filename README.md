@@ -2,7 +2,7 @@
 
 A comprehensive UK household net worth tracker built with Next.js. Track accounts, holdings, income, tax planning, retirement projections, and more — all from your browser with no backend required.
 
-**Live app:** [https://mkb-123.github.io/Runway/](https://mkb-123.github.io/Runway/)
+**Live app:** Available via GitHub Pages once deployed
 
 ## Features
 
@@ -20,11 +20,11 @@ A comprehensive UK household net worth tracker built with Next.js. Track account
 
 ## Getting Started
 
-1. Visit the [live app](https://mkb-123.github.io/Runway/)
+1. Deploy the app or run it locally (see below)
 2. Go to **Settings** (second link in the navigation) to enter your financial data
 3. All other pages automatically compute from the data you provide in Settings
 
-All data is stored locally in your browser — nothing is sent to any server.
+All data is stored locally in your browser — nothing is sent to any server. The included JSON files in `data/` contain fictional sample data for demonstration purposes only.
 
 ## Local Development
 

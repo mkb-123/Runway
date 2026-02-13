@@ -1,4 +1,5 @@
 {
+  "_sampleData": "This file contains fictional demo transactions. All values and dates are illustrative examples only.",
   "transactions": [
     {
       "id": "tx-1",
