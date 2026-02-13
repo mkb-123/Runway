@@ -27,6 +27,8 @@ import {
   calculatePensionBridge,
 } from "@/lib/projections";
 import { RetirementProgress } from "@/components/charts/retirement-progress";
+import { RetirementDrawdownChart } from "@/components/charts/retirement-drawdown-chart";
+import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 
 export default function RetirementPage() {
   const { household, getTotalNetWorth } = useData();
@@ -275,6 +277,28 @@ export default function RetirementPage() {
               );
             })}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Retirement Drawdown Projection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Retirement Drawdown Projection</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-muted-foreground">
+            How your pot depletes during retirement at {formatCurrency(retirement.targetAnnualIncome)}/yr
+            spending, with state pension income reducing withdrawals from age{" "}
+            {primaryPerson?.stateRetirementAge ?? 67}. Capital at risk — projections are illustrative only.
+          </p>
+          <RetirementDrawdownChart
+            startingPot={requiredPot}
+            annualSpend={retirement.targetAnnualIncome}
+            retirementAge={earlyRetirementAge}
+            scenarioRates={retirement.scenarioRates}
+            statePensionAge={primaryPerson?.stateRetirementAge ?? 67}
+            statePensionAnnual={UK_TAX_CONSTANTS.statePension.fullNewStatePensionAnnual}
+          />
         </CardContent>
       </Card>
 
