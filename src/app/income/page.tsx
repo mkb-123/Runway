@@ -31,6 +31,9 @@ import {
   CashFlowWaterfall,
   type WaterfallDataPoint,
 } from "@/components/charts/cash-flow-waterfall";
+import { EffectiveTaxRateChart } from "@/components/charts/effective-tax-rate-chart";
+import { TaxBandChart } from "@/components/charts/tax-band-chart";
+import type { TaxBandDataItem } from "@/components/charts/tax-band-chart";
 
 // --- Helper: projected value at vesting ---
 function projectedValue(tranche: DeferredBonusTranche): number {
@@ -581,6 +584,46 @@ export default function IncomePage() {
         <Card>
           <CardContent className="pt-6">
             <CashFlowWaterfall data={waterfallData} />
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Tax Band Consumption */}
+      <section className="space-y-4">
+        <h2 className="text-2xl font-semibold">Tax Band Consumption</h2>
+        <p className="text-muted-foreground">
+          How each person&apos;s income fills the tax bands from Personal Allowance through to Additional Rate.
+        </p>
+        <Card>
+          <CardContent className="pt-6">
+            <TaxBandChart
+              data={personAnalysis.map(({ person, incomeTaxResult }): TaxBandDataItem => {
+                const bands = incomeTaxResult.breakdown;
+                const getBand = (name: string) =>
+                  bands.find((b) => b.band === name)?.taxableAmount ?? 0;
+                return {
+                  name: person.name,
+                  personalAllowance: getBand("Personal Allowance"),
+                  basicRate: getBand("Basic Rate"),
+                  higherRate: getBand("Higher Rate"),
+                  additionalRate: getBand("Additional Rate"),
+                };
+              })}
+              height={Math.max(160, personAnalysis.length * 80)}
+            />
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Effective Tax Rate Curve */}
+      <section className="space-y-4">
+        <h2 className="text-2xl font-semibold">Effective Tax Rate Curve</h2>
+        <p className="text-muted-foreground">
+          Combined marginal and effective tax + NI rate across income levels. The red area shows the marginal rate — note the 60% trap between £100k and £125k where the personal allowance tapers away.
+        </p>
+        <Card>
+          <CardContent className="pt-6">
+            <EffectiveTaxRateChart />
           </CardContent>
         </Card>
       </section>

@@ -1,9 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Settings } from "lucide-react";
+import {
+  Settings,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  X,
+  Lightbulb,
+  ArrowRight,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   formatCurrency,
@@ -11,7 +20,13 @@ import {
   formatPercent,
 } from "@/lib/format";
 import { useData } from "@/context/data-context";
+import { useScenarioData } from "@/context/use-scenario-data";
 import { projectScenarios } from "@/lib/projections";
+import {
+  generateRecommendations,
+  type Recommendation,
+  type RecommendationPriority,
+} from "@/lib/recommendations";
 import { TAX_WRAPPER_LABELS } from "@/types";
 import type { TaxWrapper } from "@/types";
 
@@ -19,20 +34,55 @@ import { NetWorthTrajectoryChart } from "@/components/charts/net-worth-trajector
 import { NetWorthHistoryChart } from "@/components/charts/net-worth-history";
 import { ByPersonChart } from "@/components/charts/by-person-chart";
 
+const priorityConfig: Record<
+  RecommendationPriority,
+  { label: string; color: string; bg: string; border: string }
+> = {
+  high: {
+    label: "High",
+    color: "text-red-700 dark:text-red-400",
+    bg: "bg-red-50 dark:bg-red-950",
+    border: "border-red-200 dark:border-red-900",
+  },
+  medium: {
+    label: "Medium",
+    color: "text-amber-700 dark:text-amber-400",
+    bg: "bg-amber-50 dark:bg-amber-950",
+    border: "border-amber-200 dark:border-amber-900",
+  },
+  low: {
+    label: "Low",
+    color: "text-blue-700 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-950",
+    border: "border-blue-200 dark:border-blue-900",
+  },
+};
+
 export default function Home() {
   // --- Data Loading ---
   const {
-    household,
     snapshots: snapshotsData,
-    getTotalNetWorth,
-    getNetWorthByPerson,
-    getNetWorthByWrapper,
+    transactions: transactionsData,
   } = useData();
 
+  // Scenario-aware data
+  const scenarioData = useScenarioData();
+  const household = scenarioData.household;
+  const totalNetWorth = scenarioData.getTotalNetWorth();
+  const byPerson = scenarioData.getNetWorthByPerson();
+  const byWrapper = scenarioData.getNetWorthByWrapper();
+
   const { snapshots } = snapshotsData;
-  const totalNetWorth = getTotalNetWorth();
-  const byPerson = getNetWorthByPerson();
-  const byWrapper = getNetWorthByWrapper();
+
+  // --- Recommendations ---
+  const recommendations = useMemo(
+    () => generateRecommendations(household, transactionsData),
+    [household, transactionsData]
+  );
+
+  const highPriorityCount = recommendations.filter(
+    (r) => r.priority === "high"
+  ).length;
 
   // --- Snapshot Change Calculations ---
   const {
@@ -162,33 +212,66 @@ export default function Home() {
       .filter((w) => w.value > 0);
   }, [byWrapper, totalNetWorth]);
 
+  // --- Banner dismiss state ---
+  const [bannerDismissed, setBannerDismissed] = useState(true); // default hidden to prevent flash
+  useEffect(() => {
+    try {
+      setBannerDismissed(localStorage.getItem("nw-banner-dismissed") === "true");
+    } catch {
+      setBannerDismissed(false);
+    }
+  }, []);
+
+  const dismissBanner = useCallback(() => {
+    setBannerDismissed(true);
+    try {
+      localStorage.setItem("nw-banner-dismissed", "true");
+    } catch {
+      // localStorage unavailable
+    }
+  }, []);
+
   const changeIndicator = (value: number) =>
     value >= 0 ? "text-emerald-600" : "text-red-600";
   const changePrefix = (value: number) => (value >= 0 ? "+" : "");
+  const TrendIcon = ({ value }: { value: number }) => {
+    if (value > 0) return <TrendingUp className="inline size-4" aria-label="increased" />;
+    if (value < 0) return <TrendingDown className="inline size-4" aria-label="decreased" />;
+    return <Minus className="inline size-4" aria-label="unchanged" />;
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Getting Started Banner */}
-        <div className="mb-6 rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground sm:text-xl">
-                Getting Started
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Head to <strong>Settings</strong> first to enter your personal financial data — accounts, income, holdings, and goals.
-                All other pages compute from the data you provide there.
-              </p>
+        {!bannerDismissed && (
+          <div className="relative mb-6 rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
+            <button
+              onClick={dismissBanner}
+              className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
+              aria-label="Dismiss getting started banner"
+            >
+              <X className="size-4" />
+            </button>
+            <div className="flex flex-col gap-3 pr-8 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground sm:text-xl">
+                  Getting Started
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Head to <strong>Settings</strong> first to enter your personal financial data — accounts, income, holdings, and goals.
+                  All other pages compute from the data you provide there.
+                </p>
+              </div>
+              <Link href="/settings">
+                <Button size="lg" className="w-full gap-2 sm:w-auto">
+                  <Settings className="size-4" />
+                  Open Settings
+                </Button>
+              </Link>
             </div>
-            <Link href="/settings">
-              <Button size="lg" className="w-full gap-2 sm:w-auto">
-                <Settings className="size-4" />
-                Open Settings
-              </Button>
-            </Link>
           </div>
-        </div>
+        )}
 
         {/* Page Header */}
         <div className="mb-8">
@@ -255,10 +338,13 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <p
-                className={`text-2xl font-bold tracking-tight ${changeIndicator(monthOnMonthChange)}`}
+                className={`flex items-center gap-1.5 text-2xl font-bold tracking-tight ${changeIndicator(monthOnMonthChange)}`}
               >
-                {changePrefix(monthOnMonthChange)}
-                {formatCurrencyCompact(monthOnMonthChange)}
+                <TrendIcon value={monthOnMonthChange} />
+                <span>
+                  {changePrefix(monthOnMonthChange)}
+                  {formatCurrencyCompact(monthOnMonthChange)}
+                </span>
               </p>
               <p
                 className={`mt-1 text-sm ${changeIndicator(monthOnMonthPercent)}`}
@@ -278,10 +364,13 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <p
-                className={`text-2xl font-bold tracking-tight ${changeIndicator(yearOnYearChange)}`}
+                className={`flex items-center gap-1.5 text-2xl font-bold tracking-tight ${changeIndicator(yearOnYearChange)}`}
               >
-                {changePrefix(yearOnYearChange)}
-                {formatCurrencyCompact(yearOnYearChange)}
+                <TrendIcon value={yearOnYearChange} />
+                <span>
+                  {changePrefix(yearOnYearChange)}
+                  {formatCurrencyCompact(yearOnYearChange)}
+                </span>
               </p>
               <p
                 className={`mt-1 text-sm ${changeIndicator(yearOnYearPercent)}`}
@@ -294,7 +383,69 @@ export default function Home() {
         </div>
 
         {/* ============================================================ */}
-        {/* Section 2: Net Worth by Wrapper                              */}
+        {/* Section 2: Actionable Recommendations                        */}
+        {/* ============================================================ */}
+        {recommendations.length > 0 && (
+          <div className="mb-8">
+            <div className="mb-4 flex items-center gap-3">
+              <h2 className="text-xl font-semibold text-foreground">
+                Recommended Actions
+              </h2>
+              {highPriorityCount > 0 && (
+                <Badge variant="destructive">
+                  {highPriorityCount} high priority
+                </Badge>
+              )}
+            </div>
+            <div className="grid gap-3">
+              {recommendations.slice(0, 5).map((rec) => {
+                const config = priorityConfig[rec.priority];
+                return (
+                  <Card
+                    key={rec.id}
+                    className={`border ${config.border} ${config.bg}`}
+                  >
+                    <CardContent className="py-4">
+                      <div className="flex items-start gap-3">
+                        <Lightbulb
+                          className={`mt-0.5 size-5 shrink-0 ${config.color}`}
+                        />
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{rec.title}</h3>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${config.color}`}
+                            >
+                              {config.label}
+                            </Badge>
+                            {rec.personName && (
+                              <Badge variant="secondary" className="text-xs">
+                                {rec.personName}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {rec.description}
+                          </p>
+                          <p className="text-sm font-medium">{rec.impact}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {recommendations.length > 5 && (
+                <p className="text-center text-sm text-muted-foreground">
+                  +{recommendations.length - 5} more recommendations
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* Section 3: Net Worth by Wrapper                              */}
         {/* ============================================================ */}
         <div className="mb-8">
           <h2 className="mb-4 text-xl font-semibold text-foreground">
@@ -322,7 +473,7 @@ export default function Home() {
         </div>
 
         {/* ============================================================ */}
-        {/* Section 3: Net Worth Trajectory Chart                        */}
+        {/* Section 4: Net Worth Trajectory Chart                        */}
         {/* ============================================================ */}
         <div className="mb-8">
           <Card>
@@ -347,7 +498,7 @@ export default function Home() {
         </div>
 
         {/* ============================================================ */}
-        {/* Section 4: Net Worth History Chart (stacked area)            */}
+        {/* Section 5: Net Worth History Chart (stacked area)            */}
         {/* ============================================================ */}
         <div className="mb-8">
           <Card>
@@ -364,7 +515,7 @@ export default function Home() {
         </div>
 
         {/* ============================================================ */}
-        {/* Section 5: By Person Breakdown                               */}
+        {/* Section 6: By Person Breakdown                               */}
         {/* ============================================================ */}
         <div className="mb-8">
           <Card>

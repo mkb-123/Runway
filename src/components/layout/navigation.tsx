@@ -26,6 +26,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { ScenarioPanel } from "@/components/scenario-panel";
 
 const navLinks = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -82,8 +83,14 @@ export function Navigation() {
           })}
         </nav>
 
+        {/* What-If Scenario Button */}
+        <div className="ml-auto mr-2 hidden lg:block">
+          <ScenarioPanel />
+        </div>
+
         {/* Mobile Navigation */}
-        <div className="flex flex-1 items-center justify-end lg:hidden">
+        <div className="flex flex-1 items-center justify-end gap-2 lg:hidden">
+          <ScenarioPanel />
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Open menu">

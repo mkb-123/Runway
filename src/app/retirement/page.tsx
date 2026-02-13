@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useData } from "@/context/data-context";
+import { useScenarioData } from "@/context/use-scenario-data";
 import { getAccountTaxWrapper } from "@/types";
 import {
   formatCurrency,
@@ -27,14 +28,21 @@ import {
   calculatePensionBridge,
 } from "@/lib/projections";
 import { RetirementProgress } from "@/components/charts/retirement-progress";
+import { RetirementDrawdownChart } from "@/components/charts/retirement-drawdown-chart";
+import {
+  RetirementIncomeTimeline,
+  type PersonRetirementInput,
+} from "@/components/charts/retirement-income-timeline";
+import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 
 export default function RetirementPage() {
-  const { household, getTotalNetWorth } = useData();
+  // Scenario-aware data
+  const scenarioData = useScenarioData();
+  const household = scenarioData.household;
+  const currentPot = scenarioData.getTotalNetWorth();
+
   const { retirement, annualContributions, accounts, income, persons } =
     household;
-
-  // Current pot
-  const currentPot = getTotalNetWorth();
 
   // Required pot
   const requiredPot = useMemo(
@@ -129,8 +137,7 @@ export default function RetirementPage() {
   );
 
   // Pension Bridge Analysis
-  // Assume early retirement = when countdown is 0 at mid rate, or use current age + countdown
-  const earlyRetirementAge = currentAge + 10; // Aspirational: retire in ~10 years
+  const earlyRetirementAge = currentAge + 10;
   const bridgeResult = useMemo(
     () =>
       calculatePensionBridge(
@@ -148,6 +155,50 @@ export default function RetirementPage() {
     totalWealth > 0 ? (accessibleWealth / totalWealth) * 100 : 0;
   const lockedPercent =
     totalWealth > 0 ? (lockedWealth / totalWealth) * 100 : 0;
+
+  // --- Combined Retirement Income Timeline data ---
+  const personRetirementInputs: PersonRetirementInput[] = useMemo(() => {
+    return persons.map((person) => {
+      // Pension pot = sum of pension-type accounts for this person
+      const personPensionPot = accounts
+        .filter(
+          (a) =>
+            a.personId === person.id &&
+            (a.type === "workplace_pension" || a.type === "sipp")
+        )
+        .reduce((sum, a) => sum + a.currentValue, 0);
+
+      // Accessible wealth = non-pension accounts for this person
+      const personAccessible = accounts
+        .filter((a) => {
+          if (a.personId !== person.id) return false;
+          const wrapper = getAccountTaxWrapper(a.type);
+          return wrapper !== "pension";
+        })
+        .reduce((sum, a) => sum + a.currentValue, 0);
+
+      // State pension: pro-rata based on NI qualifying years
+      const qualifyingYears = person.niQualifyingYears ?? 0;
+      const requiredYears =
+        UK_TAX_CONSTANTS.statePension.qualifyingYearsRequired;
+      const minYears = UK_TAX_CONSTANTS.statePension.minimumQualifyingYears;
+      const fullPension =
+        UK_TAX_CONSTANTS.statePension.fullNewStatePensionAnnual;
+      const statePensionAnnual =
+        qualifyingYears >= minYears
+          ? Math.min(1, qualifyingYears / requiredYears) * fullPension
+          : 0;
+
+      return {
+        name: person.name,
+        pensionAccessAge: person.pensionAccessAge,
+        stateRetirementAge: person.stateRetirementAge,
+        pensionPot: personPensionPot,
+        accessibleWealth: personAccessible,
+        statePensionAnnual: Math.round(statePensionAnnual),
+      };
+    });
+  }, [persons, accounts]);
 
   return (
     <div className="space-y-8">
@@ -275,6 +326,86 @@ export default function RetirementPage() {
               );
             })}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Combined Retirement Income Timeline */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Combined Retirement Income Timeline</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-muted-foreground">
+            All household income sources stacked by year: state pensions, DC pension
+            drawdown, and ISA/savings bridge. Shows whether combined income meets
+            the {formatCurrency(retirement.targetAnnualIncome)}/yr target at{" "}
+            {formatPercent(midRate)} growth.
+          </p>
+          <RetirementIncomeTimeline
+            persons={personRetirementInputs}
+            targetAnnualIncome={retirement.targetAnnualIncome}
+            retirementAge={earlyRetirementAge}
+            growthRate={midRate}
+          />
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            {personRetirementInputs.map((p) => (
+              <div key={p.name} className="rounded-lg border p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {p.name}
+                </p>
+                <div className="mt-1 space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Pension pot</span>
+                    <span className="font-mono">
+                      {formatCurrencyCompact(p.pensionPot)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>ISA/Savings</span>
+                    <span className="font-mono">
+                      {formatCurrencyCompact(p.accessibleWealth)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>State pension</span>
+                    <span className="font-mono">
+                      {formatCurrency(p.statePensionAnnual)}/yr
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Pension access</span>
+                    <span>Age {p.pensionAccessAge}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>State pension</span>
+                    <span>Age {p.stateRetirementAge}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Retirement Drawdown Projection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Retirement Drawdown Projection</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-muted-foreground">
+            How your pot depletes during retirement at {formatCurrency(retirement.targetAnnualIncome)}/yr
+            spending, with state pension income reducing withdrawals from age{" "}
+            {primaryPerson?.stateRetirementAge ?? 67}. Capital at risk — projections are illustrative only.
+          </p>
+          <RetirementDrawdownChart
+            startingPot={requiredPot}
+            annualSpend={retirement.targetAnnualIncome}
+            retirementAge={earlyRetirementAge}
+            scenarioRates={retirement.scenarioRates}
+            statePensionAge={primaryPerson?.stateRetirementAge ?? 67}
+            statePensionAnnual={UK_TAX_CONSTANTS.statePension.fullNewStatePensionAnnual}
+          />
         </CardContent>
       </Card>
 

@@ -18,6 +18,9 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GainLossChart } from "@/components/charts/gain-loss-chart";
+import { FeeImpactChart } from "@/components/charts/fee-impact-chart";
+import { FundPerformanceChart } from "@/components/charts/fund-performance-chart";
 
 interface FundHoldingRow {
   accountId: string;
@@ -165,6 +168,68 @@ export default function HoldingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Gain/Loss by Fund Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Unrealised Gain/Loss by Fund</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <GainLossChart
+            data={fundGroups.map((g) => ({
+              name: g.fund.ticker || g.fund.name,
+              value: g.totalGainLoss,
+            }))}
+            height={Math.max(200, fundGroups.length * 50)}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Fund Performance Comparison */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Historical Returns by Fund</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Annualised historical returns where data is available. Past performance does not guarantee future results.
+          </p>
+          <FundPerformanceChart
+            data={funds
+              .filter((f) => f.historicalReturns)
+              .map((f) => ({
+                name: f.ticker || f.name,
+                "1yr": f.historicalReturns?.["1yr"],
+                "3yr": f.historicalReturns?.["3yr"],
+                "5yr": f.historicalReturns?.["5yr"],
+              }))}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Fee Impact Projection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Fee Impact Over 30 Years</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-muted-foreground">
+            The compounding cost of fund charges (OCF) on your portfolio over time,
+            assuming 7% gross annual return and current monthly contributions.
+          </p>
+          <FeeImpactChart
+            currentValue={grandTotalCurrent}
+            monthlyContribution={0}
+            annualReturn={0.07}
+            weightedOCF={
+              fundGroups.length > 0
+                ? fundGroups.reduce((sum, g) => sum + g.fund.ocf * g.totalCurrent, 0) /
+                  grandTotalCurrent || 0
+                : 0
+            }
+          />
+        </CardContent>
+      </Card>
 
       {/* Fund sections */}
       {fundGroups.map(({ fund, rows, totalInvested, totalCurrent, totalGainLoss }) => (

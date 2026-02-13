@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { formatCurrencyAxis, formatCurrencyTooltip } from "@/lib/format";
 
 export interface AllocationBarDataItem {
   name: string;
@@ -34,21 +35,6 @@ const MULTI_COLORS = [
   "hsl(280, 60%, 55%)",
   "hsl(30, 80%, 55%)",
 ];
-
-function formatCompactValue(value: number): string {
-  if (value >= 1_000_000) return `\u00A3${(value / 1_000_000).toFixed(1)}m`;
-  if (value >= 1_000) return `\u00A3${(value / 1_000).toFixed(0)}k`;
-  return `\u00A3${value.toFixed(0)}`;
-}
-
-function formatTooltipValue(value: number): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 export function AllocationBar({
   data,
@@ -79,7 +65,7 @@ export function AllocationBar({
           >
             <XAxis
               type="number"
-              tickFormatter={formatCompactValue}
+              tickFormatter={formatCurrencyAxis}
               tick={{ fontSize: 12 }}
             />
             <YAxis
@@ -89,7 +75,7 @@ export function AllocationBar({
               width={120}
             />
             <Tooltip
-              formatter={(value: number | undefined) => formatTooltipValue(value ?? 0)}
+              formatter={(value: number | undefined) => formatCurrencyTooltip(value ?? 0)}
               contentStyle={{
                 backgroundColor: "var(--card)",
                 border: "1px solid var(--border)",
@@ -126,12 +112,12 @@ export function AllocationBar({
             tick={{ fontSize: 12 }}
           />
           <YAxis
-            tickFormatter={formatCompactValue}
+            tickFormatter={formatCurrencyAxis}
             tick={{ fontSize: 12 }}
             width={70}
           />
           <Tooltip
-            formatter={(value: number | undefined) => formatTooltipValue(value ?? 0)}
+            formatter={(value: number | undefined) => formatCurrencyTooltip(value ?? 0)}
             contentStyle={{
               backgroundColor: "var(--card)",
               border: "1px solid var(--border)",

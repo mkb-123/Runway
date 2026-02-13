@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import type { NetWorthSnapshot } from "@/types";
 import type { ScenarioProjection } from "@/lib/projections";
+import { formatCurrencyAxis, formatCurrencyTooltip } from "@/lib/format";
 
 interface MilestoneMarker {
   label: string;
@@ -31,21 +32,6 @@ const SCENARIO_COLORS = [
   "var(--chart-4)",
   "var(--chart-5)",
 ];
-
-function formatCompactValue(value: number): string {
-  if (value >= 1_000_000) return `\u00A3${(value / 1_000_000).toFixed(1)}m`;
-  if (value >= 1_000) return `\u00A3${(value / 1_000).toFixed(0)}k`;
-  return `\u00A3${value.toFixed(0)}`;
-}
-
-function formatTooltipValue(value: number): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 export function NetWorthTrajectoryChart({
   snapshots,
@@ -130,14 +116,14 @@ export function NetWorthTrajectoryChart({
             interval="preserveStartEnd"
           />
           <YAxis
-            tickFormatter={formatCompactValue}
+            tickFormatter={formatCurrencyAxis}
             tick={{ fontSize: 12 }}
             width={70}
           />
           <Tooltip
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             formatter={(value: any, name: any) => [
-              formatTooltipValue(Number(value ?? 0)),
+              formatCurrencyTooltip(Number(value ?? 0)),
               name === "historical" ? "Historical" : `Growth ${name}`,
             ]}
             labelFormatter={(label) => `Year: ${label}`}
@@ -157,7 +143,7 @@ export function NetWorthTrajectoryChart({
               stroke="var(--muted-foreground)"
               strokeDasharray="4 4"
               label={{
-                value: `${m.label} (${formatCompactValue(m.value)})`,
+                value: `${m.label} (${formatCurrencyAxis(m.value)})`,
                 position: "insideTopRight",
                 fontSize: 11,
                 fill: "var(--muted-foreground)",

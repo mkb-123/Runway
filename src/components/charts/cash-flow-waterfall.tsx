@@ -10,6 +10,7 @@ import {
   Cell,
   ReferenceLine,
 } from "recharts";
+import { formatCurrencyAxis, formatCurrencyTooltip } from "@/lib/format";
 
 export interface WaterfallDataPoint {
   name: string;
@@ -27,23 +28,6 @@ interface WaterfallBarEntry {
   base: number;
   visible: number;
   type: "income" | "deduction" | "subtotal";
-}
-
-function formatCompactValue(value: number): string {
-  const abs = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-  if (abs >= 1_000_000) return `${sign}\u00A3${(abs / 1_000_000).toFixed(1)}m`;
-  if (abs >= 1_000) return `${sign}\u00A3${(abs / 1_000).toFixed(0)}k`;
-  return `${sign}\u00A3${abs.toFixed(0)}`;
-}
-
-function formatTooltipValue(value: number): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function computeWaterfallBars(data: WaterfallDataPoint[]): WaterfallBarEntry[] {
@@ -116,7 +100,7 @@ export function CashFlowWaterfall({ data }: CashFlowWaterfallProps) {
             interval={0}
           />
           <YAxis
-            tickFormatter={formatCompactValue}
+            tickFormatter={formatCurrencyAxis}
             tick={{ fontSize: 12 }}
             width={70}
           />
@@ -126,8 +110,8 @@ export function CashFlowWaterfall({ data }: CashFlowWaterfallProps) {
               const entry = props.payload as WaterfallBarEntry;
               const label =
                 entry.type === "deduction"
-                  ? `- ${formatTooltipValue(entry.value)}`
-                  : formatTooltipValue(entry.value);
+                  ? `- ${formatCurrencyTooltip(entry.value)}`
+                  : formatCurrencyTooltip(entry.value);
               return [label, entry.name];
             }}
             labelFormatter={(label) => String(label)}

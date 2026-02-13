@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import type { NetWorthSnapshot, TaxWrapper } from "@/types";
 import { TAX_WRAPPER_LABELS } from "@/types";
+import { formatCurrencyAxis, formatCurrencyTooltip } from "@/lib/format";
 
 interface NetWorthHistoryChartProps {
   snapshots: NetWorthSnapshot[];
@@ -31,21 +32,6 @@ const WRAPPER_COLORS: Record<TaxWrapper, string> = {
   cash: "var(--chart-4)",
   premium_bonds: "var(--chart-5)",
 };
-
-function formatCompactValue(value: number): string {
-  if (value >= 1_000_000) return `\u00A3${(value / 1_000_000).toFixed(1)}m`;
-  if (value >= 1_000) return `\u00A3${(value / 1_000).toFixed(0)}k`;
-  return `\u00A3${value.toFixed(0)}`;
-}
-
-function formatTooltipValue(value: number): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 function formatDateLabel(dateStr: string): string {
   const date = new Date(dateStr);
@@ -82,14 +68,14 @@ export function NetWorthHistoryChart({
             tick={{ fontSize: 12 }}
           />
           <YAxis
-            tickFormatter={formatCompactValue}
+            tickFormatter={formatCurrencyAxis}
             tick={{ fontSize: 12 }}
             width={70}
           />
           <Tooltip
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             formatter={(value: any, name: any) => [
-              formatTooltipValue(Number(value ?? 0)),
+              formatCurrencyTooltip(Number(value ?? 0)),
               TAX_WRAPPER_LABELS[name as TaxWrapper] ?? name,
             ]}
             labelFormatter={(_, payload) => {

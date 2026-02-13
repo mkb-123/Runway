@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { formatCurrencyTooltip } from "@/lib/format";
 
 interface PersonSlice {
   name: string;
@@ -25,15 +26,6 @@ const COLORS = [
   "var(--chart-4)",
   "var(--chart-5)",
 ];
-
-function formatTooltipValue(value: number): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 export function ByPersonChart({ data }: ByPersonChartProps) {
   return (
@@ -65,7 +57,7 @@ export function ByPersonChart({ data }: ByPersonChartProps) {
           <Tooltip
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             formatter={(value: any, name: any) => [
-              formatTooltipValue(Number(value ?? 0)),
+              formatCurrencyTooltip(Number(value ?? 0)),
               name,
             ]}
             contentStyle={{
