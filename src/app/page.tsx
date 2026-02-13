@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Settings,
@@ -9,7 +9,6 @@ import {
   Minus,
   X,
   Lightbulb,
-  ArrowRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +23,6 @@ import { useScenarioData } from "@/context/use-scenario-data";
 import { projectScenarios } from "@/lib/projections";
 import {
   generateRecommendations,
-  type Recommendation,
   type RecommendationPriority,
 } from "@/lib/recommendations";
 import { TAX_WRAPPER_LABELS } from "@/types";
@@ -213,14 +211,14 @@ export default function Home() {
   }, [byWrapper, totalNetWorth]);
 
   // --- Banner dismiss state ---
-  const [bannerDismissed, setBannerDismissed] = useState(true); // default hidden to prevent flash
-  useEffect(() => {
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    if (typeof window === "undefined") return true; // SSR: default hidden to prevent flash
     try {
-      setBannerDismissed(localStorage.getItem("nw-banner-dismissed") === "true");
+      return localStorage.getItem("nw-banner-dismissed") === "true";
     } catch {
-      setBannerDismissed(false);
+      return false;
     }
-  }, []);
+  });
 
   const dismissBanner = useCallback(() => {
     setBannerDismissed(true);
@@ -234,7 +232,7 @@ export default function Home() {
   const changeIndicator = (value: number) =>
     value >= 0 ? "text-emerald-600" : "text-red-600";
   const changePrefix = (value: number) => (value >= 0 ? "+" : "");
-  const TrendIcon = ({ value }: { value: number }) => {
+  const trendIcon = (value: number) => {
     if (value > 0) return <TrendingUp className="inline size-4" aria-label="increased" />;
     if (value < 0) return <TrendingDown className="inline size-4" aria-label="decreased" />;
     return <Minus className="inline size-4" aria-label="unchanged" />;
@@ -340,7 +338,7 @@ export default function Home() {
               <p
                 className={`flex items-center gap-1.5 text-2xl font-bold tracking-tight ${changeIndicator(monthOnMonthChange)}`}
               >
-                <TrendIcon value={monthOnMonthChange} />
+                {trendIcon(monthOnMonthChange)}
                 <span>
                   {changePrefix(monthOnMonthChange)}
                   {formatCurrencyCompact(monthOnMonthChange)}
@@ -366,7 +364,7 @@ export default function Home() {
               <p
                 className={`flex items-center gap-1.5 text-2xl font-bold tracking-tight ${changeIndicator(yearOnYearChange)}`}
               >
-                <TrendIcon value={yearOnYearChange} />
+                {trendIcon(yearOnYearChange)}
                 <span>
                   {changePrefix(yearOnYearChange)}
                   {formatCurrencyCompact(yearOnYearChange)}

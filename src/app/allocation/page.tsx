@@ -9,7 +9,7 @@ import {
   ASSET_CLASS_LABELS,
   REGION_LABELS,
 } from "@/types";
-import type { AssetClass, Region, TaxWrapper } from "@/types";
+import type { AssetClass, Region } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AllocationPie } from "@/components/charts/allocation-pie";

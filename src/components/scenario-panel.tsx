@@ -54,9 +54,7 @@ export function ScenarioPanel() {
     isScenarioMode,
     scenarioLabel,
     enableScenario,
-    updateOverrides,
     disableScenario,
-    overrides,
   } = useScenario();
 
   const [open, setOpen] = useState(false);

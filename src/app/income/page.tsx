@@ -10,11 +10,7 @@ import {
   calculateTakeHomePayWithStudentLoan,
 } from "@/lib/tax";
 import type {
-  Person,
-  PersonIncome,
-  BonusStructure,
   DeferredBonusTranche,
-  AnnualContributions,
 } from "@/types";
 import {
   Table,
@@ -133,8 +129,6 @@ export default function IncomePage() {
       (sum, p) => sum + (p.contributions?.giaContribution ?? 0),
       0
     );
-    const afterISA = combinedTakeHome - combinedISA;
-    const afterExpenses = afterISA - estimatedAnnualExpenses;
     // GIA overflow is whatever is directed to GIA from what remains
     const giaOverflow = combinedGIA;
 
@@ -189,7 +183,6 @@ export default function IncomePage() {
           person,
           personIncome,
           bonus,
-          contributions,
           incomeTaxResult,
           niResult,
           studentLoan,

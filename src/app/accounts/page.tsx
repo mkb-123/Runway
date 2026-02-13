@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { useData } from "@/context/data-context";
 import { formatCurrency } from "@/lib/format";
 import { ACCOUNT_TYPE_LABELS } from "@/types";
-import type { Person, Account } from "@/types";
 import {
   Table,
   TableHeader,

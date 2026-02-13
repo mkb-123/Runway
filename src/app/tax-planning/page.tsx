@@ -33,7 +33,7 @@ import type { PersonIncome } from "@/types";
 export default function TaxPlanningPage() {
   const { household, transactions: transactionsData, getAccountsForPerson, getNetWorthByWrapper } = useData();
   const { transactions } = transactionsData;
-  const { persons, accounts, income, annualContributions } = household;
+  const { persons, income, annualContributions } = household;
 
   const currentTaxYear = "2024/25";
   const isaAllowance = UK_TAX_CONSTANTS.isaAnnualAllowance;
@@ -136,14 +136,14 @@ export default function TaxPlanningPage() {
           isHigherRate,
         };
       }),
-    [persons, income, annualContributions, accounts, transactions, getAccountsForPerson, isaAllowance, pensionAllowance, cgtAnnualExempt]
+    [persons, income, annualContributions, transactions, getAccountsForPerson, isaAllowance, pensionAllowance, cgtAnnualExempt]
   );
 
   // Pension modelling scenarios
   const pensionScenarios = useMemo(
     () =>
       personData.map(
-        ({ person, personIncome, pensionUsed, pensionRemaining }) => {
+        ({ person, personIncome, pensionRemaining }) => {
           if (!personIncome) return { person, scenarios: [] };
 
           const currentEmployeePension =

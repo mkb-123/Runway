@@ -220,8 +220,6 @@ export function calculateGainsForTaxYear(
 
       if (tx.type === "sell" && isInTaxYear(tx.date, taxYear)) {
         let unitsToMatch = tx.units;
-        const proceeds = tx.units * tx.pricePerUnit;
-        let costBasis = 0;
         const txDate = new Date(tx.date);
 
         // Rule 1: Same-day matching
@@ -229,7 +227,6 @@ export function calculateGainsForTaxYear(
           if (unitsToMatch <= 0) break;
           if (buy.date === tx.date && buy.remainingUnits > 0) {
             const matched = Math.min(unitsToMatch, buy.remainingUnits);
-            costBasis += matched * buy.pricePerUnit;
             buy.remainingUnits -= matched;
             unitsToMatch -= matched;
 
@@ -258,7 +255,6 @@ export function calculateGainsForTaxYear(
 
           if (daysDiff > 0 && daysDiff <= 30 && buy.remainingUnits > 0) {
             const matched = Math.min(unitsToMatch, buy.remainingUnits);
-            costBasis += matched * buy.pricePerUnit;
             buy.remainingUnits -= matched;
             unitsToMatch -= matched;
 
@@ -283,7 +279,6 @@ export function calculateGainsForTaxYear(
           const avgCost = poolCost / poolUnits;
           const matched = Math.min(unitsToMatch, poolUnits);
           const matchedCost = matched * avgCost;
-          costBasis += matchedCost;
           poolCost -= matchedCost;
           poolUnits -= matched;
           unitsToMatch -= matched;

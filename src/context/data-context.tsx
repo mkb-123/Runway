@@ -115,6 +115,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const storedTransactions = loadFromLocalStorage<TransactionsData>(LS_KEY_TRANSACTIONS);
     const storedSnapshots = loadFromLocalStorage<SnapshotsData>(LS_KEY_SNAPSHOTS);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard Next.js hydration pattern: must read localStorage in effect (unavailable during SSR) and sync into state
     if (storedHousehold) setHousehold(storedHousehold);
     if (storedTransactions) setTransactions(storedTransactions);
     if (storedSnapshots) setSnapshots(storedSnapshots);
