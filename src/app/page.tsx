@@ -2,8 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Settings, TrendingUp, TrendingDown, Minus, X } from "lucide-react";
+import {
+  Settings,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  X,
+  Lightbulb,
+  ArrowRight,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   formatCurrency,
@@ -11,7 +20,13 @@ import {
   formatPercent,
 } from "@/lib/format";
 import { useData } from "@/context/data-context";
+import { useScenarioData } from "@/context/use-scenario-data";
 import { projectScenarios } from "@/lib/projections";
+import {
+  generateRecommendations,
+  type Recommendation,
+  type RecommendationPriority,
+} from "@/lib/recommendations";
 import { TAX_WRAPPER_LABELS } from "@/types";
 import type { TaxWrapper } from "@/types";
 
@@ -19,20 +34,55 @@ import { NetWorthTrajectoryChart } from "@/components/charts/net-worth-trajector
 import { NetWorthHistoryChart } from "@/components/charts/net-worth-history";
 import { ByPersonChart } from "@/components/charts/by-person-chart";
 
+const priorityConfig: Record<
+  RecommendationPriority,
+  { label: string; color: string; bg: string; border: string }
+> = {
+  high: {
+    label: "High",
+    color: "text-red-700 dark:text-red-400",
+    bg: "bg-red-50 dark:bg-red-950",
+    border: "border-red-200 dark:border-red-900",
+  },
+  medium: {
+    label: "Medium",
+    color: "text-amber-700 dark:text-amber-400",
+    bg: "bg-amber-50 dark:bg-amber-950",
+    border: "border-amber-200 dark:border-amber-900",
+  },
+  low: {
+    label: "Low",
+    color: "text-blue-700 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-950",
+    border: "border-blue-200 dark:border-blue-900",
+  },
+};
+
 export default function Home() {
   // --- Data Loading ---
   const {
-    household,
     snapshots: snapshotsData,
-    getTotalNetWorth,
-    getNetWorthByPerson,
-    getNetWorthByWrapper,
+    transactions: transactionsData,
   } = useData();
 
+  // Scenario-aware data
+  const scenarioData = useScenarioData();
+  const household = scenarioData.household;
+  const totalNetWorth = scenarioData.getTotalNetWorth();
+  const byPerson = scenarioData.getNetWorthByPerson();
+  const byWrapper = scenarioData.getNetWorthByWrapper();
+
   const { snapshots } = snapshotsData;
-  const totalNetWorth = getTotalNetWorth();
-  const byPerson = getNetWorthByPerson();
-  const byWrapper = getNetWorthByWrapper();
+
+  // --- Recommendations ---
+  const recommendations = useMemo(
+    () => generateRecommendations(household, transactionsData),
+    [household, transactionsData]
+  );
+
+  const highPriorityCount = recommendations.filter(
+    (r) => r.priority === "high"
+  ).length;
 
   // --- Snapshot Change Calculations ---
   const {
@@ -333,7 +383,69 @@ export default function Home() {
         </div>
 
         {/* ============================================================ */}
-        {/* Section 2: Net Worth by Wrapper                              */}
+        {/* Section 2: Actionable Recommendations                        */}
+        {/* ============================================================ */}
+        {recommendations.length > 0 && (
+          <div className="mb-8">
+            <div className="mb-4 flex items-center gap-3">
+              <h2 className="text-xl font-semibold text-foreground">
+                Recommended Actions
+              </h2>
+              {highPriorityCount > 0 && (
+                <Badge variant="destructive">
+                  {highPriorityCount} high priority
+                </Badge>
+              )}
+            </div>
+            <div className="grid gap-3">
+              {recommendations.slice(0, 5).map((rec) => {
+                const config = priorityConfig[rec.priority];
+                return (
+                  <Card
+                    key={rec.id}
+                    className={`border ${config.border} ${config.bg}`}
+                  >
+                    <CardContent className="py-4">
+                      <div className="flex items-start gap-3">
+                        <Lightbulb
+                          className={`mt-0.5 size-5 shrink-0 ${config.color}`}
+                        />
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{rec.title}</h3>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${config.color}`}
+                            >
+                              {config.label}
+                            </Badge>
+                            {rec.personName && (
+                              <Badge variant="secondary" className="text-xs">
+                                {rec.personName}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {rec.description}
+                          </p>
+                          <p className="text-sm font-medium">{rec.impact}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {recommendations.length > 5 && (
+                <p className="text-center text-sm text-muted-foreground">
+                  +{recommendations.length - 5} more recommendations
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* Section 3: Net Worth by Wrapper                              */}
         {/* ============================================================ */}
         <div className="mb-8">
           <h2 className="mb-4 text-xl font-semibold text-foreground">
@@ -361,7 +473,7 @@ export default function Home() {
         </div>
 
         {/* ============================================================ */}
-        {/* Section 3: Net Worth Trajectory Chart                        */}
+        {/* Section 4: Net Worth Trajectory Chart                        */}
         {/* ============================================================ */}
         <div className="mb-8">
           <Card>
@@ -386,7 +498,7 @@ export default function Home() {
         </div>
 
         {/* ============================================================ */}
-        {/* Section 4: Net Worth History Chart (stacked area)            */}
+        {/* Section 5: Net Worth History Chart (stacked area)            */}
         {/* ============================================================ */}
         <div className="mb-8">
           <Card>
@@ -403,7 +515,7 @@ export default function Home() {
         </div>
 
         {/* ============================================================ */}
-        {/* Section 5: By Person Breakdown                               */}
+        {/* Section 6: By Person Breakdown                               */}
         {/* ============================================================ */}
         <div className="mb-8">
           <Card>
