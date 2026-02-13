@@ -1661,8 +1661,7 @@ export default function SettingsPage() {
             <div>
               <h2 className="text-lg font-semibold">Transactions</h2>
               <p className="text-sm text-muted-foreground">
-                Record buy, sell, dividend, and contribution transactions for
-                CGT tracking.
+                Record buy, sell, dividend, and contribution transactions.
               </p>
             </div>
             <Button variant="outline" onClick={addTransaction}>
