@@ -8,6 +8,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { formatCurrencyTooltip } from "@/lib/format";
 
 export interface AllocationPieDataItem {
   name: string;
@@ -34,15 +35,6 @@ const DEFAULT_COLORS = [
   "hsl(160, 60%, 45%)",
   "hsl(350, 65%, 55%)",
 ];
-
-function formatTooltipValue(value: number): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 export function AllocationPie({
   data,
@@ -83,7 +75,7 @@ export function AllocationPie({
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: number | undefined) => formatTooltipValue(value ?? 0)}
+            formatter={(value: number | undefined) => formatCurrencyTooltip(value ?? 0)}
             contentStyle={{
               backgroundColor: "var(--card)",
               border: "1px solid var(--border)",

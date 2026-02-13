@@ -61,3 +61,27 @@ export function formatDate(dateStr: string): string {
 export function formatNumber(n: number): string {
   return new Intl.NumberFormat("en-GB").format(n);
 }
+
+/**
+ * Format currency for chart axis ticks: "£732k", "£1.5m"
+ * Uses integer for thousands, one decimal for millions/billions.
+ */
+export function formatCurrencyAxis(value: number): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}\u00A3${(abs / 1_000_000).toFixed(1)}m`;
+  if (abs >= 1_000) return `${sign}\u00A3${(abs / 1_000).toFixed(0)}k`;
+  return `${sign}\u00A3${abs.toFixed(0)}`;
+}
+
+/**
+ * Format currency for chart tooltips: "£732,000" (full precision, no pence).
+ */
+export function formatCurrencyTooltip(value: number): string {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+}

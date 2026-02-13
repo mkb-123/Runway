@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Settings } from "lucide-react";
+import { Settings, TrendingUp, TrendingDown, Minus, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -162,33 +162,66 @@ export default function Home() {
       .filter((w) => w.value > 0);
   }, [byWrapper, totalNetWorth]);
 
+  // --- Banner dismiss state ---
+  const [bannerDismissed, setBannerDismissed] = useState(true); // default hidden to prevent flash
+  useEffect(() => {
+    try {
+      setBannerDismissed(localStorage.getItem("nw-banner-dismissed") === "true");
+    } catch {
+      setBannerDismissed(false);
+    }
+  }, []);
+
+  const dismissBanner = useCallback(() => {
+    setBannerDismissed(true);
+    try {
+      localStorage.setItem("nw-banner-dismissed", "true");
+    } catch {
+      // localStorage unavailable
+    }
+  }, []);
+
   const changeIndicator = (value: number) =>
     value >= 0 ? "text-emerald-600" : "text-red-600";
   const changePrefix = (value: number) => (value >= 0 ? "+" : "");
+  const TrendIcon = ({ value }: { value: number }) => {
+    if (value > 0) return <TrendingUp className="inline size-4" aria-label="increased" />;
+    if (value < 0) return <TrendingDown className="inline size-4" aria-label="decreased" />;
+    return <Minus className="inline size-4" aria-label="unchanged" />;
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Getting Started Banner */}
-        <div className="mb-6 rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground sm:text-xl">
-                Getting Started
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Head to <strong>Settings</strong> first to enter your personal financial data — accounts, income, holdings, and goals.
-                All other pages compute from the data you provide there.
-              </p>
+        {!bannerDismissed && (
+          <div className="relative mb-6 rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
+            <button
+              onClick={dismissBanner}
+              className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
+              aria-label="Dismiss getting started banner"
+            >
+              <X className="size-4" />
+            </button>
+            <div className="flex flex-col gap-3 pr-8 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground sm:text-xl">
+                  Getting Started
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Head to <strong>Settings</strong> first to enter your personal financial data — accounts, income, holdings, and goals.
+                  All other pages compute from the data you provide there.
+                </p>
+              </div>
+              <Link href="/settings">
+                <Button size="lg" className="w-full gap-2 sm:w-auto">
+                  <Settings className="size-4" />
+                  Open Settings
+                </Button>
+              </Link>
             </div>
-            <Link href="/settings">
-              <Button size="lg" className="w-full gap-2 sm:w-auto">
-                <Settings className="size-4" />
-                Open Settings
-              </Button>
-            </Link>
           </div>
-        </div>
+        )}
 
         {/* Page Header */}
         <div className="mb-8">
@@ -255,10 +288,13 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <p
-                className={`text-2xl font-bold tracking-tight ${changeIndicator(monthOnMonthChange)}`}
+                className={`flex items-center gap-1.5 text-2xl font-bold tracking-tight ${changeIndicator(monthOnMonthChange)}`}
               >
-                {changePrefix(monthOnMonthChange)}
-                {formatCurrencyCompact(monthOnMonthChange)}
+                <TrendIcon value={monthOnMonthChange} />
+                <span>
+                  {changePrefix(monthOnMonthChange)}
+                  {formatCurrencyCompact(monthOnMonthChange)}
+                </span>
               </p>
               <p
                 className={`mt-1 text-sm ${changeIndicator(monthOnMonthPercent)}`}
@@ -278,10 +314,13 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <p
-                className={`text-2xl font-bold tracking-tight ${changeIndicator(yearOnYearChange)}`}
+                className={`flex items-center gap-1.5 text-2xl font-bold tracking-tight ${changeIndicator(yearOnYearChange)}`}
               >
-                {changePrefix(yearOnYearChange)}
-                {formatCurrencyCompact(yearOnYearChange)}
+                <TrendIcon value={yearOnYearChange} />
+                <span>
+                  {changePrefix(yearOnYearChange)}
+                  {formatCurrencyCompact(yearOnYearChange)}
+                </span>
               </p>
               <p
                 className={`mt-1 text-sm ${changeIndicator(yearOnYearPercent)}`}
