@@ -36,6 +36,8 @@ import {
 } from "@/components/charts/cash-flow-waterfall";
 import { EffectiveTaxRateChart } from "@/components/charts/effective-tax-rate-chart";
 import { TaxBandChart } from "@/components/charts/tax-band-chart";
+import { CashFlowTimeline } from "@/components/charts/cash-flow-timeline";
+import { generateCashFlowTimeline } from "@/lib/cash-flow";
 import type { TaxBandDataItem } from "@/components/charts/tax-band-chart";
 
 // --- Helper: projected value at vesting (delegates to lib function) ---
@@ -609,6 +611,21 @@ export default function IncomePage() {
         <Card>
           <CardContent className="pt-6">
             <CashFlowWaterfall data={waterfallData} />
+          </CardContent>
+        </Card>
+      </section>
+      </CollapsibleSection>
+
+      {/* Cash Flow Timeline */}
+      <CollapsibleSection title="Cash Flow Timeline" summary="Monthly income vs outgoings over 24 months" storageKey="income-cashflow-timeline">
+      <section className="space-y-4">
+        <p className="text-muted-foreground">
+          Monthly income (salary, bonuses, deferred vesting) vs total outgoings over the next 24 months.
+          Shows seasonal crunches when school fees, insurance, and bonuses collide.
+        </p>
+        <Card>
+          <CardContent className="pt-6">
+            <CashFlowTimeline data={generateCashFlowTimeline(household)} />
           </CardContent>
         </Card>
       </section>

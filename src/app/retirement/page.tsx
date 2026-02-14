@@ -139,6 +139,7 @@ export default function RetirementPage() {
   const currentAge = primaryPerson
     ? calculateAge(primaryPerson.dateOfBirth)
     : 35;
+  const plannedRetirementAge = primaryPerson?.plannedRetirementAge ?? 60;
   const pensionAccessAge = primaryPerson?.pensionAccessAge ?? 57;
 
   // Coast FIRE: use the middle scenario rate
@@ -168,16 +169,15 @@ export default function RetirementPage() {
   }, [requiredPot, currentPot, midRate]);
 
   // Pension Bridge Analysis
-  const earlyRetirementAge = currentAge + 10;
   const bridgeResult = useMemo(
     () =>
       calculatePensionBridge(
-        earlyRetirementAge,
+        plannedRetirementAge,
         pensionAccessAge,
         retirement.targetAnnualIncome,
         accessibleWealth
       ),
-    [earlyRetirementAge, pensionAccessAge, retirement.targetAnnualIncome, accessibleWealth]
+    [plannedRetirementAge, pensionAccessAge, retirement.targetAnnualIncome, accessibleWealth]
   );
 
   // Max bar width calculation for stacked bar
@@ -383,7 +383,7 @@ export default function RetirementPage() {
           <RetirementIncomeTimeline
             persons={personRetirementInputs}
             targetAnnualIncome={retirement.targetAnnualIncome}
-            retirementAge={earlyRetirementAge}
+            retirementAge={plannedRetirementAge}
             growthRate={midRate}
           />
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -440,7 +440,7 @@ export default function RetirementPage() {
           <RetirementDrawdownChart
             startingPot={requiredPot}
             annualSpend={retirement.targetAnnualIncome}
-            retirementAge={earlyRetirementAge}
+            retirementAge={plannedRetirementAge}
             scenarioRates={retirement.scenarioRates}
             statePensionAge={primaryPerson?.stateRetirementAge ?? 67}
             statePensionAnnual={primaryStatePensionAnnual}
@@ -528,7 +528,7 @@ export default function RetirementPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <p className="text-sm text-muted-foreground">
-            If you retire at age {earlyRetirementAge}, can your accessible
+            If you retire at age {plannedRetirementAge}, can your accessible
             (non-pension) wealth bridge the gap until pension access at age{" "}
             {pensionAccessAge}?
           </p>
@@ -584,7 +584,7 @@ export default function RetirementPage() {
                   {formatCurrency(bridgeResult.bridgePotRequired)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {pensionAccessAge - earlyRetirementAge} years x{" "}
+                  {pensionAccessAge - plannedRetirementAge} years x{" "}
                   {formatCurrencyCompact(retirement.targetAnnualIncome)}/yr
                 </p>
               </CardContent>

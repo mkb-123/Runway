@@ -182,15 +182,15 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
   // Contribution helpers
   // ----------------------------------------------------------
 
-  function addContribution(personId: string) {
+  function addContribution(personId: string, template?: { label: string; target: ContributionTarget; amount: number; frequency: ContributionFrequency }) {
     const updated = clone(household);
     updated.contributions.push({
       id: `contrib-${Date.now()}`,
       personId,
-      label: "",
-      target: "isa" as ContributionTarget,
-      amount: 0,
-      frequency: "monthly" as ContributionFrequency,
+      label: template?.label ?? "",
+      target: template?.target ?? ("isa" as ContributionTarget),
+      amount: template?.amount ?? 0,
+      frequency: template?.frequency ?? ("monthly" as ContributionFrequency),
     });
     updateHousehold(updated);
   }
@@ -772,13 +772,36 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                       }
                       return null;
                     })()}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addContribution(person.id)}
-                    >
-                      + Add Contribution
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addContribution(person.id)}
+                      >
+                        + Custom
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => addContribution(person.id, { label: "Monthly ISA", target: "isa", amount: 1666, frequency: "monthly" })}
+                      >
+                        Monthly ISA
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => addContribution(person.id, { label: "Annual ISA", target: "isa", amount: 20000, frequency: "annually" })}
+                      >
+                        Annual ISA
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => addContribution(person.id, { label: "Annual SIPP top-up", target: "pension", amount: 10000, frequency: "annually" })}
+                      >
+                        SIPP Top-up
+                      </Button>
+                    </div>
                   </div>
                 </CollapsibleContent>
               </Collapsible>

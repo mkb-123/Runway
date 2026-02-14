@@ -25,6 +25,12 @@ import {
 // Re-export for consumers
 export type { ScenarioOverrides, ContributionOverride };
 
+export interface SavedScenario {
+  name: string;
+  overrides: ScenarioOverrides;
+  savedAt: string; // ISO date
+}
+
 export interface ScenarioContextValue {
   isScenarioMode: boolean;
   scenarioLabel: string;
@@ -32,16 +38,40 @@ export interface ScenarioContextValue {
   enableScenario: (label: string, overrides: ScenarioOverrides) => void;
   updateOverrides: (overrides: Partial<ScenarioOverrides>) => void;
   disableScenario: () => void;
-  /** Apply overrides to household data to produce scenario-adjusted data */
   applyOverrides: (household: HouseholdData) => HouseholdData;
+  savedScenarios: SavedScenario[];
+  saveScenario: (name: string) => void;
+  loadScenario: (name: string) => void;
+  deleteScenario: (name: string) => void;
 }
 
 const ScenarioContext = createContext<ScenarioContextValue | null>(null);
+
+const LS_KEY_SCENARIOS = "nw-saved-scenarios";
+
+function loadSavedScenarios(): SavedScenario[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LS_KEY_SCENARIOS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistSavedScenarios(scenarios: SavedScenario[]) {
+  try {
+    localStorage.setItem(LS_KEY_SCENARIOS, JSON.stringify(scenarios));
+  } catch {
+    // ignore
+  }
+}
 
 export function ScenarioProvider({ children }: { children: ReactNode }) {
   const [isScenarioMode, setIsScenarioMode] = useState(false);
   const [scenarioLabel, setScenarioLabel] = useState("");
   const [overrides, setOverrides] = useState<ScenarioOverrides>({});
+  const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>(loadSavedScenarios);
 
   const enableScenario = useCallback(
     (label: string, newOverrides: ScenarioOverrides) => {
@@ -65,6 +95,32 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
     setOverrides({});
   }, []);
 
+  const saveScenario = useCallback((name: string) => {
+    setSavedScenarios((prev) => {
+      const updated = prev.filter((s) => s.name !== name);
+      updated.push({ name, overrides, savedAt: new Date().toISOString() });
+      persistSavedScenarios(updated);
+      return updated;
+    });
+  }, [overrides]);
+
+  const loadScenario = useCallback((name: string) => {
+    const found = savedScenarios.find((s) => s.name === name);
+    if (found) {
+      setIsScenarioMode(true);
+      setScenarioLabel(found.name);
+      setOverrides(found.overrides);
+    }
+  }, [savedScenarios]);
+
+  const deleteScenario = useCallback((name: string) => {
+    setSavedScenarios((prev) => {
+      const updated = prev.filter((s) => s.name !== name);
+      persistSavedScenarios(updated);
+      return updated;
+    });
+  }, []);
+
   const applyOverrides = useCallback(
     (household: HouseholdData): HouseholdData => {
       if (!isScenarioMode) return household;
@@ -82,6 +138,10 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
       updateOverrides,
       disableScenario,
       applyOverrides,
+      savedScenarios,
+      saveScenario,
+      loadScenario,
+      deleteScenario,
     }),
     [
       isScenarioMode,
@@ -91,6 +151,10 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
       updateOverrides,
       disableScenario,
       applyOverrides,
+      savedScenarios,
+      saveScenario,
+      loadScenario,
+      deleteScenario,
     ]
   );
 
