@@ -10,7 +10,15 @@ import {
   Lightbulb,
   Printer,
   ArrowRight,
+  Wallet2,
+  Banknote,
+  Clock,
+  BarChart3,
+  PiggyBank,
+  Target,
+  Shield,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,19 +75,21 @@ interface HeroMetricData {
 function resolveMetric(
   type: HeroMetricType,
   data: HeroMetricData
-): { label: string; value: string; subtext?: string; color: string; trend?: "up" | "down" } {
+): { label: string; value: string; subtext?: string; color: string; trend?: "up" | "down"; icon: LucideIcon } {
   switch (type) {
     case "net_worth":
       return {
         label: "Net Worth",
         value: formatCurrencyCompact(data.totalNetWorth),
         color: "",
+        icon: Wallet2,
       };
     case "cash_position":
       return {
         label: "Cash Position",
         value: formatCurrencyCompact(data.cashPosition),
         color: "",
+        icon: Banknote,
       };
     case "retirement_countdown": {
       const y = data.retirementCountdownYears;
@@ -89,6 +99,7 @@ function resolveMetric(
         value: y === 0 && m === 0 ? "On track" : `${y}y ${m}m`,
         subtext: y === 0 && m === 0 ? "Target pot reached" : "to target",
         color: "",
+        icon: Clock,
       };
     }
     case "period_change": {
@@ -100,6 +111,7 @@ function resolveMetric(
         subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.monthOnMonthPercent)} MoM`,
         color,
         trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
+        icon: TrendingUp,
       };
     }
     case "year_on_year_change": {
@@ -111,6 +123,7 @@ function resolveMetric(
         subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.yearOnYearPercent)} YoY`,
         color,
         trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
+        icon: BarChart3,
       };
     }
     case "savings_rate":
@@ -119,6 +132,7 @@ function resolveMetric(
         value: `${data.savingsRate.toFixed(1)}%`,
         subtext: "of gross income",
         color: "",
+        icon: PiggyBank,
       };
     case "fire_progress":
       return {
@@ -126,6 +140,7 @@ function resolveMetric(
         value: `${data.fireProgress.toFixed(1)}%`,
         subtext: "of target pot",
         color: data.fireProgress >= 100 ? "text-emerald-600 dark:text-emerald-400" : "",
+        icon: Target,
       };
     case "net_worth_after_commitments":
       return {
@@ -133,6 +148,7 @@ function resolveMetric(
         value: formatCurrencyCompact(data.netWorthAfterCommitments),
         subtext: `${formatCurrencyCompact(data.totalAnnualCommitments)}/yr committed`,
         color: "",
+        icon: Shield,
       };
   }
 }
@@ -489,69 +505,107 @@ export default function Home() {
         </Button>
       </PageHeader>
 
-      {/* HERO — primary metric large, secondary metrics as accent cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {heroMetrics.map((metric, i) => {
-          const resolved = resolveMetric(metric, heroData);
-          const isPrimary = i === 0;
-          return (
-            <Card
-              key={`${metric}-${i}`}
-              className={
-                isPrimary
-                  ? "sm:col-span-1 bg-gradient-to-br from-primary/10 via-card to-card border-primary/20"
-                  : ""
-              }
-            >
-              <CardContent className="pt-6">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  {resolved.label}
-                </span>
-                <div className="mt-1 flex items-center gap-2">
-                  <span
-                    className={`${isPrimary ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl"} font-bold tracking-tight tabular-nums ${resolved.color}`}
-                  >
-                    {resolved.value}
-                  </span>
-                  {resolved.trend === "up" && <TrendingUp className="size-5 text-emerald-500" />}
-                  {resolved.trend === "down" && <TrendingDown className="size-5 text-red-500" />}
+      {/* HERO — bold primary metric + supporting metrics */}
+      {(() => {
+        const primary = resolveMetric(heroMetrics[0], heroData);
+        const PrimaryIcon = primary.icon;
+        const secondaryMetrics = heroMetrics.slice(1).map((m) => resolveMetric(m, heroData));
+        return (
+          <div className="space-y-4">
+            {/* Primary metric — the headline number */}
+            <Card className="relative overflow-hidden border-primary/20 bg-gradient-to-br from-primary/8 via-primary/4 to-card">
+              <div className="pointer-events-none absolute -right-6 -top-6 size-32 rounded-full bg-primary/5" />
+              <div className="pointer-events-none absolute -right-2 bottom-0 size-20 rounded-full bg-primary/3" />
+              <CardContent className="relative pt-6 pb-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+                        <PrimaryIcon className="size-4 text-primary" />
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {primary.label}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-3">
+                      <span className={`text-4xl sm:text-5xl font-bold tracking-tight tabular-nums ${primary.color}`}>
+                        {primary.value}
+                      </span>
+                      {primary.trend === "up" && <TrendingUp className="size-6 text-emerald-500" />}
+                      {primary.trend === "down" && <TrendingDown className="size-6 text-red-500" />}
+                    </div>
+                    {primary.subtext && (
+                      <span className="mt-1 block text-sm text-muted-foreground">{primary.subtext}</span>
+                    )}
+                  </div>
                 </div>
-                {resolved.subtext && (
-                  <span className="mt-0.5 block text-xs text-muted-foreground">{resolved.subtext}</span>
+
+                {/* FIRE progress bar — integrated into hero */}
+                {heroData.fireProgress > 0 && (
+                  <div className="mt-5 pt-4 border-t border-primary/10">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Target className="size-3.5 text-muted-foreground" />
+                        <span className="text-xs font-medium text-muted-foreground">FIRE Progress</span>
+                      </div>
+                      <span className="text-xs font-bold tabular-nums">
+                        {heroData.fireProgress.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-primary/10">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-all"
+                        style={{ width: `${Math.min(heroData.fireProgress, 100)}%` }}
+                      />
+                    </div>
+                    <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
+                      <span>{formatCurrencyCompact(heroData.totalNetWorth)} saved</span>
+                      <span>
+                        Target: {formatCurrencyCompact(
+                          heroData.fireProgress > 0 ? heroData.totalNetWorth / (heroData.fireProgress / 100) : 0
+                        )}
+                      </span>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
-          );
-        })}
-      </div>
 
-      {/* FIRE progress bar */}
-      {heroData.fireProgress > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">FIRE Progress</span>
-              <span className="text-sm font-bold tabular-nums">
-                {heroData.fireProgress.toFixed(1)}%
-              </span>
-            </div>
-            <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-all"
-                style={{ width: `${Math.min(heroData.fireProgress, 100)}%` }}
-              />
-            </div>
-            <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-              <span>{formatCurrencyCompact(heroData.totalNetWorth)} saved</span>
-              <span>
-                Target: {formatCurrencyCompact(
-                  heroData.fireProgress > 0 ? heroData.totalNetWorth / (heroData.fireProgress / 100) : 0
-                )}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            {/* Secondary metrics — compact row */}
+            {secondaryMetrics.length > 0 && (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {secondaryMetrics.map((metric, i) => {
+                  const MetricIcon = metric.icon;
+                  return (
+                    <Card key={i} className="border-muted-foreground/10">
+                      <CardContent className="pt-4 pb-3">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className="flex size-6 items-center justify-center rounded-md bg-muted">
+                            <MetricIcon className="size-3.5 text-muted-foreground" />
+                          </div>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            {metric.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-xl sm:text-2xl font-bold tracking-tight tabular-nums ${metric.color}`}>
+                            {metric.value}
+                          </span>
+                          {metric.trend === "up" && <TrendingUp className="size-4 text-emerald-500" />}
+                          {metric.trend === "down" && <TrendingDown className="size-4 text-red-500" />}
+                        </div>
+                        {metric.subtext && (
+                          <span className="mt-0.5 block text-[11px] text-muted-foreground">{metric.subtext}</span>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* RECOMMENDATIONS — collapsible */}
       {filteredRecommendations.length > 0 && (
@@ -569,9 +623,9 @@ export default function Home() {
         </CollapsibleSection>
       )}
 
-      {/* PRIMARY CHARTS — 2-col on desktop */}
+      {/* PRIMARY CHARTS — 2-col on desktop, with accent top border */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="border-t-2 border-t-primary/30">
           <CardHeader>
             <div className="flex items-baseline justify-between">
               <CardTitle>Net Worth by Wrapper</CardTitle>
@@ -583,7 +637,7 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-t-2 border-t-primary/30">
           <CardHeader>
             <div className="flex items-baseline justify-between">
               <CardTitle>Net Worth Trajectory</CardTitle>
