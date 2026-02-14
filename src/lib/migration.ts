@@ -33,6 +33,7 @@ export function migrateHouseholdData(raw: Record<string, unknown>): Record<strin
   data = migrateMonthlyLifestyleSpending(data);
   data = migrateCommittedOutgoingsDefault(data);
   data = migrateDashboardConfigDefault(data);
+  data = migratePersonDefaults(data);
   return data;
 }
 
@@ -161,6 +162,34 @@ function migrateDashboardConfigDefault(data: Record<string, unknown>): Record<st
     ...data,
     dashboardConfig: { heroMetrics: ["net_worth", "fire_progress", "retirement_countdown"] },
   };
+}
+
+/**
+ * Migration 6: Add plannedRetirementAge and default niQualifyingYears to persons
+ */
+function migratePersonDefaults(data: Record<string, unknown>): Record<string, unknown> {
+  const persons = data.persons;
+  if (!Array.isArray(persons)) return data;
+
+  const updated = persons.map((p: unknown) => {
+    if (typeof p !== "object" || p === null) return p;
+    const person = p as Record<string, unknown>;
+    const result = { ...person };
+
+    // Default plannedRetirementAge if missing
+    if (typeof result.plannedRetirementAge !== "number") {
+      result.plannedRetirementAge = 60;
+    }
+
+    // Default niQualifyingYears to full if missing
+    if (typeof result.niQualifyingYears !== "number") {
+      result.niQualifyingYears = 35;
+    }
+
+    return result;
+  });
+
+  return { ...data, persons: updated };
 }
 
 // --- Helpers ---

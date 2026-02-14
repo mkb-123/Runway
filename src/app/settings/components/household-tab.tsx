@@ -92,9 +92,10 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
       name: "",
       relationship: "spouse",
       dateOfBirth: "1990-01-01",
+      plannedRetirementAge: 60,
       pensionAccessAge: 57,
       stateRetirementAge: 67,
-      niQualifyingYears: 0,
+      niQualifyingYears: 35,
       studentLoanPlan: "none",
     };
     updated.persons.push(newPerson);
@@ -359,23 +360,23 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                       "Check yours at gov.uk/state-pension-age"
                     )}
                     {renderField(
-                      "NI Qualifying Years",
+                      "Planned Retirement Age",
                       <>
                         <Input
                           type="number"
-                          value={person.niQualifyingYears}
+                          value={person.plannedRetirementAge}
                           onChange={(e) =>
-                            updatePerson(pIdx, "niQualifyingYears", Number(e.target.value))
+                            updatePerson(pIdx, "plannedRetirementAge", Number(e.target.value))
                           }
                         />
                         <FieldWarning
-                          value={person.niQualifyingYears}
-                          min={0}
-                          max={50}
-                          label="NI qualifying years"
+                          value={person.plannedRetirementAge}
+                          min={40}
+                          max={80}
+                          label="planned retirement age"
                         />
                       </>,
-                      "Need 35 years for full state pension. Check at gov.uk/check-state-pension"
+                      "When you plan to stop working"
                     )}
                     {renderField(
                       "Student Loan Plan",

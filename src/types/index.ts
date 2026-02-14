@@ -30,9 +30,10 @@ export interface Person {
   name: string;
   relationship: "self" | "spouse";
   dateOfBirth: string; // ISO date
-  pensionAccessAge: number;
-  stateRetirementAge: number;
-  niQualifyingYears: number;
+  plannedRetirementAge: number; // when they plan to stop working
+  pensionAccessAge: number; // when private pension is accessible (e.g. 57)
+  stateRetirementAge: number; // when state pension starts (e.g. 67)
+  niQualifyingYears: number; // kept for data compat, not shown in UI
   studentLoanPlan: StudentLoanPlan;
 }
 
@@ -76,7 +77,7 @@ export type ContributionFrequency = "monthly" | "annually";
 
 export const CONTRIBUTION_TARGET_LABELS: Record<ContributionTarget, string> = {
   isa: "ISA",
-  pension: "Pension",
+  pension: "SIPP / Additional Pension",
   gia: "GIA",
 };
 

@@ -5,8 +5,8 @@ import type { HouseholdData } from "@/types";
 function makeHousehold(overrides?: Partial<HouseholdData>): HouseholdData {
   return {
     persons: [
-      { id: "p1", name: "Alice", relationship: "self", dateOfBirth: "1990-01-01", pensionAccessAge: 57, stateRetirementAge: 67, niQualifyingYears: 15, studentLoanPlan: "none" },
-      { id: "p2", name: "Bob", relationship: "spouse", dateOfBirth: "1992-01-01", pensionAccessAge: 57, stateRetirementAge: 67, niQualifyingYears: 10, studentLoanPlan: "none" },
+      { id: "p1", name: "Alice", relationship: "self", dateOfBirth: "1990-01-01", plannedRetirementAge: 60, pensionAccessAge: 57, stateRetirementAge: 67, niQualifyingYears: 35, studentLoanPlan: "none" },
+      { id: "p2", name: "Bob", relationship: "spouse", dateOfBirth: "1992-01-01", plannedRetirementAge: 60, pensionAccessAge: 57, stateRetirementAge: 67, niQualifyingYears: 35, studentLoanPlan: "none" },
     ],
     accounts: [
       { id: "a1", personId: "p1", type: "stocks_and_shares_isa", provider: "V", name: "ISA", currentValue: 100000 },
