@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import {
   Users,
   Landmark,
-  BookOpen,
   Target,
   Shield,
   Receipt,
@@ -40,7 +39,6 @@ const RunwayExportSchema = z.object({
 
 import { HouseholdTab } from "./components/household-tab";
 import { AccountsTab } from "./components/accounts-tab";
-import { FundsTab } from "./components/funds-tab";
 import { PlanningTab } from "./components/planning-tab";
 import { IhtTab } from "./components/iht-tab";
 import { CommitmentsTab } from "./components/commitments-tab";
@@ -73,14 +71,9 @@ export default function SettingsPage() {
     household.persons.some((p) => p.name.length > 0);
   const hasAccounts = household.accounts.length > 0;
   const hasIncome = household.income.some((i) => i.grossSalary > 0);
-  const hasContributions = household.annualContributions.some(
-    (c) =>
-      c.isaContribution > 0 ||
-      c.pensionContribution > 0 ||
-      c.giaContribution > 0
+  const hasContributions = household.contributions.some(
+    (c) => c.amount > 0
   );
-  const hasFunds = household.funds.length > 0;
-
   const setupSteps = [
     {
       key: "people",
@@ -99,12 +92,6 @@ export default function SettingsPage() {
       label: "Set up accounts",
       done: hasAccounts,
       tab: "accounts",
-    },
-    {
-      key: "funds",
-      label: "Add funds/investments",
-      done: hasFunds,
-      tab: "funds",
     },
     {
       key: "contributions",
@@ -263,10 +250,6 @@ export default function SettingsPage() {
             <Landmark className="size-3.5" />
             Accounts
           </TabsTrigger>
-          <TabsTrigger value="funds" className="gap-1.5 shrink-0">
-            <BookOpen className="size-3.5" />
-            Funds
-          </TabsTrigger>
           <TabsTrigger value="planning" className="gap-1.5 shrink-0">
             <Target className="size-3.5" />
             Planning
@@ -291,13 +274,6 @@ export default function SettingsPage() {
 
         <TabsContent value="accounts">
           <AccountsTab
-            household={household}
-            updateHousehold={updateHousehold}
-          />
-        </TabsContent>
-
-        <TabsContent value="funds">
-          <FundsTab
             household={household}
             updateHousehold={updateHousehold}
           />

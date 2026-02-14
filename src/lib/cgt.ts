@@ -10,11 +10,9 @@ import { roundPence } from "@/lib/format";
 
 export interface UnrealisedGain {
   accountId: string;
-  fundId: string;
   unrealisedGain: number;
-  units: number;
-  averageCost: number;
-  currentPrice: number;
+  currentValue: number;
+  costBasis: number;
 }
 
 export interface BedAndISAResult {
@@ -58,8 +56,8 @@ export function parseTaxYearDates(taxYear: string): { start: string; end: string
 // --- Unrealised Gains ---
 
 /**
- * Calculate unrealised gains across all accounts and holdings,
- * using each holding's purchase price as the cost basis.
+ * Estimate unrealised gains across accounts using the optional costBasis field.
+ * If an account has no costBasis, it is skipped (gain cannot be estimated).
  */
 export function getUnrealisedGains(
   accounts: Account[]
@@ -67,21 +65,16 @@ export function getUnrealisedGains(
   const results: UnrealisedGain[] = [];
 
   for (const account of accounts) {
-    for (const holding of account.holdings) {
-      const averageCost = holding.purchasePrice;
-      const units = holding.units;
-      const currentPrice = holding.currentPrice;
-      const unrealisedGain = units * (currentPrice - averageCost);
+    if (account.costBasis == null) continue;
 
-      results.push({
-        accountId: account.id,
-        fundId: holding.fundId,
-        unrealisedGain: roundPence(unrealisedGain),
-        units,
-        averageCost: roundPence(averageCost),
-        currentPrice,
-      });
-    }
+    const unrealisedGain = account.currentValue - account.costBasis;
+
+    results.push({
+      accountId: account.id,
+      unrealisedGain: roundPence(unrealisedGain),
+      currentValue: account.currentValue,
+      costBasis: roundPence(account.costBasis),
+    });
   }
 
   return results;
@@ -97,18 +90,12 @@ export function getUnrealisedGains(
  * band, the basic CGT rate applies; otherwise the higher rate.
  *
  * HMRC ref: https://www.gov.uk/capital-gains-tax/rates
- *
- * @param grossIncome - Gross employment income
- * @param pensionContribution - Employee pension contribution
- * @param pensionMethod - "salary_sacrifice" | "net_pay" | "relief_at_source"
- * @returns The applicable CGT rate (0.18 or 0.24 for 2024/25)
  */
 export function determineCgtRate(
   grossIncome: number,
   pensionContribution: number = 0,
   pensionMethod: string = "relief_at_source"
 ): number {
-  // Salary sacrifice and net pay reduce income before tax
   const taxableIncome =
     pensionMethod === "salary_sacrifice" || pensionMethod === "net_pay"
       ? grossIncome - pensionContribution
@@ -120,14 +107,7 @@ export function determineCgtRate(
 }
 
 /**
- * Calculate the Bed & ISA break-even period: how many years until
- * the CGT cost of transferring is recouped by ISA tax savings on future gains.
- *
- * @param cgtCost - Upfront CGT cost of the Bed & ISA transfer
- * @param giaValue - Current GIA value being transferred
- * @param cgtRate - Applicable CGT rate
- * @param assumedReturn - Assumed annual return rate (default 0.07 = 7%)
- * @returns Break-even in years (rounded to 1 decimal), or 0 if no cost
+ * Calculate the Bed & ISA break-even period.
  */
 export function calculateBedAndISABreakEven(
   cgtCost: number,
@@ -144,25 +124,15 @@ export function calculateBedAndISABreakEven(
 // --- Bed and ISA ---
 
 /**
- * Calculate the benefit of a Bed and ISA strategy:
- * Sell holdings in a GIA, crystallise the gain using CGT allowance,
- * and re-purchase within an ISA to shield future growth from tax.
- *
- * @param unrealisedGain - The unrealised gain on the holding to transfer
- * @param cgtAllowanceRemaining - How much of the annual exempt amount is unused
- * @param cgtRate - The CGT rate applicable (basic or higher)
- * @returns The cost of CGT and the annual tax saved on future gains
+ * Calculate the benefit of a Bed and ISA strategy.
  */
 export function calculateBedAndISA(
   unrealisedGain: number,
   cgtAllowanceRemaining: number,
   cgtRate: number
 ): BedAndISAResult {
-  // Taxable gain after applying remaining allowance
   const taxableGain = Math.max(0, unrealisedGain - cgtAllowanceRemaining);
   const cgtCost = roundPence(taxableGain * cgtRate);
-
-  // Annual tax saved: future gains on this amount would be tax-free in ISA
   const annualTaxSaved = roundPence(unrealisedGain * cgtRate);
 
   return {

@@ -13,8 +13,8 @@ import type {
   PersonIncome,
   Person,
   Account,
-  AnnualContributions,
 } from "@/types";
+import { getPersonContributionTotals, annualiseContribution } from "@/types";
 import { calculateIncomeTax, calculateNI } from "@/lib/tax";
 import { getUnrealisedGains } from "@/lib/cgt";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
@@ -57,10 +57,16 @@ function getAdjustedGrossForTax(income: PersonIncome): number {
 
 // --- Per-person context passed to each analyzer ---
 
+interface PersonContributionTotals {
+  isaContribution: number;
+  pensionContribution: number;
+  giaContribution: number;
+}
+
 interface PersonContext {
   person: Person;
   income: PersonIncome;
-  contributions: AnnualContributions;
+  contributions: PersonContributionTotals;
   accounts: Account[];
   adjustedGross: number;
   allAccounts: Account[];
@@ -272,7 +278,7 @@ export function analyzeGIAOverweight(ctx: PersonContext): Recommendation[] {
       category: "investment",
       personId: person.id,
       personName: person.name,
-      actionUrl: "/allocation",
+      actionUrl: "/tax-planning",
       plainAction: `When you next invest, put the money into your ISA or pension first — they're tax-free. Only overflow into your general account.`,
     },
   ];
@@ -291,8 +297,8 @@ export function analyzeRetirementProgress(household: HouseholdData): Recommendat
   if (progress >= 0.5) return [];
 
   const shortfall = Math.round(requiredPot - totalNW);
-  const totalAnnualContribs = household.annualContributions.reduce(
-    (s, c) => s + c.isaContribution + c.pensionContribution + c.giaContribution,
+  const totalAnnualContribs = household.contributions.reduce(
+    (s, c) => s + annualiseContribution(c.amount, c.frequency),
     0
   );
   const yearsAtCurrentRate = totalAnnualContribs > 0
@@ -344,43 +350,7 @@ export function analyzeEmergencyFund(household: HouseholdData): Recommendation[]
   ];
 }
 
-/** 8. Concentration risk */
-export function analyzeConcentrationRisk(household: HouseholdData): Recommendation[] {
-  const allHoldings = household.accounts.flatMap((a) =>
-    a.holdings.map((h) => ({ ...h, accountId: a.id, value: h.units * h.currentPrice }))
-  );
-  const totalHoldingsValue = allHoldings.reduce((s, h) => s + h.value, 0);
-
-  if (totalHoldingsValue <= 0) return [];
-
-  const byFund = new Map<string, number>();
-  for (const h of allHoldings) {
-    byFund.set(h.fundId, (byFund.get(h.fundId) ?? 0) + h.value);
-  }
-
-  const results: Recommendation[] = [];
-  for (const [fundId, value] of byFund) {
-    const pct = value / totalHoldingsValue;
-    if (pct > 0.4) {
-      const fund = household.funds.find((f) => f.id === fundId);
-      const fundName = fund?.name ?? fundId;
-      results.push({
-        id: `concentration-${fundId}`,
-        title: `${((pct * 100).toFixed(0))}% in ${fundName} — diversification risk`,
-        description: `${((pct * 100).toFixed(0))}% of your £${Math.round(totalHoldingsValue).toLocaleString()} invested portfolio is in a single fund. Even good funds can underperform for extended periods.`,
-        impact: `Consider diversifying across additional funds or asset classes.`,
-        priority: "medium",
-        category: "risk",
-        actionUrl: "/allocation",
-        plainAction: `Almost half your investments are in one fund. Consider spreading across 2-3 different funds to reduce risk.`,
-      });
-    }
-  }
-
-  return results;
-}
-
-/** 9. High cash balance — excess above emergency fund */
+/** 8. High cash balance — excess above emergency fund */
 export function analyzeExcessCash(household: HouseholdData): Recommendation[] {
   const cashAccounts = household.accounts.filter((a) =>
     ["cash_savings", "premium_bonds"].includes(a.type)
@@ -406,19 +376,19 @@ export function analyzeExcessCash(household: HouseholdData): Recommendation[] {
       impact: `Consider investing the excess in ISA or pension for long-term growth.`,
       priority: "medium",
       category: "investment",
-      actionUrl: "/allocation",
+      actionUrl: "/settings",
       plainAction: `You have more cash than you need for emergencies. The extra £${Math.round(excessCash).toLocaleString()} could be working harder in an ISA or pension.`,
     },
   ];
 }
 
-/** 10. Savings rate tracker */
+/** 9. Savings rate tracker */
 export function analyzeSavingsRate(household: HouseholdData): Recommendation[] {
   const totalGrossIncome = household.income.reduce((s, i) => s + i.grossSalary, 0);
   if (totalGrossIncome <= 0) return [];
 
-  const totalAnnualContribs = household.annualContributions.reduce(
-    (s, c) => s + c.isaContribution + c.pensionContribution + c.giaContribution,
+  const totalAnnualContribs = household.contributions.reduce(
+    (s, c) => s + annualiseContribution(c.amount, c.frequency),
     0
   );
   const savingsRate = totalAnnualContribs / totalGrossIncome;
@@ -462,7 +432,6 @@ const householdAnalyzers: ((
 ) => Recommendation[])[] = [
   analyzeRetirementProgress,
   analyzeEmergencyFund,
-  analyzeConcentrationRisk,
   analyzeExcessCash,
   analyzeSavingsRate,
 ];
@@ -481,17 +450,16 @@ export function generateRecommendations(
   household: HouseholdData
 ): Recommendation[] {
   const recommendations: Recommendation[] = [];
-  const { persons, accounts, income, annualContributions } = household;
+  const { persons, accounts, income, contributions } = household;
 
   // Per-person analysis
   for (const person of persons) {
     const personIncome = income.find((i) => i.personId === person.id);
-    const personContributions = annualContributions.find(
-      (c) => c.personId === person.id
-    );
     const personAccounts = accounts.filter((a) => a.personId === person.id);
 
-    if (!personIncome || !personContributions) continue;
+    if (!personIncome) continue;
+
+    const personContributions = getPersonContributionTotals(contributions, person.id);
 
     const ctx: PersonContext = {
       person,

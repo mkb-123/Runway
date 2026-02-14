@@ -16,6 +16,7 @@ import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/format";
+import { annualiseContribution } from "@/types";
 import { projectScenarios, calculateRequiredPot } from "@/lib/projections";
 import { ProjectionChart } from "@/components/charts/projection-chart";
 
@@ -34,9 +35,9 @@ export default function ProjectionsPage() {
   }, [household.accounts, selectedView]);
 
   const filteredContributions = useMemo(() => {
-    if (selectedView === "household") return household.annualContributions;
-    return household.annualContributions.filter((c) => c.personId === selectedView);
-  }, [household.annualContributions, selectedView]);
+    if (selectedView === "household") return household.contributions;
+    return household.contributions.filter((c) => c.personId === selectedView);
+  }, [household.contributions, selectedView]);
 
   // Calculate total current pot (filtered)
   const currentPot = useMemo(
@@ -48,7 +49,7 @@ export default function ProjectionsPage() {
   const totalAnnualContributions = useMemo(
     () =>
       filteredContributions.reduce(
-        (sum, c) => sum + c.isaContribution + c.pensionContribution + c.giaContribution,
+        (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
         0
       ),
     [filteredContributions]

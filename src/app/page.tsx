@@ -36,7 +36,7 @@ import {
   type RecommendationPriority,
   type Recommendation,
 } from "@/lib/recommendations";
-import { annualiseOutgoing } from "@/types";
+import { annualiseOutgoing, annualiseContribution } from "@/types";
 import { TAX_WRAPPER_LABELS } from "@/types";
 import type { TaxWrapper, HeroMetricType } from "@/types";
 
@@ -313,9 +313,9 @@ export default function Home() {
 
   // --- Retirement countdown ---
   const { retirementCountdownYears, retirementCountdownMonths } = useMemo(() => {
-    const { retirement, annualContributions } = household;
-    const totalAnnual = annualContributions.reduce(
-      (sum, c) => sum + c.isaContribution + c.pensionContribution + c.giaContribution,
+    const { retirement, contributions } = household;
+    const totalAnnual = contributions.reduce(
+      (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
       0
     );
     const requiredPot = calculateRequiredPot(retirement.targetAnnualIncome, retirement.withdrawalRate);
@@ -326,12 +326,12 @@ export default function Home() {
 
   // --- Savings rate + FIRE progress ---
   const savingsRate = useMemo(() => {
-    const contributions = household.annualContributions.reduce(
-      (sum, c) => sum + c.isaContribution + c.pensionContribution + c.giaContribution,
+    const totalContrib = household.contributions.reduce(
+      (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
       0
     );
     const income = household.income.reduce((sum, i) => sum + i.grossSalary, 0);
-    return income > 0 ? (contributions / income) * 100 : 0;
+    return income > 0 ? (totalContrib / income) * 100 : 0;
   }, [household]);
 
   const fireProgress = useMemo(() => {
@@ -365,8 +365,8 @@ export default function Home() {
 
   // --- Projections ---
   const { scenarios, scenarioRates, projectionYears, milestones } = useMemo(() => {
-    const monthlyContrib = household.annualContributions.reduce(
-      (sum, c) => sum + (c.isaContribution + c.pensionContribution + c.giaContribution) / 12,
+    const monthlyContrib = household.contributions.reduce(
+      (sum, c) => sum + annualiseContribution(c.amount, c.frequency) / 12,
       0
     );
     const rates = household.retirement.scenarioRates;

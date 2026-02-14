@@ -50,7 +50,7 @@ describe("parseTaxYearDates", () => {
 });
 
 describe("getUnrealisedGains", () => {
-  it("calculates unrealised gains using holding purchase price", () => {
+  it("calculates unrealised gain using costBasis", () => {
     const accounts: Account[] = [
       {
         id: "acc-1",
@@ -59,26 +59,19 @@ describe("getUnrealisedGains", () => {
         provider: "Test",
         name: "Test GIA",
         currentValue: 15000,
-        holdings: [
-          {
-            fundId: "fund-1",
-            units: 100,
-            purchasePrice: 10,
-            currentPrice: 15,
-          },
-        ],
+        costBasis: 10000,
       },
     ];
 
     const gains = getUnrealisedGains(accounts);
     expect(gains).toHaveLength(1);
-    expect(gains[0].unrealisedGain).toBe(500); // 100 * (15 - 10)
-    expect(gains[0].units).toBe(100);
-    expect(gains[0].averageCost).toBe(10);
-    expect(gains[0].currentPrice).toBe(15);
+    expect(gains[0].unrealisedGain).toBe(5000); // 15000 - 10000
+    expect(gains[0].currentValue).toBe(15000);
+    expect(gains[0].costBasis).toBe(10000);
+    expect(gains[0].accountId).toBe("acc-1");
   });
 
-  it("handles multiple holdings across accounts", () => {
+  it("handles multiple accounts with costBasis", () => {
     const accounts: Account[] = [
       {
         id: "acc-1",
@@ -87,10 +80,7 @@ describe("getUnrealisedGains", () => {
         provider: "Test",
         name: "Test GIA 1",
         currentValue: 15000,
-        holdings: [
-          { fundId: "fund-1", units: 100, purchasePrice: 10, currentPrice: 15 },
-          { fundId: "fund-2", units: 50, purchasePrice: 20, currentPrice: 25 },
-        ],
+        costBasis: 10000,
       },
       {
         id: "acc-2",
@@ -99,17 +89,14 @@ describe("getUnrealisedGains", () => {
         provider: "Test",
         name: "Test GIA 2",
         currentValue: 5000,
-        holdings: [
-          { fundId: "fund-1", units: 200, purchasePrice: 12, currentPrice: 15 },
-        ],
+        costBasis: 3000,
       },
     ];
 
     const gains = getUnrealisedGains(accounts);
-    expect(gains).toHaveLength(3);
-    expect(gains[0].unrealisedGain).toBe(500); // 100 * (15 - 10)
-    expect(gains[1].unrealisedGain).toBe(250); // 50 * (25 - 20)
-    expect(gains[2].unrealisedGain).toBe(600); // 200 * (15 - 12)
+    expect(gains).toHaveLength(2);
+    expect(gains[0].unrealisedGain).toBe(5000); // 15000 - 10000
+    expect(gains[1].unrealisedGain).toBe(2000); // 5000 - 3000
   });
 
   it("handles negative unrealised gains (losses)", () => {
@@ -121,17 +108,41 @@ describe("getUnrealisedGains", () => {
         provider: "Test",
         name: "Test GIA",
         currentValue: 8000,
-        holdings: [
-          { fundId: "fund-1", units: 100, purchasePrice: 15, currentPrice: 10 },
-        ],
+        costBasis: 10000,
       },
     ];
 
     const gains = getUnrealisedGains(accounts);
-    expect(gains[0].unrealisedGain).toBe(-500); // 100 * (10 - 15)
+    expect(gains[0].unrealisedGain).toBe(-2000); // 8000 - 10000
   });
 
-  it("returns empty array for accounts with no holdings", () => {
+  it("skips accounts without costBasis", () => {
+    const accounts: Account[] = [
+      {
+        id: "acc-1",
+        personId: "person-1",
+        type: "gia",
+        provider: "Test",
+        name: "GIA no basis",
+        currentValue: 15000,
+      },
+      {
+        id: "acc-2",
+        personId: "person-1",
+        type: "gia",
+        provider: "Test",
+        name: "GIA with basis",
+        currentValue: 5000,
+        costBasis: 3000,
+      },
+    ];
+
+    const gains = getUnrealisedGains(accounts);
+    expect(gains).toHaveLength(1);
+    expect(gains[0].accountId).toBe("acc-2");
+  });
+
+  it("returns empty array for accounts with no costBasis", () => {
     const accounts: Account[] = [
       {
         id: "acc-1",
@@ -140,7 +151,6 @@ describe("getUnrealisedGains", () => {
         provider: "Test",
         name: "Cash",
         currentValue: 5000,
-        holdings: [],
       },
     ];
 

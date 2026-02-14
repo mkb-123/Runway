@@ -34,6 +34,7 @@ import { calculateTakeHomePay } from "@/lib/tax";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
 import type { PersonIncome } from "@/types";
+import { getPersonContributionTotals } from "@/types";
 
 export default function TaxPlanningPage() {
   const { getAccountsForPerson } = useData();
@@ -47,7 +48,7 @@ export default function TaxPlanningPage() {
     return household.persons.filter((p) => p.id === selectedView);
   }, [household.persons, selectedView]);
 
-  const { income, annualContributions } = household;
+  const { income, contributions } = household;
 
   const currentTaxYear = "2024/25";
   const isaAllowance = UK_TAX_CONSTANTS.isaAnnualAllowance;
@@ -65,9 +66,7 @@ export default function TaxPlanningPage() {
     () =>
       persons.map((person) => {
         const personIncome = income.find((i) => i.personId === person.id);
-        const personContributions = annualContributions.find(
-          (c) => c.personId === person.id
-        );
+        const personContributions = getPersonContributionTotals(contributions, person.id);
         const personAccounts = getAccountsForPerson(person.id);
         const personGiaAccounts = personAccounts.filter((a) => a.type === "gia");
 
@@ -78,11 +77,11 @@ export default function TaxPlanningPage() {
         );
 
         // ISA remaining
-        const isaUsed = personContributions?.isaContribution ?? 0;
+        const isaUsed = personContributions.isaContribution;
         const isaRemaining = Math.max(0, isaAllowance - isaUsed);
 
         // Pension remaining
-        const pensionUsed = personContributions?.pensionContribution ?? 0;
+        const pensionUsed = personContributions.pensionContribution;
         const pensionRemaining = Math.max(0, pensionAllowance - pensionUsed);
 
         // Unrealised gains in GIA
@@ -137,7 +136,7 @@ export default function TaxPlanningPage() {
           isHigherRate,
         };
       }),
-    [persons, income, annualContributions, getAccountsForPerson, isaAllowance, pensionAllowance, cgtAnnualExempt]
+    [persons, income, contributions, getAccountsForPerson, isaAllowance, pensionAllowance, cgtAnnualExempt]
   );
 
   // Pension modelling scenarios
@@ -400,9 +399,7 @@ export default function TaxPlanningPage() {
               const personIncome = income.find(
                 (i) => i.personId === person.id
               );
-              const personContributions = annualContributions.find(
-                (c) => c.personId === person.id
-              );
+              const personContributions = getPersonContributionTotals(contributions, person.id);
               const isSalarySacrifice =
                 personIncome?.pensionContributionMethod === "salary_sacrifice";
 
@@ -440,7 +437,7 @@ export default function TaxPlanningPage() {
                       </p>
                       <p className="font-semibold">
                         {formatCurrency(
-                          personContributions?.pensionContribution ?? 0
+                          personContributions.pensionContribution
                         )}
                       </p>
                     </div>
@@ -451,7 +448,7 @@ export default function TaxPlanningPage() {
                       <p className="font-semibold">
                         {formatCurrency(
                           pensionAllowance -
-                            (personContributions?.pensionContribution ?? 0)
+                            personContributions.pensionContribution
                         )}
                       </p>
                     </div>

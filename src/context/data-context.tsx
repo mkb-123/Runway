@@ -20,7 +20,6 @@ import type {
   SnapshotsData,
   Person,
   Account,
-  Fund,
   AccountType,
   TaxWrapper,
 } from "@/types";
@@ -44,10 +43,9 @@ const defaultSnapshots = SnapshotsDataSchema.parse(snapshotsJson);
 const emptyHousehold: HouseholdData = {
   persons: [],
   accounts: [],
-  funds: [],
   income: [],
   bonusStructures: [],
-  annualContributions: [],
+  contributions: [],
   retirement: {
     targetAnnualIncome: 0,
     withdrawalRate: 0.04,
@@ -56,7 +54,6 @@ const emptyHousehold: HouseholdData = {
   },
   emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
   iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
-  estimatedAnnualExpenses: 0,
   committedOutgoings: [],
   dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
 };
@@ -81,7 +78,6 @@ interface DataContextValue {
   // Computed helpers
   getPersonById: (id: string) => Person | undefined;
   getAccountById: (id: string) => Account | undefined;
-  getFundById: (id: string) => Fund | undefined;
   getAccountsForPerson: (personId: string) => Account[];
   getNetWorthByPerson: () => { personId: string; name: string; value: number }[];
   getNetWorthByWrapper: () => { wrapper: TaxWrapper; value: number }[];
@@ -199,13 +195,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [household]
   );
 
-  const getFundById = useCallback(
-    (id: string): Fund | undefined => {
-      return household.funds.find((f) => f.id === id);
-    },
-    [household]
-  );
-
   const getAccountsForPerson = useCallback(
     (personId: string): Account[] => {
       return household.accounts.filter((a) => a.personId === personId);
@@ -289,7 +278,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       loadExampleData,
       getPersonById,
       getAccountById,
-      getFundById,
       getAccountsForPerson,
       getNetWorthByPerson,
       getNetWorthByWrapper,
@@ -307,7 +295,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       loadExampleData,
       getPersonById,
       getAccountById,
-      getFundById,
       getAccountsForPerson,
       getNetWorthByPerson,
       getNetWorthByWrapper,

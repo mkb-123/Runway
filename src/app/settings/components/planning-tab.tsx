@@ -55,12 +55,6 @@ export function PlanningTab({ household, updateHousehold }: PlanningTabProps) {
     updateHousehold(updated);
   }
 
-  function updateEstimatedAnnualExpenses(value: number) {
-    const updated = clone(household);
-    updated.estimatedAnnualExpenses = value;
-    updateHousehold(updated);
-  }
-
   return (
     <div className="space-y-4 mt-4">
       <p className="text-sm text-muted-foreground">
@@ -228,32 +222,6 @@ export function PlanningTab({ household, updateHousehold }: PlanningTabProps) {
         </CardContent>
       </Card>
 
-      {/* Annual Expenses */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Annual Expenses</CardTitle>
-          <CardDescription>
-            Total household spending used for savings rate and retirement calculations.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {renderField(
-              "Estimated Annual Expenses",
-              <Input
-                type="number"
-                step="0.01"
-                value={household.estimatedAnnualExpenses}
-                onChange={(e) =>
-                  updateEstimatedAnnualExpenses(Number(e.target.value))
-                }
-                placeholder="0.00"
-              />,
-              "Total spending per year including discretionary"
-            )}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

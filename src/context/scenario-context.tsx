@@ -15,15 +15,21 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import type { HouseholdData, PersonIncome, AnnualContributions, RetirementConfig } from "@/types";
+import type { HouseholdData, PersonIncome, RetirementConfig, Contribution } from "@/types";
 
 // --- Scenario overrides ---
 
+export interface ContributionOverride {
+  personId: string;
+  isaContribution?: number;
+  pensionContribution?: number;
+  giaContribution?: number;
+}
+
 export interface ScenarioOverrides {
   income?: Partial<PersonIncome>[];
-  annualContributions?: Partial<AnnualContributions>[];
+  contributionOverrides?: ContributionOverride[];
   retirement?: Partial<RetirementConfig>;
-  estimatedAnnualExpenses?: number;
   /** Override specific account values by ID */
   accountValues?: Record<string, number>;
   /** Apply a percentage shock to all account values (e.g. -0.30 for a 30% crash) */
@@ -89,30 +95,35 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      // Override contributions
+      // Override contributions — replace per-person contributions with overrides
       if (
-        overrides.annualContributions &&
-        overrides.annualContributions.length > 0
+        overrides.contributionOverrides &&
+        overrides.contributionOverrides.length > 0
       ) {
-        result.annualContributions = household.annualContributions.map((c) => {
-          const override = overrides.annualContributions?.find(
-            (o) => o.personId === c.personId
-          );
-          if (override) {
-            return { ...c, ...override } as AnnualContributions;
+        // Keep contributions for persons not being overridden
+        const overriddenPersonIds = new Set(overrides.contributionOverrides.map((o) => o.personId));
+        const kept = household.contributions.filter((c) => !overriddenPersonIds.has(c.personId));
+
+        // Create synthetic contributions from overrides
+        const synthetic: Contribution[] = [];
+        for (const ov of overrides.contributionOverrides) {
+          if (ov.isaContribution !== undefined && ov.isaContribution > 0) {
+            synthetic.push({ id: `scenario-isa-${ov.personId}`, personId: ov.personId, label: "ISA (scenario)", target: "isa", amount: ov.isaContribution, frequency: "annually" });
           }
-          return c;
-        });
+          if (ov.pensionContribution !== undefined && ov.pensionContribution > 0) {
+            synthetic.push({ id: `scenario-pension-${ov.personId}`, personId: ov.personId, label: "Pension (scenario)", target: "pension", amount: ov.pensionContribution, frequency: "annually" });
+          }
+          if (ov.giaContribution !== undefined && ov.giaContribution > 0) {
+            synthetic.push({ id: `scenario-gia-${ov.personId}`, personId: ov.personId, label: "GIA (scenario)", target: "gia", amount: ov.giaContribution, frequency: "annually" });
+          }
+        }
+
+        result.contributions = [...kept, ...synthetic];
       }
 
       // Override retirement config
       if (overrides.retirement) {
         result.retirement = { ...household.retirement, ...overrides.retirement };
-      }
-
-      // Override expenses
-      if (overrides.estimatedAnnualExpenses !== undefined) {
-        result.estimatedAnnualExpenses = overrides.estimatedAnnualExpenses;
       }
 
       // Override account values (specific accounts or market shock)

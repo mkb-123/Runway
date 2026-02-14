@@ -16,7 +16,7 @@ import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { EmptyState } from "@/components/empty-state";
-import { getAccountTaxWrapper } from "@/types";
+import { getAccountTaxWrapper, annualiseContribution } from "@/types";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -60,10 +60,10 @@ export default function RetirementPage() {
     return household.income.filter((i) => i.personId === selectedView);
   }, [household.income, selectedView]);
 
-  const annualContributions = useMemo(() => {
-    if (selectedView === "household") return household.annualContributions;
-    return household.annualContributions.filter((c) => c.personId === selectedView);
-  }, [household.annualContributions, selectedView]);
+  const filteredContributions = useMemo(() => {
+    if (selectedView === "household") return household.contributions;
+    return household.contributions.filter((c) => c.personId === selectedView);
+  }, [household.contributions, selectedView]);
 
   const currentPot = useMemo(
     () => accounts.reduce((sum, a) => sum + a.currentValue, 0),
@@ -88,12 +88,11 @@ export default function RetirementPage() {
   // Total annual contributions
   const totalAnnualContributions = useMemo(
     () =>
-      annualContributions.reduce(
-        (sum, c) =>
-          sum + c.isaContribution + c.pensionContribution + c.giaContribution,
+      filteredContributions.reduce(
+        (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
         0
       ),
-    [annualContributions]
+    [filteredContributions]
   );
 
   // Total gross income

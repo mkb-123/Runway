@@ -12,7 +12,7 @@ import {
   calculateYearsUntilIHTExceeded,
   yearsSince,
 } from "@/lib/iht";
-import { getAccountTaxWrapper } from "@/types";
+import { getAccountTaxWrapper, annualiseContribution } from "@/types";
 import type { TaxWrapper } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -106,12 +106,14 @@ export default function IHTPage() {
     // --- Estate Growth Projection ---
     // Total annual contributions going to non-pension accounts (in estate)
     const filteredContributions = selectedView === "household"
-      ? household.annualContributions
-      : household.annualContributions.filter((c) => c.personId === selectedView);
-    const annualSavingsInEstate = filteredContributions.reduce(
-      (sum, c) => sum + c.isaContribution + c.giaContribution,
-      0,
-    );
+      ? household.contributions
+      : household.contributions.filter((c) => c.personId === selectedView);
+    const annualSavingsInEstate = filteredContributions
+      .filter((c) => c.target === "isa" || c.target === "gia")
+      .reduce(
+        (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
+        0,
+      );
     const yearsUntilExceeded = calculateYearsUntilIHTExceeded(
       inEstate,
       combinedThreshold,
