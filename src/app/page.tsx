@@ -11,9 +11,10 @@ import {
   Lightbulb,
   Printer,
   ArrowRight,
-  MessageCircle,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,18 +24,196 @@ import {
 } from "@/lib/format";
 import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
+import { usePersonView } from "@/context/person-view-context";
+import { PersonToggle } from "@/components/person-toggle";
 import { projectScenarios } from "@/lib/projections";
+import {
+  calculateRetirementCountdown,
+  calculateRequiredPot,
+} from "@/lib/projections";
 import {
   generateRecommendations,
   type RecommendationPriority,
   type Recommendation,
 } from "@/lib/recommendations";
+import { annualiseOutgoing } from "@/types";
 import { TAX_WRAPPER_LABELS } from "@/types";
-import type { TaxWrapper } from "@/types";
+import type { TaxWrapper, HeroMetricType } from "@/types";
 
 import { NetWorthTrajectoryChart } from "@/components/charts/net-worth-trajectory";
 import { NetWorthHistoryChart } from "@/components/charts/net-worth-history";
 import { ByPersonChart } from "@/components/charts/by-person-chart";
+
+// ============================================================
+// Hero Metric — one of 3 configurable slots above the fold
+// ============================================================
+
+interface HeroMetricData {
+  totalNetWorth: number;
+  cashPosition: number;
+  monthOnMonthChange: number;
+  monthOnMonthPercent: number;
+  yearOnYearChange: number;
+  yearOnYearPercent: number;
+  retirementCountdownYears: number;
+  retirementCountdownMonths: number;
+  savingsRate: number;
+  fireProgress: number;
+  netWorthAfterCommitments: number;
+  totalAnnualCommitments: number;
+}
+
+function resolveMetric(
+  type: HeroMetricType,
+  data: HeroMetricData
+): { label: string; value: string; subtext?: string; color: string } {
+  switch (type) {
+    case "net_worth":
+      return {
+        label: "Net Worth",
+        value: formatCurrencyCompact(data.totalNetWorth),
+        color: "",
+      };
+    case "cash_position":
+      return {
+        label: "Cash Position",
+        value: formatCurrencyCompact(data.cashPosition),
+        color: "",
+      };
+    case "retirement_countdown": {
+      const y = data.retirementCountdownYears;
+      const m = data.retirementCountdownMonths;
+      return {
+        label: "Retirement",
+        value: y === 0 && m === 0 ? "On track" : `${y}y ${m}m`,
+        subtext: y === 0 && m === 0 ? "Target pot reached" : "to target",
+        color: "",
+      };
+    }
+    case "period_change": {
+      const pos = data.monthOnMonthChange >= 0;
+      return {
+        label: "Period Change",
+        value: `${pos ? "+" : ""}${formatCurrencyCompact(data.monthOnMonthChange)}`,
+        subtext: `${pos ? "+" : ""}${formatPercent(data.monthOnMonthPercent)} MoM`,
+        color: pos ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
+      };
+    }
+    case "year_on_year_change": {
+      const pos = data.yearOnYearChange >= 0;
+      return {
+        label: "Year-on-Year",
+        value: `${pos ? "+" : ""}${formatCurrencyCompact(data.yearOnYearChange)}`,
+        subtext: `${pos ? "+" : ""}${formatPercent(data.yearOnYearPercent)} YoY`,
+        color: pos ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
+      };
+    }
+    case "savings_rate":
+      return {
+        label: "Savings Rate",
+        value: `${data.savingsRate.toFixed(1)}%`,
+        subtext: "of gross income",
+        color: "",
+      };
+    case "fire_progress":
+      return {
+        label: "FIRE Progress",
+        value: `${data.fireProgress.toFixed(1)}%`,
+        subtext: "of target pot",
+        color: data.fireProgress >= 100 ? "text-emerald-600 dark:text-emerald-400" : "",
+      };
+    case "net_worth_after_commitments":
+      return {
+        label: "After Commitments",
+        value: formatCurrencyCompact(data.netWorthAfterCommitments),
+        subtext: `${formatCurrencyCompact(data.totalAnnualCommitments)}/yr committed`,
+        color: "",
+      };
+  }
+}
+
+function HeroMetric({ type, data }: { type: HeroMetricType; data: HeroMetricData }) {
+  const { label, value, subtext, color } = resolveMetric(type, data);
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <span className={`text-2xl font-bold tracking-tight tabular-nums sm:text-3xl ${color}`}>
+        {value}
+      </span>
+      {subtext && <span className="text-xs text-muted-foreground">{subtext}</span>}
+    </div>
+  );
+}
+
+// ============================================================
+// Collapsible Dashboard Section — progressive disclosure
+// ============================================================
+
+function DashboardSection({
+  title,
+  summary,
+  defaultOpen = false,
+  children,
+  storageKey,
+}: {
+  title: string;
+  summary: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+  storageKey: string;
+}) {
+  const [isOpen, setIsOpen] = useState(() => {
+    if (typeof window === "undefined") return defaultOpen;
+    try {
+      const stored = localStorage.getItem(`nw-section-${storageKey}`);
+      return stored !== null ? stored === "true" : defaultOpen;
+    } catch {
+      return defaultOpen;
+    }
+  });
+
+  const toggle = useCallback(() => {
+    setIsOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(`nw-section-${storageKey}`, String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, [storageKey]);
+
+  return (
+    <div className="mb-4">
+      <button
+        onClick={toggle}
+        className="flex w-full items-center justify-between rounded-lg border bg-card px-4 py-3 text-left transition-colors hover:bg-accent/50"
+      >
+        <div className="flex items-center gap-2">
+          {isOpen ? (
+            <ChevronDown className="size-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="size-4 text-muted-foreground" />
+          )}
+          <span className="font-semibold text-sm">{title}</span>
+        </div>
+        {!isOpen && (
+          <span className="text-xs text-muted-foreground truncate ml-4 max-w-[60%] text-right">
+            {summary}
+          </span>
+        )}
+      </button>
+      {isOpen && <div className="mt-3">{children}</div>}
+    </div>
+  );
+}
+
+// ============================================================
+// Recommendation Card
+// ============================================================
 
 const priorityConfig: Record<
   RecommendationPriority,
@@ -60,122 +239,81 @@ const priorityConfig: Record<
   },
 };
 
-function RecommendationsSection({
-  recommendations,
-  highPriorityCount,
-}: {
-  recommendations: Recommendation[];
-  highPriorityCount: number;
-}) {
-  const [plainMode, setPlainMode] = useState(false);
-  const [showAll, setShowAll] = useState(false);
-  const displayed = showAll ? recommendations : recommendations.slice(0, 5);
-
+function RecommendationCard({ rec }: { rec: Recommendation }) {
+  const config = priorityConfig[rec.priority];
   return (
-    <div className="mb-8">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-semibold text-foreground">
-            Recommended Actions
-          </h2>
-          {highPriorityCount > 0 && (
-            <Badge variant="destructive">
-              {highPriorityCount} high priority
-            </Badge>
-          )}
+    <Card className={`border ${config.border} ${config.bg}`}>
+      <CardContent className="py-3">
+        <div className="flex items-start gap-3">
+          <Lightbulb className={`mt-0.5 size-4 shrink-0 ${config.color}`} />
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold">{rec.title}</h3>
+              <Badge variant="outline" className={`text-[10px] ${config.color}`}>
+                {config.label}
+              </Badge>
+              {rec.personName && (
+                <Badge variant="secondary" className="text-[10px]">
+                  {rec.personName}
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">{rec.description}</p>
+            <p className="text-xs font-medium">{rec.impact}</p>
+            {rec.actionUrl && (
+              <Link
+                href={rec.actionUrl}
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                Take action <ArrowRight className="size-3" />
+              </Link>
+            )}
+          </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setPlainMode(!plainMode)}
-          className="gap-1.5 text-xs text-muted-foreground"
-        >
-          <MessageCircle className="size-3.5" />
-          {plainMode ? "Detailed" : "Simple"}
-        </Button>
-      </div>
-      <div className="grid gap-3">
-        {displayed.map((rec) => {
-          const config = priorityConfig[rec.priority];
-          return (
-            <Card
-              key={rec.id}
-              className={`border ${config.border} ${config.bg}`}
-            >
-              <CardContent className="py-4">
-                <div className="flex items-start gap-3">
-                  <Lightbulb
-                    className={`mt-0.5 size-5 shrink-0 ${config.color}`}
-                  />
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold">{rec.title}</h3>
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${config.color}`}
-                      >
-                        {config.label}
-                      </Badge>
-                      {rec.personName && (
-                        <Badge variant="secondary" className="text-xs">
-                          {rec.personName}
-                        </Badge>
-                      )}
-                    </div>
-                    {plainMode && rec.plainAction ? (
-                      <p className="text-sm text-foreground">{rec.plainAction}</p>
-                    ) : (
-                      <>
-                        <p className="text-sm text-muted-foreground">
-                          {rec.description}
-                        </p>
-                        <p className="text-sm font-medium">{rec.impact}</p>
-                      </>
-                    )}
-                    {rec.actionUrl && (
-                      <Link
-                        href={rec.actionUrl}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                      >
-                        Take action <ArrowRight className="size-3" />
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-        {recommendations.length > 5 && (
-          <button
-            onClick={() => setShowAll(!showAll)}
-            className="text-center text-sm font-medium text-primary hover:underline"
-          >
-            {showAll
-              ? "Show fewer"
-              : `+${recommendations.length - 5} more recommendations`}
-          </button>
-        )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
-export default function Home() {
-  // --- Data Loading ---
-  const {
-    snapshots: snapshotsData,
-    transactions: transactionsData,
-  } = useData();
+// ============================================================
+// Main Dashboard
+// ============================================================
 
-  // Scenario-aware data
+export default function Home() {
+  const { snapshots: snapshotsData, transactions: transactionsData } = useData();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
   const totalNetWorth = scenarioData.getTotalNetWorth();
   const byPerson = scenarioData.getNetWorthByPerson();
   const byWrapper = scenarioData.getNetWorthByWrapper();
-
+  const { selectedView } = usePersonView();
   const { snapshots } = snapshotsData;
+
+  // --- Person filtering ---
+  const filteredAccounts = useMemo(() => {
+    if (selectedView === "household") return household.accounts;
+    return household.accounts.filter((a) => a.personId === selectedView);
+  }, [household.accounts, selectedView]);
+
+  const filteredNetWorth = useMemo(
+    () => filteredAccounts.reduce((sum, a) => sum + a.currentValue, 0),
+    [filteredAccounts]
+  );
+
+  // --- Cash position ---
+  const cashPosition = useMemo(
+    () =>
+      filteredAccounts
+        .filter((a) => a.type === "cash_savings" || a.type === "cash_isa" || a.type === "premium_bonds")
+        .reduce((sum, a) => sum + a.currentValue, 0),
+    [filteredAccounts]
+  );
+
+  // --- Committed outgoings ---
+  const totalAnnualCommitments = useMemo(
+    () => household.committedOutgoings.reduce((sum, o) => sum + annualiseOutgoing(o.amount, o.frequency), 0),
+    [household.committedOutgoings]
+  );
 
   // --- Recommendations ---
   const recommendations = useMemo(
@@ -183,126 +321,132 @@ export default function Home() {
     [household, transactionsData]
   );
 
-  const highPriorityCount = recommendations.filter(
-    (r) => r.priority === "high"
-  ).length;
+  const filteredRecommendations = useMemo(() => {
+    if (selectedView === "household") return recommendations;
+    return recommendations.filter(
+      (r) =>
+        !r.personName ||
+        r.personName === household.persons.find((p) => p.id === selectedView)?.name
+    );
+  }, [recommendations, selectedView, household.persons]);
 
-  // --- Snapshot Change Calculations ---
-  const {
-    monthOnMonthChange,
-    monthOnMonthPercent,
-    yearOnYearChange,
-    yearOnYearPercent,
-    latestSnapshot,
-  } = useMemo(() => {
-    const latest = snapshots[snapshots.length - 1];
-    const previous =
-      snapshots.length >= 2 ? snapshots[snapshots.length - 2] : null;
+  const [showAllRecs, setShowAllRecs] = useState(false);
 
-    const moMChange =
-      latest && previous
-        ? latest.totalNetWorth - previous.totalNetWorth
-        : 0;
-    const moMPercent =
-      previous && previous.totalNetWorth > 0
-        ? moMChange / previous.totalNetWorth
-        : 0;
+  // --- Snapshot changes ---
+  const { monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent, latestSnapshot } =
+    useMemo(() => {
+      const latest = snapshots[snapshots.length - 1];
+      const previous = snapshots.length >= 2 ? snapshots[snapshots.length - 2] : null;
+      const moMChange = latest && previous ? latest.totalNetWorth - previous.totalNetWorth : 0;
+      const moMPercent = previous && previous.totalNetWorth > 0 ? moMChange / previous.totalNetWorth : 0;
 
-    // Year-on-year: find a snapshot roughly 12 months before the latest
-    const latestDate = new Date(latest?.date ?? new Date());
-    const oneYearAgo = new Date(latestDate);
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      const latestDate = new Date(latest?.date ?? new Date());
+      const oneYearAgo = new Date(latestDate);
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-    const yearAgoSnapshot = snapshots.reduce<(typeof snapshots)[number] | null>(
-      (closest, snap) => {
+      const yearAgoSnapshot = snapshots.reduce<(typeof snapshots)[number] | null>((closest, snap) => {
         const snapDate = new Date(snap.date);
         if (!closest) return snap;
-        const closestDiff = Math.abs(
-          new Date(closest.date).getTime() - oneYearAgo.getTime()
-        );
-        const snapDiff = Math.abs(snapDate.getTime() - oneYearAgo.getTime());
-        return snapDiff < closestDiff ? snap : closest;
-      },
-      null
+        return Math.abs(snapDate.getTime() - oneYearAgo.getTime()) <
+          Math.abs(new Date(closest.date).getTime() - oneYearAgo.getTime())
+          ? snap
+          : closest;
+      }, null);
+
+      const yoYChange = latest && yearAgoSnapshot ? latest.totalNetWorth - yearAgoSnapshot.totalNetWorth : 0;
+      const yoYPercent =
+        yearAgoSnapshot && yearAgoSnapshot.totalNetWorth > 0
+          ? yoYChange / yearAgoSnapshot.totalNetWorth
+          : 0;
+
+      return {
+        monthOnMonthChange: moMChange,
+        monthOnMonthPercent: moMPercent,
+        yearOnYearChange: yoYChange,
+        yearOnYearPercent: yoYPercent,
+        latestSnapshot: latest,
+      };
+    }, [snapshots]);
+
+  // --- Retirement countdown ---
+  const { retirementCountdownYears, retirementCountdownMonths } = useMemo(() => {
+    const { retirement, annualContributions } = household;
+    const totalAnnual = annualContributions.reduce(
+      (sum, c) => sum + c.isaContribution + c.pensionContribution + c.giaContribution,
+      0
     );
+    const requiredPot = calculateRequiredPot(retirement.targetAnnualIncome, retirement.withdrawalRate);
+    const midRate = retirement.scenarioRates[Math.floor(retirement.scenarioRates.length / 2)] ?? 0.07;
+    const countdown = calculateRetirementCountdown(totalNetWorth, totalAnnual, requiredPot, midRate);
+    return { retirementCountdownYears: countdown.years, retirementCountdownMonths: countdown.months };
+  }, [household, totalNetWorth]);
 
-    const yoYChange =
-      latest && yearAgoSnapshot
-        ? latest.totalNetWorth - yearAgoSnapshot.totalNetWorth
-        : 0;
-    const yoYPercent =
-      yearAgoSnapshot && yearAgoSnapshot.totalNetWorth > 0
-        ? yoYChange / yearAgoSnapshot.totalNetWorth
-        : 0;
+  // --- Savings rate + FIRE progress ---
+  const savingsRate = useMemo(() => {
+    const contributions = household.annualContributions.reduce(
+      (sum, c) => sum + c.isaContribution + c.pensionContribution + c.giaContribution,
+      0
+    );
+    const income = household.income.reduce((sum, i) => sum + i.grossSalary, 0);
+    return income > 0 ? (contributions / income) * 100 : 0;
+  }, [household]);
 
-    return {
-      monthOnMonthChange: moMChange,
-      monthOnMonthPercent: moMPercent,
-      yearOnYearChange: yoYChange,
-      yearOnYearPercent: yoYPercent,
-      latestSnapshot: latest,
-    };
-  }, [snapshots]);
+  const fireProgress = useMemo(() => {
+    const req = calculateRequiredPot(household.retirement.targetAnnualIncome, household.retirement.withdrawalRate);
+    return req > 0 ? (totalNetWorth / req) * 100 : 0;
+  }, [household.retirement, totalNetWorth]);
+
+  // --- Hero data ---
+  const heroData: HeroMetricData = useMemo(
+    () => ({
+      totalNetWorth: selectedView === "household" ? totalNetWorth : filteredNetWorth,
+      cashPosition,
+      monthOnMonthChange,
+      monthOnMonthPercent,
+      yearOnYearChange,
+      yearOnYearPercent,
+      retirementCountdownYears,
+      retirementCountdownMonths,
+      savingsRate,
+      fireProgress,
+      netWorthAfterCommitments: totalNetWorth - totalAnnualCommitments,
+      totalAnnualCommitments,
+    }),
+    [
+      totalNetWorth, filteredNetWorth, selectedView, cashPosition,
+      monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent,
+      retirementCountdownYears, retirementCountdownMonths,
+      savingsRate, fireProgress, totalAnnualCommitments,
+    ]
+  );
 
   // --- Projections ---
   const { scenarios, scenarioRates, projectionYears, milestones } = useMemo(() => {
-    const totalMonthlyContributions = household.annualContributions.reduce(
-      (sum, c) =>
-        sum + (c.isaContribution + c.pensionContribution + c.giaContribution) / 12,
+    const monthlyContrib = household.annualContributions.reduce(
+      (sum, c) => sum + (c.isaContribution + c.pensionContribution + c.giaContribution) / 12,
       0
     );
-
     const rates = household.retirement.scenarioRates;
     const years = 30;
-    const projScenarios = projectScenarios(
-      totalNetWorth,
-      totalMonthlyContributions,
-      rates,
-      years
-    );
-
-    // --- Milestones ---
+    const projScenarios = projectScenarios(totalNetWorth, monthlyContrib, rates, years);
     const targetPot =
       household.retirement.withdrawalRate > 0
-        ? household.retirement.targetAnnualIncome /
-          household.retirement.withdrawalRate
+        ? household.retirement.targetAnnualIncome / household.retirement.withdrawalRate
         : 0;
-
     const ms = [
       { label: "FIRE Target", value: targetPot },
       { label: "\u00A31m", value: 1_000_000 },
       { label: "\u00A32m", value: 2_000_000 },
     ].filter((m) => m.value > 0);
-
-    return {
-      scenarios: projScenarios,
-      scenarioRates: rates,
-      projectionYears: years,
-      milestones: ms,
-    };
+    return { scenarios: projScenarios, scenarioRates: rates, projectionYears: years, milestones: ms };
   }, [household, totalNetWorth]);
 
-  // --- Per-person data for donut chart ---
-  const personChartData = useMemo(
-    () =>
-      byPerson.map((p) => ({
-        name: p.name,
-        value: p.value,
-      })),
-    [byPerson]
-  );
+  // --- Chart data ---
+  const personChartData = useMemo(() => byPerson.map((p) => ({ name: p.name, value: p.value })), [byPerson]);
 
-  // --- Wrapper order for consistent display ---
   const wrapperData = useMemo(() => {
-    const wrapperOrder: TaxWrapper[] = [
-      "pension",
-      "isa",
-      "gia",
-      "cash",
-      "premium_bonds",
-    ];
-
-    return wrapperOrder
+    const order: TaxWrapper[] = ["pension", "isa", "gia", "cash", "premium_bonds"];
+    return order
       .map((wrapper) => {
         const found = byWrapper.find((bw) => bw.wrapper === wrapper);
         return {
@@ -315,9 +459,11 @@ export default function Home() {
       .filter((w) => w.value > 0);
   }, [byWrapper, totalNetWorth]);
 
-  // --- Banner dismiss state ---
+  const wrapperSummary = wrapperData.map((w) => `${Math.round(w.percent * 100)}% ${w.label}`).join(", ");
+
+  // --- Banner ---
   const [bannerDismissed, setBannerDismissed] = useState(() => {
-    if (typeof window === "undefined") return true; // SSR: default hidden to prevent flash
+    if (typeof window === "undefined") return true;
     try {
       return localStorage.getItem("nw-banner-dismissed") === "true";
     } catch {
@@ -330,38 +476,27 @@ export default function Home() {
     try {
       localStorage.setItem("nw-banner-dismissed", "true");
     } catch {
-      // localStorage unavailable
+      // ignore
     }
   }, []);
 
-  const changeIndicator = (value: number) =>
-    value >= 0 ? "text-emerald-600" : "text-red-600";
-  const changePrefix = (value: number) => (value >= 0 ? "+" : "");
-  const trendIcon = (value: number) => {
-    if (value > 0) return <TrendingUp className="inline size-4" aria-label="increased" />;
-    if (value < 0) return <TrendingDown className="inline size-4" aria-label="decreased" />;
-    return <Minus className="inline size-4" aria-label="unchanged" />;
-  };
+  const heroMetrics = household.dashboardConfig.heroMetrics;
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Print-only report header */}
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* Print header */}
         <div className="print-report-header hidden print:block">
           <h1>Runway — Financial Report</h1>
           <p>
             Generated{" "}
-            {new Intl.DateTimeFormat("en-GB", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            }).format(new Date())}
+            {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(new Date())}
             {" | "}
             Household net worth: {formatCurrency(totalNetWorth)}
           </p>
         </div>
 
-        {/* Getting Started Banner */}
+        {/* Getting Started */}
         {!bannerDismissed && (
           <div className="relative mb-6 rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
             <button
@@ -373,12 +508,9 @@ export default function Home() {
             </button>
             <div className="flex flex-col gap-3 pr-8 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-foreground sm:text-xl">
-                  Getting Started
-                </h2>
+                <h2 className="text-lg font-semibold sm:text-xl">Getting Started</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Head to <strong>Settings</strong> first to enter your personal financial data — accounts, income, holdings, and goals.
-                  All other pages compute from the data you provide there.
+                  Head to <strong>Settings</strong> first to enter your personal financial data.
                 </p>
               </div>
               <Link href="/settings">
@@ -391,222 +523,140 @@ export default function Home() {
           </div>
         )}
 
-        {/* Page Header */}
-        <div className="mb-8 flex items-start justify-between gap-4">
+        {/* Header + Person Toggle */}
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Net Worth Dashboard
-            </h1>
-            <p className="mt-1 text-muted-foreground">
-              Household financial overview as of{" "}
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
+            <p className="text-sm text-muted-foreground">
               {latestSnapshot
-                ? new Intl.DateTimeFormat("en-GB", {
-                    month: "long",
-                    year: "numeric",
-                  }).format(new Date(latestSnapshot.date))
+                ? new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" }).format(
+                    new Date(latestSnapshot.date)
+                  )
                 : "now"}
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="shrink-0 gap-1.5 print:hidden"
-            onClick={() => window.print()}
-          >
-            <Printer className="size-3.5" />
-            <span className="hidden sm:inline">Print Report</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <PersonToggle />
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 print:hidden"
+              onClick={() => window.print()}
+            >
+              <Printer className="size-3.5" />
+              <span className="hidden sm:inline">Print</span>
+            </Button>
+          </div>
         </div>
 
-        {/* ============================================================ */}
-        {/* Section 1: Summary Cards Row                                 */}
-        {/* ============================================================ */}
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Total Net Worth */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Net Worth
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold tracking-tight">
-                {formatCurrency(totalNetWorth)}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Per-person cards */}
-          {byPerson.map((person) => (
-            <Card key={person.personId}>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {person.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold tracking-tight">
-                  {formatCurrency(person.value)}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {totalNetWorth > 0
-                    ? formatPercent(person.value / totalNetWorth)
-                    : "0%"}{" "}
-                  of total
-                </p>
-              </CardContent>
-            </Card>
+        {/* HERO METRICS — 3 configurable slots, zero scrolling */}
+        <div className="mb-6 grid grid-cols-1 gap-4 rounded-xl border bg-card p-4 sm:grid-cols-3 sm:gap-6 sm:p-6">
+          {heroMetrics.map((metric, i) => (
+            <HeroMetric key={`${metric}-${i}`} type={metric} data={heroData} />
           ))}
-
-          {/* Month-on-month change */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Period Change
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p
-                className={`flex items-center gap-1.5 text-2xl font-bold tracking-tight ${changeIndicator(monthOnMonthChange)}`}
-              >
-                {trendIcon(monthOnMonthChange)}
-                <span>
-                  {changePrefix(monthOnMonthChange)}
-                  {formatCurrencyCompact(monthOnMonthChange)}
-                </span>
-              </p>
-              <p
-                className={`mt-1 text-sm ${changeIndicator(monthOnMonthPercent)}`}
-              >
-                {changePrefix(monthOnMonthPercent)}
-                {formatPercent(monthOnMonthPercent)} vs previous snapshot
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Year-on-year change */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Year-on-Year Change
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p
-                className={`flex items-center gap-1.5 text-2xl font-bold tracking-tight ${changeIndicator(yearOnYearChange)}`}
-              >
-                {trendIcon(yearOnYearChange)}
-                <span>
-                  {changePrefix(yearOnYearChange)}
-                  {formatCurrencyCompact(yearOnYearChange)}
-                </span>
-              </p>
-              <p
-                className={`mt-1 text-sm ${changeIndicator(yearOnYearPercent)}`}
-              >
-                {changePrefix(yearOnYearPercent)}
-                {formatPercent(yearOnYearPercent)} year-on-year
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* ============================================================ */}
-        {/* Section 2: Actionable Recommendations                        */}
-        {/* ============================================================ */}
-        {recommendations.length > 0 && (
-          <RecommendationsSection
-            recommendations={recommendations}
-            highPriorityCount={highPriorityCount}
-          />
+        {/* TOP RECOMMENDATION — one card, expand for more */}
+        {filteredRecommendations.length > 0 && (
+          <div className="mb-6">
+            <RecommendationCard rec={filteredRecommendations[0]} />
+            {filteredRecommendations.length > 1 && (
+              <>
+                {showAllRecs && (
+                  <div className="mt-3 grid gap-3">
+                    {filteredRecommendations.slice(1).map((rec) => (
+                      <RecommendationCard key={rec.id} rec={rec} />
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowAllRecs(!showAllRecs)}
+                  className="mt-2 text-sm font-medium text-primary hover:underline"
+                >
+                  {showAllRecs ? "Show fewer" : `+${filteredRecommendations.length - 1} more recommendations`}
+                </button>
+              </>
+            )}
+          </div>
         )}
 
-        {/* ============================================================ */}
-        {/* Section 3: Net Worth by Wrapper                              */}
-        {/* ============================================================ */}
-        <div className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold text-foreground">
-            Net Worth by Tax Wrapper
-          </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {/* COLLAPSIBLE SECTIONS — progressive disclosure */}
+        <DashboardSection title="Net Worth by Wrapper" summary={wrapperSummary} storageKey="wrappers">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {wrapperData.map((w) => (
               <Card key={w.wrapper}>
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {w.label}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xl font-bold tracking-tight">
-                    {formatCurrency(w.value)}
+                <CardContent className="pt-4 pb-4">
+                  <p className="text-xs font-medium text-muted-foreground">{w.label}</p>
+                  <p className="text-lg font-bold tracking-tight tabular-nums">
+                    {formatCurrencyCompact(w.value)}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {formatPercent(w.percent)} of total
-                  </p>
+                  <p className="text-xs text-muted-foreground tabular-nums">{formatPercent(w.percent)}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
-        </div>
+        </DashboardSection>
 
-        {/* ============================================================ */}
-        {/* Section 4: Net Worth Trajectory Chart                        */}
-        {/* ============================================================ */}
-        <div className="mb-8">
+        <DashboardSection
+          title="Net Worth Trajectory"
+          summary={`${scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over ${projectionYears}yr`}
+          storageKey="trajectory"
+        >
           <Card>
-            <CardHeader>
-              <CardTitle>Net Worth Trajectory</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Historical net worth with projected growth at{" "}
-                {scenarioRates
-                  .map((r) => `${(r * 100).toFixed(0)}%`)
-                  .join(", ")}{" "}
-                annual returns over {projectionYears} years.
-              </p>
-              <NetWorthTrajectoryChart
-                snapshots={snapshots}
-                scenarios={scenarios}
-                milestones={milestones}
-              />
+            <CardContent className="pt-6">
+              <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} />
             </CardContent>
           </Card>
-        </div>
+        </DashboardSection>
 
-        {/* ============================================================ */}
-        {/* Section 5: Net Worth History Chart (stacked area)            */}
-        {/* ============================================================ */}
-        <div className="mb-8">
+        <DashboardSection title="Net Worth History" summary="By tax wrapper over time" storageKey="history">
           <Card>
-            <CardHeader>
-              <CardTitle>Net Worth History by Wrapper</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Historical breakdown of net worth across tax wrappers.
-              </p>
+            <CardContent className="pt-6">
               <NetWorthHistoryChart snapshots={snapshots} />
             </CardContent>
           </Card>
-        </div>
+        </DashboardSection>
 
-        {/* ============================================================ */}
-        {/* Section 6: By Person Breakdown                               */}
-        {/* ============================================================ */}
-        <div className="mb-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Net Worth by Person</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Share of total household net worth per person.
-              </p>
-              <ByPersonChart data={personChartData} />
-            </CardContent>
-          </Card>
-        </div>
+        {selectedView === "household" && (
+          <DashboardSection
+            title="Net Worth by Person"
+            summary={byPerson.map((p) => `${p.name}: ${formatCurrencyCompact(p.value)}`).join(", ")}
+            storageKey="by-person"
+          >
+            <Card>
+              <CardContent className="pt-6">
+                <ByPersonChart data={personChartData} />
+              </CardContent>
+            </Card>
+          </DashboardSection>
+        )}
+
+        {household.committedOutgoings.length > 0 && (
+          <DashboardSection
+            title="Committed Outgoings"
+            summary={`${formatCurrencyCompact(totalAnnualCommitments)}/yr across ${household.committedOutgoings.length} items`}
+            storageKey="commitments"
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {household.committedOutgoings.map((o) => (
+                <Card key={o.id}>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{o.label || o.category}</span>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {o.frequency}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-lg font-bold tabular-nums">{formatCurrency(o.amount)}</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {formatCurrencyCompact(annualiseOutgoing(o.amount, o.frequency))}/yr
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </DashboardSection>
+        )}
       </div>
     </div>
   );

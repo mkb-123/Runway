@@ -300,5 +300,24 @@
       }
     ]
   },
-  "estimatedAnnualExpenses": 48000
+  "estimatedAnnualExpenses": 48000,
+  "committedOutgoings": [
+    {
+      "id": "outgoing-1",
+      "category": "mortgage",
+      "label": "Mortgage",
+      "amount": 1850,
+      "frequency": "monthly"
+    },
+    {
+      "id": "outgoing-2",
+      "category": "insurance",
+      "label": "Home & Life Insurance",
+      "amount": 2400,
+      "frequency": "annually"
+    }
+  ],
+  "dashboardConfig": {
+    "heroMetrics": ["net_worth", "period_change", "retirement_countdown"]
+  }
 }
