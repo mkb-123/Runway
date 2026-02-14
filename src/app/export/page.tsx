@@ -156,13 +156,6 @@ export default function ExportPage() {
     },
   ];
 
-  const printReport = () => {
-    // Navigate to dashboard for the print view (it has the print-optimised layout)
-    window.location.href = "/";
-    // Use a short delay to allow the page to render, then trigger print
-    setTimeout(() => window.print(), 500);
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
