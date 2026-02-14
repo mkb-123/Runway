@@ -5,19 +5,16 @@ Branch: `claude/add-design-principles-zTnMP`
 
 ## Issues to Address
 
-### 1. Settings page is ~1865 lines
+### 1. Settings page is ~1865 lines — RESOLVED
 **Severity:** Medium | **Type:** Maintainability
 
-`src/app/settings/page.tsx` is the largest file in the codebase. Each tab (People, Accounts, Income, etc.) could be extracted into its own component. This would improve local reasoning (design principle #1) — currently you need to scroll through 1800+ lines to understand any single tab.
+Resolved by agent team discussion. Settings page restructured from 1,979 lines to 253-line
+thin orchestrator + 6 extracted tab components. See decision record below.
 
-**Proposed action:** Extract each `<TabsContent>` into a dedicated component (e.g. `PeopleTab`, `AccountsTab`). Pass `household`, `updateHousehold`, and relevant helpers as props.
-
-### 2. `src/lib/data.ts` appears to be dead code
+### 2. `src/lib/data.ts` appears to be dead code — RESOLVED
 **Severity:** Low | **Type:** Cleanup
 
-`data.ts` contains aggregation functions (`getTotalNetWorth`, `getNetWorthByPerson`, etc.) that duplicate what `data-context.tsx` provides. It's only referenced in a comment. The context is the actual source of truth used by all pages.
-
-**Proposed action:** Verify no imports exist, then delete the file.
+Confirmed zero imports. File deleted. Comment reference in `data-context.tsx` updated.
 
 ### 3. Print stylesheet hides all `<button>` elements
 **Severity:** Low | **Type:** Design constraint
@@ -40,12 +37,10 @@ The Collapsible component from shadcn/ui is not installed. It would be useful fo
 
 **Proposed action:** Install with `npx shadcn@latest add collapsible` when needed.
 
-### 6. Transactions tab has duplicated description text
+### 6. Transactions tab has duplicated description text — RESOLVED
 **Severity:** Low | **Type:** Polish
 
-The transactions tab now has both a tab-level description paragraph and an existing section header with its own description. The text is nearly identical.
-
-**Proposed action:** Remove one of the two descriptions to avoid redundancy.
+Fixed during settings page restructuring. The extracted `TransactionsTab` component has a single description line.
 
 ## Architecture Observations
 
@@ -53,3 +48,66 @@ The transactions tab now has both a tab-level description paragraph and an exist
 - **Zod validation at localStorage boundary** works well. No runtime errors observed. The `safeParse` approach gracefully falls back to defaults on invalid data.
 - **Navigation split (Today/Plan)** provides clear information architecture. Future pages should be categorised into one of these groups.
 - **The agent team review process** (Devil's Advocate, Financial Advisor, UX Designer, HNW Customer) produced good outcomes. The Devil's Advocate correctly flagged the wizard as over-engineered — the Quick Setup card was a better solution.
+
+---
+
+## Decision Record: Settings Page Usability Overhaul
+
+**Date:** 2026-02-14
+**Trigger:** User reported settings page hard to use
+**Review type:** Full team
+
+### Verdict: APPROVED
+
+### Summary
+
+Restructured the settings page from a 1,979-line 7-tab monolith into a person-centric,
+component-extracted design with 6 tabs. The key UX change: merged People + Income + Bonus +
+Contributions into a single "Household" tab where all per-person data lives together.
+Added contextual help text to ambiguous fields. Accounts grouped by person. Scenario rates
+given descriptive labels (Pessimistic/Expected/Optimistic). "Goals" tab renamed to "Planning".
+
+### Agent Consensus
+
+- HNW Customer (James): **WANT** — "I'd rather see James's stuff and Sarah's stuff in one place"
+- Financial Advisor: **SUPPORT** — "Foundational infrastructure; clients think per-account, not per-data-type"
+- Mobile Web Designer: **SUPPORT** — "7-tab bar breaks on mobile; forms waste space on desktop"
+- Charting Expert: **NEUTRAL** — No charts involved
+- Devil's Advocate: **OVERRULED** — Raised valid scope concerns but user accepted the risk
+
+### What Changed
+
+**Tab structure: 7 tabs → 6 tabs**
+- `People` + `Income` + `Goals` → `Household` (per-person cards with details, income, bonus, contributions)
+- `Accounts` — now groups accounts by person with section headers
+- `Funds` — shows holding reference count per fund
+- `Goals` → `Planning` (retirement, growth scenarios, emergency fund, expenses)
+- `IHT` — added IHT-specific help text (nil-rate bands, 7-year rule)
+- `Transactions` — fixed duplicate description text
+
+**Code structure: 1 file → 8 files**
+- `page.tsx` — 253 lines (thin orchestrator)
+- `components/household-tab.tsx` — per-person everything
+- `components/accounts-tab.tsx` — accounts grouped by person
+- `components/funds-tab.tsx` — fund catalogue
+- `components/planning-tab.tsx` — retirement & projections
+- `components/iht-tab.tsx` — inheritance tax
+- `components/transactions-tab.tsx` — transaction log
+- `components/field-helpers.tsx` — shared clone/setField/renderField with hint support
+
+**UX improvements:**
+- Help text on 20+ fields (pension access age, NI years, salary sacrifice, ISA limits, etc.)
+- Account count shown per person in Household tab
+- Holding reference count shown per fund in Funds tab
+- Scenario rates labelled Pessimistic/Expected/Optimistic instead of Rate 1/2/3
+- Growth Scenarios split into its own card for clarity
+- Orphaned accounts (no matching person) highlighted with destructive styling
+- Quick Setup steps updated to point to new tab names
+
+### Also Resolved
+- Deleted dead code file `src/lib/data.ts` (confirmed zero imports)
+- Updated stale comment in `data-context.tsx`
+
+### Risks Accepted
+- Settings page is the most stateful page; restructuring touches all data models
+- No new tests added (existing 143 tests all pass; TypeScript clean; lint clean)
