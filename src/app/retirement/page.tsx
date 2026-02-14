@@ -180,6 +180,18 @@ export default function RetirementPage() {
   const lockedPercent =
     totalWealth > 0 ? (lockedWealth / totalWealth) * 100 : 0;
 
+  // --- Primary person pro-rata state pension ---
+  const primaryStatePensionAnnual = useMemo(() => {
+    if (!primaryPerson) return UK_TAX_CONSTANTS.statePension.fullNewStatePensionAnnual;
+    const qualifyingYears = primaryPerson.niQualifyingYears ?? 0;
+    const requiredYears = UK_TAX_CONSTANTS.statePension.qualifyingYearsRequired;
+    const minYears = UK_TAX_CONSTANTS.statePension.minimumQualifyingYears;
+    const fullPension = UK_TAX_CONSTANTS.statePension.fullNewStatePensionAnnual;
+    return qualifyingYears >= minYears
+      ? Math.min(1, qualifyingYears / requiredYears) * fullPension
+      : 0;
+  }, [primaryPerson]);
+
   // --- Combined Retirement Income Timeline data ---
   const personRetirementInputs: PersonRetirementInput[] = useMemo(() => {
     return persons.map((person) => {
@@ -226,12 +238,12 @@ export default function RetirementPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             Retirement Planning
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground">
             Track your progress toward financial independence
           </p>
         </div>
@@ -431,7 +443,7 @@ export default function RetirementPage() {
             retirementAge={earlyRetirementAge}
             scenarioRates={retirement.scenarioRates}
             statePensionAge={primaryPerson?.stateRetirementAge ?? 67}
-            statePensionAnnual={UK_TAX_CONSTANTS.statePension.fullNewStatePensionAnnual}
+            statePensionAnnual={primaryStatePensionAnnual}
           />
         </CardContent>
       </Card>

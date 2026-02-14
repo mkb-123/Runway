@@ -68,15 +68,36 @@ export default function IHTPage() {
       propertyValue + isaValue + giaValue + cashValue + premiumBondsValue;
     const outsideEstate = pensionValue;
 
+    // --- 7-Year Gift Tracker ---
+    const giftsWithStatus = ihtConfig.gifts.map((gift) => {
+      const years = yearsSince(gift.date);
+      const fallenOut = years >= 7;
+      return { ...gift, yearsSinceGift: years, fallenOut };
+    });
+
+    // Gifts within 7 years reduce the available NRB
+    const giftsWithin7Years = giftsWithStatus
+      .filter((g) => !g.fallenOut)
+      .reduce((sum, g) => sum + g.amount, 0);
+
     // --- IHT Thresholds ---
     const numberOfPersons = selectedView === "household" ? household.persons.length : 1;
     const nilRateBandPerPerson = ihtConstants.nilRateBand;
-    const residenceNilRateBandPerPerson = ihtConfig.passingToDirectDescendants
+    const totalNilRateBand = Math.max(
+      0,
+      nilRateBandPerPerson * numberOfPersons - giftsWithin7Years
+    );
+
+    // RNRB tapers by £1 for every £2 the estate exceeds the taper threshold
+    const rnrbPerPerson = ihtConfig.passingToDirectDescendants
       ? ihtConstants.residenceNilRateBand
       : 0;
-    const totalNilRateBand = nilRateBandPerPerson * numberOfPersons;
-    const totalResidenceNilRateBand =
-      residenceNilRateBandPerPerson * numberOfPersons;
+    const grossRnrb = rnrbPerPerson * numberOfPersons;
+    const rnrbTaperReduction = Math.max(
+      0,
+      Math.floor((inEstate - ihtConstants.rnrbTaperThreshold) / 2)
+    );
+    const totalResidenceNilRateBand = Math.max(0, grossRnrb - rnrbTaperReduction);
     const combinedThreshold = totalNilRateBand + totalResidenceNilRateBand;
 
     // --- IHT Liability ---
@@ -88,13 +109,6 @@ export default function IHTPage() {
       totalNetWorth > 0 ? outsideEstate / totalNetWorth : 0;
     const exposedPct =
       totalNetWorth > 0 ? inEstate / totalNetWorth : 0;
-
-    // --- 7-Year Gift Tracker ---
-    const giftsWithStatus = ihtConfig.gifts.map((gift) => {
-      const years = yearsSince(gift.date);
-      const fallenOut = years >= 7;
-      return { ...gift, yearsSinceGift: years, fallenOut };
-    });
 
     // --- Estate Growth Projection ---
     // Total annual contributions going to non-pension accounts (in estate)
@@ -146,7 +160,7 @@ export default function IHTPage() {
       inEstate,
       outsideEstate,
       nilRateBandPerPerson,
-      residenceNilRateBandPerPerson,
+      residenceNilRateBandPerPerson: rnrbPerPerson,
       totalNilRateBand,
       totalResidenceNilRateBand,
       combinedThreshold,
@@ -190,12 +204,12 @@ export default function IHTPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             Inheritance Tax Planning
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground">
             Estimate your estate value, IHT liability, and track gifts within the
             7-year window.
           </p>

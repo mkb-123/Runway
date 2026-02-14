@@ -259,10 +259,10 @@ describe("calculateGainsForTaxYear", () => {
 
     const result = calculateGainsForTaxYear(transactions, "2024/25");
     // Gain: £10,000, allowance: £3,000, taxable: £7,000
-    // Default to higher rate: £7,000 * 0.20 = £1,400
+    // Default to higher rate: £7,000 * 0.24 = £1,680
     expect(result.totalGains).toBe(10000);
     expect(result.taxableGain).toBe(7000);
-    expect(result.taxDue).toBe(1400);
+    expect(result.taxDue).toBe(1680);
   });
 
   it("ignores sells outside the tax year", () => {

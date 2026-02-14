@@ -96,14 +96,18 @@ export default function IncomePage() {
         const bonus = bonusStructures.find((b) => b.personId === person.id);
         const contributions = annualContributions.find((c) => c.personId === person.id);
 
+        // Include cash bonus in total gross employment income for tax purposes
+        const cashBonus = bonus?.cashBonusAnnual ?? 0;
+        const totalGross = personIncome.grossSalary + cashBonus;
+
         const incomeTaxResult = calculateIncomeTax(
-          personIncome.grossSalary,
+          totalGross,
           personIncome.employeePensionContribution,
           personIncome.pensionContributionMethod
         );
 
         const niResult = calculateNI(
-          personIncome.grossSalary,
+          totalGross,
           personIncome.employeePensionContribution,
           personIncome.pensionContributionMethod
         );
@@ -111,11 +115,12 @@ export default function IncomePage() {
         // For student loan, use adjusted gross if salary sacrifice
         const studentLoanGross =
           personIncome.pensionContributionMethod === "salary_sacrifice"
-            ? personIncome.grossSalary - personIncome.employeePensionContribution
-            : personIncome.grossSalary;
+            ? totalGross - personIncome.employeePensionContribution
+            : totalGross;
         const studentLoan = calculateStudentLoan(studentLoanGross, person.studentLoanPlan);
 
-        const takeHome = calculateTakeHomePayWithStudentLoan(personIncome, person.studentLoanPlan);
+        const incomeWithBonus = { ...personIncome, grossSalary: totalGross };
+        const takeHome = calculateTakeHomePayWithStudentLoan(incomeWithBonus, person.studentLoanPlan);
 
         return {
           person,
@@ -196,10 +201,10 @@ export default function IncomePage() {
   return (
     <div className="space-y-8 p-4 md:p-8">
       {/* Page Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">Income &amp; Cash Flow</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Income &amp; Cash Flow</h1>
+          <p className="text-sm text-muted-foreground">
             Detailed income tax breakdown, take-home pay, bonus structures, and cash flow analysis.
           </p>
         </div>

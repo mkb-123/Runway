@@ -39,8 +39,8 @@ describe("UK_TAX_CONSTANTS", () => {
 
   it("has correct CGT values", () => {
     expect(UK_TAX_CONSTANTS.cgt.annualExemptAmount).toBe(3000);
-    expect(UK_TAX_CONSTANTS.cgt.basicRate).toBe(0.1);
-    expect(UK_TAX_CONSTANTS.cgt.higherRate).toBe(0.2);
+    expect(UK_TAX_CONSTANTS.cgt.basicRate).toBe(0.18);
+    expect(UK_TAX_CONSTANTS.cgt.higherRate).toBe(0.24);
   });
 
   it("has correct ISA allowance", () => {
