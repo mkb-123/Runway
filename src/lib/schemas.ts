@@ -157,7 +157,7 @@ export const RetirementConfigSchema = z.object({
   targetAnnualIncome: z.number().min(0),
   withdrawalRate: z.number().min(0).max(1),
   includeStatePension: z.boolean(),
-  scenarioRates: z.array(z.number()),
+  scenarioRates: z.array(z.number().min(-1).max(1)).min(1).max(10),
 });
 
 export const EmergencyFundConfigSchema = z.object({
@@ -274,7 +274,7 @@ export const HouseholdDataSchema = z.object({
   emergencyFund: EmergencyFundConfigSchema,
   committedOutgoings: z.array(CommittedOutgoingSchema).default([]),
   dashboardConfig: DashboardConfigSchema.default({
-    heroMetrics: ["net_worth", "period_change", "retirement_countdown"],
+    heroMetrics: ["net_worth", "fire_progress", "retirement_countdown"],
   }),
   iht: IHTConfigSchema,
   estimatedAnnualExpenses: z.number().min(0),

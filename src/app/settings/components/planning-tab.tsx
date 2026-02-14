@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -27,6 +28,24 @@ export function PlanningTab({ household, updateHousehold }: PlanningTabProps) {
   function updateScenarioRate(index: number, value: number) {
     const updated = clone(household);
     updated.retirement.scenarioRates[index] = value;
+    updateHousehold(updated);
+  }
+
+  function addScenarioRate() {
+    const updated = clone(household);
+    const rates = updated.retirement.scenarioRates;
+    if (rates.length >= 10) return;
+    const lastRate = rates[rates.length - 1] ?? 0;
+    updated.retirement.scenarioRates = [...rates, lastRate + 0.02];
+    updateHousehold(updated);
+  }
+
+  function removeScenarioRate(index: number) {
+    const updated = clone(household);
+    if (updated.retirement.scenarioRates.length <= 1) return;
+    updated.retirement.scenarioRates = updated.retirement.scenarioRates.filter(
+      (_: number, i: number) => i !== index
+    );
     updateHousehold(updated);
   }
 
@@ -114,57 +133,56 @@ export function PlanningTab({ household, updateHousehold }: PlanningTabProps) {
         <CardHeader>
           <CardTitle>Growth Scenarios</CardTitle>
           <CardDescription>
-            Three return assumptions for pessimistic, expected, and optimistic projections.
+            Return assumptions for projections (nominal, before inflation). Add up to 10 scenarios.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {renderField(
-              "Pessimistic (%)",
-              <Input
-                type="number"
-                step="0.01"
-                value={
-                  household.retirement.scenarioRates[0] !== undefined
-                    ? Math.round(household.retirement.scenarioRates[0] * 100 * 100) / 100
-                    : ""
-                }
-                onChange={(e) => updateScenarioRate(0, Number(e.target.value) / 100)}
-                placeholder="5"
-              />,
-              "Low-growth scenario"
-            )}
-            {renderField(
-              "Expected (%)",
-              <Input
-                type="number"
-                step="0.01"
-                value={
-                  household.retirement.scenarioRates[1] !== undefined
-                    ? Math.round(household.retirement.scenarioRates[1] * 100 * 100) / 100
-                    : ""
-                }
-                onChange={(e) => updateScenarioRate(1, Number(e.target.value) / 100)}
-                placeholder="7"
-              />,
-              "Base case scenario"
-            )}
-            {renderField(
-              "Optimistic (%)",
-              <Input
-                type="number"
-                step="0.01"
-                value={
-                  household.retirement.scenarioRates[2] !== undefined
-                    ? Math.round(household.retirement.scenarioRates[2] * 100 * 100) / 100
-                    : ""
-                }
-                onChange={(e) => updateScenarioRate(2, Number(e.target.value) / 100)}
-                placeholder="9"
-              />,
-              "High-growth scenario"
-            )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {household.retirement.scenarioRates.map((rate, index) => (
+              <div key={index} className="space-y-1.5">
+                <Label className="text-sm font-medium">
+                  Scenario {index + 1} (%)
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={Math.round(rate * 100 * 100) / 100}
+                    onChange={(e) =>
+                      updateScenarioRate(index, Number(e.target.value) / 100)
+                    }
+                    placeholder="0"
+                  />
+                  {household.retirement.scenarioRates.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeScenarioRate(index)}
+                      aria-label={`Remove scenario ${index + 1}`}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Annual return rate
+                </p>
+              </div>
+            ))}
           </div>
+          {household.retirement.scenarioRates.length < 10 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={addScenarioRate}
+            >
+              Add scenario
+            </Button>
+          )}
         </CardContent>
       </Card>
 
