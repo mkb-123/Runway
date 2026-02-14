@@ -6,6 +6,7 @@ import { ACCOUNT_TYPE_LABELS, ASSET_CLASS_LABELS, REGION_LABELS } from "@/types"
 import { roundPence } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 function downloadWorkbook(wb: XLSX.WorkBook, filename: string) {
   XLSX.writeFile(wb, filename);
@@ -155,6 +156,13 @@ export default function ExportPage() {
     },
   ];
 
+  const printReport = () => {
+    // Navigate to dashboard for the print view (it has the print-optimised layout)
+    window.location.href = "/";
+    // Use a short delay to allow the page to render, then trigger print
+    setTimeout(() => window.print(), 500);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
@@ -163,6 +171,27 @@ export default function ExportPage() {
           Download your financial data as Excel spreadsheets for offline analysis or record keeping.
         </p>
       </div>
+
+      {/* Print Financial Report card */}
+      <Card className="mb-6 border-primary/20 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base sm:text-lg">Print Financial Report</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground sm:text-sm">
+            Generate a print-optimised PDF of your dashboard including net worth summary,
+            wrapper breakdown, charts, and recommendations. Uses your browser&apos;s built-in
+            &ldquo;Save as PDF&rdquo; option.
+          </p>
+          <div className="flex gap-2">
+            <Link href="/" className="flex-1">
+              <Button variant="outline" className="w-full" onClick={() => setTimeout(() => window.print(), 300)}>
+                Print from Dashboard
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
         {exportItems.map((exp) => (

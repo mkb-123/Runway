@@ -1,5 +1,17 @@
 "use client";
 
+import { useState } from "react";
+import {
+  Users,
+  Landmark,
+  Wallet,
+  Target,
+  BookOpen,
+  Shield,
+  ArrowRightLeft,
+  CheckCircle2,
+  Circle,
+} from "lucide-react";
 import { useData } from "@/context/data-context";
 import { roundPence } from "@/lib/format";
 import {
@@ -504,6 +516,30 @@ export default function SettingsPage() {
   }
 
   // ============================================================
+  // Quick Setup completeness checks
+  // ============================================================
+
+  const hasPersons = household.persons.length > 0 && household.persons.some(p => p.name.length > 0);
+  const hasAccounts = household.accounts.length > 0;
+  const hasIncome = household.income.some(i => i.grossSalary > 0);
+  const hasContributions = household.annualContributions.some(
+    c => c.isaContribution > 0 || c.pensionContribution > 0 || c.giaContribution > 0
+  );
+  const hasFunds = household.funds.length > 0;
+
+  const setupSteps = [
+    { key: "people", label: "Add household members", done: hasPersons, tab: "people" },
+    { key: "accounts", label: "Set up accounts", done: hasAccounts, tab: "accounts" },
+    { key: "income", label: "Enter income details", done: hasIncome, tab: "income" },
+    { key: "funds", label: "Add funds/investments", done: hasFunds, tab: "funds" },
+    { key: "contributions", label: "Set contribution goals", done: hasContributions, tab: "contributions" },
+  ];
+  const completedSteps = setupSteps.filter(s => s.done).length;
+  const allComplete = completedSteps === setupSteps.length;
+
+  const [activeTab, setActiveTab] = useState("people");
+
+  // ============================================================
   // RENDER
   // ============================================================
 
@@ -516,21 +552,82 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="people" className="w-full">
+      {/* Quick Setup Guide */}
+      {!allComplete && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Quick Setup</CardTitle>
+            <CardDescription>
+              Complete these steps to get the most out of Runway.{" "}
+              {completedSteps}/{setupSteps.length} done.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+              {setupSteps.map((step) => (
+                <button
+                  key={step.key}
+                  onClick={() => setActiveTab(step.tab)}
+                  className={`flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                    step.done
+                      ? "text-muted-foreground"
+                      : "font-medium text-foreground hover:bg-accent"
+                  }`}
+                >
+                  {step.done ? (
+                    <CheckCircle2 className="size-4 shrink-0 text-green-600" />
+                  ) : (
+                    <Circle className="size-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className={step.done ? "line-through" : ""}>
+                    {step.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full flex-wrap h-auto gap-1">
-          <TabsTrigger value="people">People</TabsTrigger>
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
-          <TabsTrigger value="income">Income</TabsTrigger>
-          <TabsTrigger value="contributions">Contributions &amp; Goals</TabsTrigger>
-          <TabsTrigger value="funds">Funds</TabsTrigger>
-          <TabsTrigger value="iht">IHT &amp; Gifts</TabsTrigger>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="people" className="gap-1.5">
+            <Users className="size-3.5" />
+            People
+          </TabsTrigger>
+          <TabsTrigger value="accounts" className="gap-1.5">
+            <Landmark className="size-3.5" />
+            Accounts
+          </TabsTrigger>
+          <TabsTrigger value="income" className="gap-1.5">
+            <Wallet className="size-3.5" />
+            Income
+          </TabsTrigger>
+          <TabsTrigger value="contributions" className="gap-1.5">
+            <Target className="size-3.5" />
+            Goals
+          </TabsTrigger>
+          <TabsTrigger value="funds" className="gap-1.5">
+            <BookOpen className="size-3.5" />
+            Funds
+          </TabsTrigger>
+          <TabsTrigger value="iht" className="gap-1.5">
+            <Shield className="size-3.5" />
+            IHT
+          </TabsTrigger>
+          <TabsTrigger value="transactions" className="gap-1.5">
+            <ArrowRightLeft className="size-3.5" />
+            Transactions
+          </TabsTrigger>
         </TabsList>
 
         {/* ====================================================== */}
         {/* TAB 1: PEOPLE                                          */}
         {/* ====================================================== */}
         <TabsContent value="people" className="space-y-4 mt-4">
+          <p className="text-sm text-muted-foreground">
+            Add everyone in your household. Accounts, income, and contributions are linked to each person.
+          </p>
           {household.persons.map((person, pIdx) => (
             <Card key={person.id}>
               <CardHeader>
@@ -651,6 +748,9 @@ export default function SettingsPage() {
         {/* TAB 2: ACCOUNTS                                        */}
         {/* ====================================================== */}
         <TabsContent value="accounts" className="space-y-4 mt-4">
+          <p className="text-sm text-muted-foreground">
+            Add your ISAs, pensions, GIAs, and cash accounts. Each account belongs to a person and can hold multiple fund holdings.
+          </p>
           {household.accounts.map((account, aIdx) => (
             <Card key={account.id}>
               <CardHeader>
@@ -876,6 +976,9 @@ export default function SettingsPage() {
         {/* TAB 3: INCOME                                          */}
         {/* ====================================================== */}
         <TabsContent value="income" className="space-y-4 mt-4">
+          <p className="text-sm text-muted-foreground">
+            Enter salary, pension contributions, and bonus details. Used for tax calculations and income projections.
+          </p>
           {household.persons.map((person) => {
             const incomeIdx = household.income.findIndex(
               (i) => i.personId === person.id
@@ -1121,6 +1224,9 @@ export default function SettingsPage() {
         {/* TAB 4: CONTRIBUTIONS & GOALS                           */}
         {/* ====================================================== */}
         <TabsContent value="contributions" className="space-y-4 mt-4">
+          <p className="text-sm text-muted-foreground">
+            Set annual saving targets, retirement goals, and emergency fund parameters. These drive projections and recommendations.
+          </p>
           {/* Annual Contributions per person */}
           {household.persons.map((person) => {
             const contribIdx = household.annualContributions.findIndex(
@@ -1392,6 +1498,9 @@ export default function SettingsPage() {
         {/* TAB 5: FUNDS                                           */}
         {/* ====================================================== */}
         <TabsContent value="funds" className="space-y-4 mt-4">
+          <p className="text-sm text-muted-foreground">
+            Define the funds and ETFs you invest in. Holdings in accounts reference these funds for asset class and region breakdowns.
+          </p>
           {household.funds.map((fund, fIdx) => (
             <Card key={fund.id}>
               <CardHeader>
@@ -1518,6 +1627,9 @@ export default function SettingsPage() {
         {/* TAB 6: IHT & GIFTS                                     */}
         {/* ====================================================== */}
         <TabsContent value="iht" className="space-y-4 mt-4">
+          <p className="text-sm text-muted-foreground">
+            Configure property value and gift records for inheritance tax estimates under the 7-year rule.
+          </p>
           <Card>
             <CardHeader>
               <CardTitle>Inheritance Tax Configuration</CardTitle>
@@ -1659,6 +1771,9 @@ export default function SettingsPage() {
         {/* TAB 7: TRANSACTIONS                                    */}
         {/* ====================================================== */}
         <TabsContent value="transactions" className="space-y-4 mt-4">
+          <p className="text-sm text-muted-foreground">
+            Track buy, sell, dividend, and contribution transactions for CGT calculations and audit trail.
+          </p>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold">Transactions</h2>

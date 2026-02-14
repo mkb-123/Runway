@@ -9,6 +9,7 @@ import {
   Minus,
   X,
   Lightbulb,
+  Printer,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -241,6 +242,21 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Print-only report header */}
+        <div className="print-report-header hidden print:block">
+          <h1>Runway — Financial Report</h1>
+          <p>
+            Generated{" "}
+            {new Intl.DateTimeFormat("en-GB", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            }).format(new Date())}
+            {" | "}
+            Household net worth: {formatCurrency(totalNetWorth)}
+          </p>
+        </div>
+
         {/* Getting Started Banner */}
         {!bannerDismissed && (
           <div className="relative mb-6 rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
@@ -272,19 +288,30 @@ export default function Home() {
         )}
 
         {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Net Worth Dashboard
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Household financial overview as of{" "}
-            {latestSnapshot
-              ? new Intl.DateTimeFormat("en-GB", {
-                  month: "long",
-                  year: "numeric",
-                }).format(new Date(latestSnapshot.date))
-              : "now"}
-          </p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Net Worth Dashboard
+            </h1>
+            <p className="mt-1 text-muted-foreground">
+              Household financial overview as of{" "}
+              {latestSnapshot
+                ? new Intl.DateTimeFormat("en-GB", {
+                    month: "long",
+                    year: "numeric",
+                  }).format(new Date(latestSnapshot.date))
+                : "now"}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 gap-1.5 print:hidden"
+            onClick={() => window.print()}
+          >
+            <Printer className="size-3.5" />
+            <span className="hidden sm:inline">Print Report</span>
+          </Button>
         </div>
 
         {/* ============================================================ */}
