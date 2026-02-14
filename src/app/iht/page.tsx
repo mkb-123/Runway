@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { useScenarioData } from "@/context/use-scenario-data";
+import { usePersonView } from "@/context/person-view-context";
+import { PersonToggle } from "@/components/person-toggle";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { getAccountTaxWrapper } from "@/types";
@@ -31,17 +33,22 @@ function yearsSince(dateStr: string): number {
 
 export default function IHTPage() {
   const scenarioData = useScenarioData();
+  const { selectedView } = usePersonView();
   const household = scenarioData.household;
-  const getTotalNetWorth = scenarioData.getTotalNetWorth;
+
+  const filteredAccounts = useMemo(() => {
+    if (selectedView === "household") return household.accounts;
+    return household.accounts.filter((a) => a.personId === selectedView);
+  }, [household.accounts, selectedView]);
 
   const ihtData = useMemo(() => {
     const ihtConfig = household.iht;
-    const totalNetWorth = getTotalNetWorth();
+    const totalNetWorth = filteredAccounts.reduce((sum, a) => sum + a.currentValue, 0);
     const ihtConstants = UK_TAX_CONSTANTS.iht;
 
     // --- Estate breakdown by wrapper type ---
     const wrapperTotals = new Map<TaxWrapper, number>();
-    for (const account of household.accounts) {
+    for (const account of filteredAccounts) {
       const wrapper = getAccountTaxWrapper(account.type);
       wrapperTotals.set(
         wrapper,
@@ -62,7 +69,7 @@ export default function IHTPage() {
     const outsideEstate = pensionValue;
 
     // --- IHT Thresholds ---
-    const numberOfPersons = household.persons.length;
+    const numberOfPersons = selectedView === "household" ? household.persons.length : 1;
     const nilRateBandPerPerson = ihtConstants.nilRateBand;
     const residenceNilRateBandPerPerson = ihtConfig.passingToDirectDescendants
       ? ihtConstants.residenceNilRateBand
@@ -91,7 +98,10 @@ export default function IHTPage() {
 
     // --- Estate Growth Projection ---
     // Total annual contributions going to non-pension accounts (in estate)
-    const annualSavingsInEstate = household.annualContributions.reduce(
+    const filteredContributions = selectedView === "household"
+      ? household.annualContributions
+      : household.annualContributions.filter((c) => c.personId === selectedView);
+    const annualSavingsInEstate = filteredContributions.reduce(
       (sum, c) => sum + c.isaContribution + c.giaContribution,
       0,
     );
@@ -152,7 +162,7 @@ export default function IHTPage() {
       estateBreakdown,
       numberOfPersons,
     };
-  }, [household, getTotalNetWorth]);
+  }, [household, filteredAccounts, selectedView]);
 
   const {
     ihtConfig,
@@ -180,14 +190,17 @@ export default function IHTPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Inheritance Tax Planning
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Estimate your estate value, IHT liability, and track gifts within the
-          7-year window.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Inheritance Tax Planning
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Estimate your estate value, IHT liability, and track gifts within the
+            7-year window.
+          </p>
+        </div>
+        <PersonToggle />
       </div>
 
       {/* Estate Value Estimator */}

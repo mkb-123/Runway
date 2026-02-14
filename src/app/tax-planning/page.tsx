@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/table";
 import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
+import { usePersonView } from "@/context/person-view-context";
+import { PersonToggle } from "@/components/person-toggle";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import {
   getUnrealisedGains,
@@ -33,11 +35,18 @@ import type { PersonIncome } from "@/types";
 
 export default function TaxPlanningPage() {
   const { transactions: transactionsData, getAccountsForPerson } = useData();
+  const { selectedView } = usePersonView();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
   const getNetWorthByWrapper = scenarioData.getNetWorthByWrapper;
   const { transactions } = transactionsData;
-  const { persons, income, annualContributions } = household;
+
+  const persons = useMemo(() => {
+    if (selectedView === "household") return household.persons;
+    return household.persons.filter((p) => p.id === selectedView);
+  }, [household.persons, selectedView]);
+
+  const { income, annualContributions } = household;
 
   const currentTaxYear = "2024/25";
   const isaAllowance = UK_TAX_CONSTANTS.isaAnnualAllowance;
@@ -223,13 +232,16 @@ export default function TaxPlanningPage() {
   return (
     <div className="space-y-8 p-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Tax Planning &amp; Optimisation
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Strategies to minimise tax drag and optimise your investment wrappers.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Tax Planning &amp; Optimisation
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Strategies to minimise tax drag and optimise your investment wrappers.
+          </p>
+        </div>
+        <PersonToggle />
       </div>
 
       {/* Bed & ISA Planner */}

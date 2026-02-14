@@ -12,6 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useScenarioData } from "@/context/use-scenario-data";
+import { usePersonView } from "@/context/person-view-context";
+import { PersonToggle } from "@/components/person-toggle";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/format";
 import { projectScenarios, calculateRequiredPot } from "@/lib/projections";
 import { ProjectionChart } from "@/components/charts/projection-chart";
@@ -21,20 +23,34 @@ const SNAPSHOT_INTERVALS = [5, 10, 15, 20, 25, 30];
 
 export default function ProjectionsPage() {
   const scenarioData = useScenarioData();
+  const { selectedView } = usePersonView();
   const household = scenarioData.household;
-  const { retirement, annualContributions } = household;
+  const { retirement } = household;
 
-  // Calculate total current pot (scenario-aware)
-  const currentPot = scenarioData.getTotalNetWorth();
+  const filteredAccounts = useMemo(() => {
+    if (selectedView === "household") return household.accounts;
+    return household.accounts.filter((a) => a.personId === selectedView);
+  }, [household.accounts, selectedView]);
 
-  // Calculate total annual contributions across all persons
+  const filteredContributions = useMemo(() => {
+    if (selectedView === "household") return household.annualContributions;
+    return household.annualContributions.filter((c) => c.personId === selectedView);
+  }, [household.annualContributions, selectedView]);
+
+  // Calculate total current pot (filtered)
+  const currentPot = useMemo(
+    () => filteredAccounts.reduce((sum, a) => sum + a.currentValue, 0),
+    [filteredAccounts]
+  );
+
+  // Calculate total annual contributions (filtered)
   const totalAnnualContributions = useMemo(
     () =>
-      annualContributions.reduce(
+      filteredContributions.reduce(
         (sum, c) => sum + c.isaContribution + c.pensionContribution + c.giaContribution,
         0
       ),
-    [annualContributions]
+    [filteredContributions]
   );
 
   // Monthly contributions
@@ -64,11 +80,14 @@ export default function ProjectionsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Projections</h1>
-        <p className="text-muted-foreground mt-1">
-          Growth projections across multiple return scenarios over {PROJECTION_YEARS} years
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Projections</h1>
+          <p className="text-muted-foreground mt-1">
+            Growth projections across multiple return scenarios over {PROJECTION_YEARS} years
+          </p>
+        </div>
+        <PersonToggle />
       </div>
 
       {/* Summary Cards */}

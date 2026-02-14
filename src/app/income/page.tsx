@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
+import { usePersonView } from "@/context/person-view-context";
+import { PersonToggle } from "@/components/person-toggle";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import {
   calculateIncomeTax,
@@ -61,9 +63,30 @@ function studentLoanLabel(plan: string): string {
 
 export default function IncomePage() {
   const { getFundById } = useData();
+  const { selectedView } = usePersonView();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
-  const { persons, income, bonusStructures, annualContributions, estimatedAnnualExpenses } = household;
+  const { persons: allPersons, income: allIncome, bonusStructures: allBonusStructures, annualContributions: allAnnualContributions, estimatedAnnualExpenses } = household;
+
+  const persons = useMemo(() => {
+    if (selectedView === "household") return allPersons;
+    return allPersons.filter((p) => p.id === selectedView);
+  }, [allPersons, selectedView]);
+
+  const income = useMemo(() => {
+    if (selectedView === "household") return allIncome;
+    return allIncome.filter((i) => i.personId === selectedView);
+  }, [allIncome, selectedView]);
+
+  const bonusStructures = useMemo(() => {
+    if (selectedView === "household") return allBonusStructures;
+    return allBonusStructures.filter((b) => b.personId === selectedView);
+  }, [allBonusStructures, selectedView]);
+
+  const annualContributions = useMemo(() => {
+    if (selectedView === "household") return allAnnualContributions;
+    return allAnnualContributions.filter((c) => c.personId === selectedView);
+  }, [allAnnualContributions, selectedView]);
 
   // Build per-person income analysis
   const personAnalysis = useMemo(
@@ -173,11 +196,14 @@ export default function IncomePage() {
   return (
     <div className="space-y-8 p-4 md:p-8">
       {/* Page Header */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Income &amp; Cash Flow</h1>
-        <p className="text-muted-foreground">
-          Detailed income tax breakdown, take-home pay, bonus structures, and cash flow analysis.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Income &amp; Cash Flow</h1>
+          <p className="text-muted-foreground">
+            Detailed income tax breakdown, take-home pay, bonus structures, and cash flow analysis.
+          </p>
+        </div>
+        <PersonToggle />
       </div>
 
       {/* Per-Person Income Breakdown */}

@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { useData } from "@/context/data-context";
+import { usePersonView } from "@/context/person-view-context";
+import { PersonToggle } from "@/components/person-toggle";
 import { formatCurrency } from "@/lib/format";
 import { ACCOUNT_TYPE_LABELS } from "@/types";
 import {
@@ -19,33 +21,44 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export default function AccountsPage() {
   const { household } = useData();
   const { persons, accounts } = household;
+  const { selectedView } = usePersonView();
+
+  const filteredAccounts = useMemo(() => {
+    if (selectedView === "household") return accounts;
+    return accounts.filter((a) => a.personId === selectedView);
+  }, [accounts, selectedView]);
 
   // Group accounts by person
   const accountsByPerson = useMemo(
     () =>
-      persons.map((person) => {
-        const personAccounts = accounts.filter((a) => a.personId === person.id);
-        const totalValue = personAccounts.reduce(
-          (sum, a) => sum + a.currentValue,
-          0
-        );
-        return { person, accounts: personAccounts, totalValue };
-      }),
-    [persons, accounts]
+      persons
+        .map((person) => {
+          const personAccounts = filteredAccounts.filter((a) => a.personId === person.id);
+          const totalValue = personAccounts.reduce(
+            (sum, a) => sum + a.currentValue,
+            0
+          );
+          return { person, accounts: personAccounts, totalValue };
+        })
+        .filter((g) => g.accounts.length > 0),
+    [persons, filteredAccounts]
   );
 
   const grandTotal = useMemo(
-    () => accounts.reduce((sum, a) => sum + a.currentValue, 0),
-    [accounts]
+    () => filteredAccounts.reduce((sum, a) => sum + a.currentValue, 0),
+    [filteredAccounts]
   );
 
   return (
     <div className="space-y-8 p-4 md:p-8">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Accounts</h1>
-        <p className="text-muted-foreground">
-          Overview of all accounts grouped by person.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Accounts</h1>
+          <p className="text-muted-foreground">
+            Overview of all accounts grouped by person.
+          </p>
+        </div>
+        <PersonToggle />
       </div>
 
       {accountsByPerson.map(({ person, accounts: personAccounts, totalValue }) => (
