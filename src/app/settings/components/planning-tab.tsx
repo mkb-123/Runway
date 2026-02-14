@@ -1,5 +1,6 @@
 "use client";
 
+import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -116,7 +117,7 @@ export function PlanningTab({ household, updateHousehold }: PlanningTabProps) {
                   {household.retirement.includeStatePension ? "Yes" : "No"}
                 </Label>
               </div>,
-              "Full new state pension is £221.20/week (2024-25)"
+              `Full new state pension is £${UK_TAX_CONSTANTS.statePension.fullNewStatePensionWeekly.toFixed(2)}/week`
             )}
           </div>
         </CardContent>

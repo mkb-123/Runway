@@ -73,7 +73,7 @@ function buildAvoidTaperPreset(household: ReturnType<typeof useData>["household"
     if (adjustedGross > UK_TAX_CONSTANTS.personalAllowanceTaperThreshold && adjustedGross <= UK_TAX_CONSTANTS.incomeTax.higherRateUpperLimit) {
       const excess = adjustedGross - UK_TAX_CONSTANTS.personalAllowanceTaperThreshold;
       const contribs = getPersonContributionTotals(household.contributions, person.id);
-      const pensionUsed = contribs.pensionContribution;
+      const pensionUsed = income.employeePensionContribution + income.employerPensionContribution + contribs.pensionContribution;
       const headroom = UK_TAX_CONSTANTS.pensionAnnualAllowance - pensionUsed;
       const additionalSacrifice = Math.min(excess, headroom);
 
@@ -109,10 +109,12 @@ const SMART_PRESETS: SmartPreset[] = [
         .map((person) => {
           const income = household.income.find((i) => i.personId === person.id);
           if (!income) return null;
+          const contribs = getPersonContributionTotals(household.contributions, person.id);
+          const maxEmployee = Math.max(0, UK_TAX_CONSTANTS.pensionAnnualAllowance - income.employerPensionContribution - contribs.pensionContribution);
           return {
             personId: person.id,
             grossSalary: income.grossSalary,
-            employeePensionContribution: Math.min(UK_TAX_CONSTANTS.pensionAnnualAllowance, income.grossSalary),
+            employeePensionContribution: Math.min(maxEmployee, income.grossSalary),
             employerPensionContribution: income.employerPensionContribution,
             pensionContributionMethod: income.pensionContributionMethod,
           };

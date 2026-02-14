@@ -192,7 +192,12 @@ export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
   }
 
   // Partially used — any remaining amount triggers recommendation
-  const monthsLeft = 12 - new Date().getMonth(); // rough estimate to April
+  // ISA year ends 5 April — calculate months remaining in tax year
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+  const taxYearEnd = new Date(currentMonth >= 3 && now.getDate() > 5 ? currentYear + 1 : currentYear, 3, 5);
+  const monthsLeft = Math.max(0, Math.round((taxYearEnd.getTime() - now.getTime()) / (30.44 * 24 * 60 * 60 * 1000)));
   const monthlyNeeded = Math.round(isaRemaining / Math.max(1, monthsLeft));
 
   return [

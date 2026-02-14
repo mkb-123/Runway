@@ -62,7 +62,11 @@ export default function TaxPlanningPage() {
 
   const { income, contributions } = household;
 
-  const currentTaxYear = "2024/25";
+  const currentTaxYear = (() => {
+    const now = new Date();
+    const y = now.getMonth() >= 3 && now.getDate() > 5 ? now.getFullYear() : now.getFullYear() - 1;
+    return `${y}/${(y + 1) % 100}`;
+  })();
   const isaAllowance = UK_TAX_CONSTANTS.isaAnnualAllowance;
   const pensionAllowance = UK_TAX_CONSTANTS.pensionAnnualAllowance;
   const cgtAnnualExempt = UK_TAX_CONSTANTS.cgt.annualExemptAmount;
@@ -365,7 +369,7 @@ export default function TaxPlanningPage() {
                           <p className="mb-2 text-sm font-medium">
                             Bed &amp; ISA Analysis
                           </p>
-                          <div className="grid grid-cols-3 gap-4 text-center">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                             <div>
                               <p className="text-muted-foreground text-xs">
                                 CGT Allowance Left
@@ -470,7 +474,7 @@ export default function TaxPlanningPage() {
                       )}
                     </div>
 
-                    <div className="mb-3 grid grid-cols-3 gap-4">
+                    <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {(() => {
                         const totalPensionUsed =
                           (personIncome?.employeePensionContribution ?? 0) +

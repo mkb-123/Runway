@@ -248,10 +248,15 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
     totalStatePension
   );
   const progressPct = requiredPot > 0 ? (grandTotal / requiredPot) * 100 : 0;
-  const totalAnnualContribs = household.contributions.reduce(
+  const discretionaryContribs = household.contributions.reduce(
     (s, c) => s + annualiseContribution(c.amount, c.frequency),
     0
   );
+  const employmentPension = household.income.reduce(
+    (s, i) => s + i.employeePensionContribution + i.employerPensionContribution,
+    0
+  );
+  const totalAnnualContribs = discretionaryContribs + employmentPension;
 
   const primaryPerson = household.persons.find((p) => p.relationship === "self");
   const currentAge = primaryPerson ? calculateAge(primaryPerson.dateOfBirth) : 35;
