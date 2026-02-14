@@ -30,6 +30,7 @@ import {
   HouseholdDataSchema,
   SnapshotsDataSchema,
 } from "@/lib/schemas";
+import { migrateHouseholdData } from "@/lib/migration";
 
 import householdJson from "../../data/household.json";
 import snapshotsJson from "../../data/snapshots.json";
@@ -52,7 +53,7 @@ const emptyHousehold: HouseholdData = {
     includeStatePension: true,
     scenarioRates: [0.05, 0.07, 0.09],
   },
-  emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+  emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6, monthlyLifestyleSpending: 0 },
   iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
   committedOutgoings: [],
   dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
@@ -91,12 +92,18 @@ const DataContext = createContext<DataContextValue | null>(null);
 
 // --- Safe localStorage helpers ---
 
-function loadFromLocalStorage<T>(key: string, schema: z.ZodType<T>): T | null {
+function loadFromLocalStorage<T>(key: string, schema: z.ZodType<T>, migrate?: (raw: Record<string, unknown>) => Record<string, unknown>): T | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(key);
     if (raw === null) return null;
-    const parsed = JSON.parse(raw);
+    let parsed = JSON.parse(raw);
+
+    // Apply migration before validation to handle schema changes
+    if (migrate && typeof parsed === "object" && parsed !== null) {
+      parsed = migrate(parsed as Record<string, unknown>);
+    }
+
     const result = schema.safeParse(parsed);
     if (result.success) {
       return result.data;
@@ -136,7 +143,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Hydrate from localStorage on mount (client only)
   useEffect(() => {
-    const storedHousehold = loadFromLocalStorage(LS_KEY_HOUSEHOLD, HouseholdDataSchema);
+    const storedHousehold = loadFromLocalStorage(LS_KEY_HOUSEHOLD, HouseholdDataSchema, migrateHouseholdData);
     const storedSnapshots = loadFromLocalStorage(LS_KEY_SNAPSHOTS, SnapshotsDataSchema);
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard Next.js hydration pattern: must read localStorage in effect (unavailable during SSR) and sync into state

@@ -117,6 +117,7 @@ export const RetirementConfigSchema = z.object({
 export const EmergencyFundConfigSchema = z.object({
   monthlyEssentialExpenses: z.number().min(0),
   targetMonths: z.number().int().min(0),
+  monthlyLifestyleSpending: z.number().min(0).default(0),
 });
 
 // --- Committed Outgoings ---

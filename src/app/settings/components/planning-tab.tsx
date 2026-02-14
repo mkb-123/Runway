@@ -189,7 +189,7 @@ export function PlanningTab({ household, updateHousehold }: PlanningTabProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {renderField(
               "Monthly Essential Expenses",
               <Input
@@ -217,6 +217,22 @@ export function PlanningTab({ household, updateHousehold }: PlanningTabProps) {
                 placeholder="6"
               />,
               "3-6 months is typical; more if self-employed"
+            )}
+            {renderField(
+              "Monthly Lifestyle Spending",
+              <Input
+                type="number"
+                step="0.01"
+                value={household.emergencyFund.monthlyLifestyleSpending}
+                onChange={(e) =>
+                  updateEmergencyFund(
+                    "monthlyLifestyleSpending",
+                    Number(e.target.value)
+                  )
+                }
+                placeholder="0.00"
+              />,
+              "Groceries, transport, leisure — everything not in committed outgoings"
             )}
           </div>
         </CardContent>

@@ -70,7 +70,7 @@ export default function IncomePage() {
   const { selectedView } = usePersonView();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
-  const { persons: allPersons, income: allIncome, bonusStructures: allBonusStructures, contributions: allContributions, committedOutgoings } = household;
+  const { persons: allPersons, income: allIncome, bonusStructures: allBonusStructures, contributions: allContributions, committedOutgoings, emergencyFund } = household;
 
   const persons = useMemo(() => {
     if (selectedView === "household") return allPersons;
@@ -167,6 +167,8 @@ export default function IncomePage() {
     // GIA overflow is whatever is directed to GIA from what remains
     const giaOverflow = combinedGIA;
 
+    const annualLifestyle = emergencyFund.monthlyLifestyleSpending * 12;
+
     const wfData: WaterfallDataPoint[] = [
       { name: "Gross Income", value: combinedGross, type: "income" },
       { name: "Income Tax", value: combinedTax, type: "deduction" },
@@ -178,7 +180,10 @@ export default function IncomePage() {
       { name: "Take-Home Pay", value: combinedTakeHome, type: "subtotal" },
       { name: "ISA Contributions", value: combinedISA, type: "deduction" },
       { name: "Committed Outgoings", value: committedOutgoings.reduce((s, o) => s + annualiseOutgoing(o.amount, o.frequency), 0), type: "deduction" },
-      { name: "GIA Overflow", value: giaOverflow, type: "subtotal" },
+      ...(annualLifestyle > 0
+        ? [{ name: "Lifestyle Spending", value: annualLifestyle, type: "deduction" as const }]
+        : []),
+      { name: "Discretionary", value: giaOverflow, type: "subtotal" },
     ];
 
     // Tax Efficiency Score (via lib function)
@@ -195,7 +200,7 @@ export default function IncomePage() {
       taxAdvantagedSavings: taxAdvSavings,
       taxEfficiencyScore: taxEffScore,
     };
-  }, [personAnalysis, committedOutgoings]);
+  }, [personAnalysis, committedOutgoings, emergencyFund.monthlyLifestyleSpending]);
 
   return (
     <div className="space-y-8 p-4 md:p-8">

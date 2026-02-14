@@ -128,6 +128,7 @@ export interface RetirementConfig {
 export interface EmergencyFundConfig {
   monthlyEssentialExpenses: number;
   targetMonths: number; // e.g. 6
+  monthlyLifestyleSpending: number; // groceries, transport, leisure — non-committed spending
 }
 
 // --- Committed Outgoings ---

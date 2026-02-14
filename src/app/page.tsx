@@ -252,10 +252,14 @@ export default function Home() {
     [filteredAccounts]
   );
 
-  // --- Committed outgoings ---
+  // --- Committed outgoings + lifestyle spending ---
   const totalAnnualCommitments = useMemo(
-    () => household.committedOutgoings.reduce((sum, o) => sum + annualiseOutgoing(o.amount, o.frequency), 0),
-    [household.committedOutgoings]
+    () => {
+      const committed = household.committedOutgoings.reduce((sum, o) => sum + annualiseOutgoing(o.amount, o.frequency), 0);
+      const lifestyle = household.emergencyFund.monthlyLifestyleSpending * 12;
+      return committed + lifestyle;
+    },
+    [household.committedOutgoings, household.emergencyFund.monthlyLifestyleSpending]
   );
 
   // --- Recommendations ---

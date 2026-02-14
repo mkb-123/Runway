@@ -226,7 +226,8 @@
   },
   "emergencyFund": {
     "monthlyEssentialExpenses": 3500,
-    "targetMonths": 6
+    "targetMonths": 6,
+    "monthlyLifestyleSpending": 2800
   },
   "iht": {
     "estimatedPropertyValue": 450000,
