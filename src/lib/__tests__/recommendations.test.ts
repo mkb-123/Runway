@@ -14,7 +14,6 @@ import {
 } from "../recommendations";
 import type {
   HouseholdData,
-  TransactionsData,
   Person,
   PersonIncome,
   AnnualContributions,
@@ -98,8 +97,6 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
     ...overrides,
   };
 }
-
-const emptyTransactions: TransactionsData = { transactions: [] };
 
 // --- Tests ---
 
@@ -417,7 +414,7 @@ describe("generateRecommendations", () => {
       ],
     });
 
-    const recs = generateRecommendations(household, emptyTransactions);
+    const recs = generateRecommendations(household);
     expect(recs.length).toBeGreaterThan(0);
 
     // Verify sort order
@@ -433,7 +430,7 @@ describe("generateRecommendations", () => {
       annualContributions: [makeContributions({ isaContribution: 0 })],
     });
 
-    const recs = generateRecommendations(household, emptyTransactions);
+    const recs = generateRecommendations(household);
     const personRecs = recs.filter((r) => r.personId);
 
     for (const rec of personRecs) {
@@ -448,7 +445,7 @@ describe("generateRecommendations", () => {
       // Only person-1 has income/contributions
     });
 
-    const recs = generateRecommendations(household, emptyTransactions);
+    const recs = generateRecommendations(household);
     const bobRecs = recs.filter((r) => r.personId === "person-2");
     expect(bobRecs).toHaveLength(0);
   });
@@ -477,8 +474,7 @@ describe("analyzeBedAndISA", () => {
     };
 
     // GIA value: 30,000, ISA remaining: 15,000
-    // Unrealised gain: 100 * (300-200) = 10,000 - but we use transactions for pool
-    // With no transactions, it uses holding purchasePrice -> gain = 100*(300-200) = 10,000
+    // Unrealised gain: 100 * (300-200) = 10,000
     // Wait, 10,000 > 3,000 CGT allowance, so analyzeBedAndISA filters this out
 
     // Let's make the gain within CGT allowance
@@ -500,7 +496,7 @@ describe("analyzeBedAndISA", () => {
       allAccounts: [smallGainAccount],
     };
 
-    const recs = analyzeBedAndISA(ctx2, emptyTransactions);
+    const recs = analyzeBedAndISA(ctx2);
     expect(recs).toHaveLength(1);
     expect(recs[0].id).toContain("bed-isa-free");
     expect(recs[0].priority).toBe("high");
@@ -524,7 +520,7 @@ describe("analyzeBedAndISA", () => {
       allAccounts: [emptyGia],
     };
 
-    expect(analyzeBedAndISA(ctx, emptyTransactions)).toHaveLength(0);
+    expect(analyzeBedAndISA(ctx)).toHaveLength(0);
   });
 
   it("returns nothing when ISA fully used", () => {
@@ -546,7 +542,7 @@ describe("analyzeBedAndISA", () => {
       allAccounts: [giaAccount],
     };
 
-    expect(analyzeBedAndISA(ctx, emptyTransactions)).toHaveLength(0);
+    expect(analyzeBedAndISA(ctx)).toHaveLength(0);
   });
 });
 

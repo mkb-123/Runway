@@ -46,6 +46,7 @@ This project uses a **Finance Agent Team** for design and architecture decisions
 | HNW Customer (James) | `.claude/agents/hnw-customer.md` | Real user perspective, retirement planning, tax optimisation, couple's finances |
 | HNW Customer (Priya) | `.claude/agents/hnw-customer-priya.md` | Busy family perspective, cash flow under school fees, bonus tranches, variable household income |
 | Senior Web Architect | `.claude/agents/web-architect.md` | 30 years building web apps, separation of concerns, testability, no inline computation, anti-duplication |
+| QA Engineer (Sam) | `.claude/agents/qa-engineer.md` | Pedantic tester, cross-page consistency, edge cases, data model contradictions, confusion risks |
 
 ### Decision Process
 

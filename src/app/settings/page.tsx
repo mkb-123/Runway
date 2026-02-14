@@ -7,7 +7,6 @@ import {
   BookOpen,
   Target,
   Shield,
-  ArrowRightLeft,
   Receipt,
   CheckCircle2,
   Circle,
@@ -17,7 +16,6 @@ import {
 import { useData } from "@/context/data-context";
 import {
   HouseholdDataSchema,
-  TransactionsDataSchema,
   SnapshotsDataSchema,
 } from "@/lib/schemas";
 import { z } from "zod";
@@ -37,7 +35,6 @@ const RunwayExportSchema = z.object({
   version: z.literal(1),
   exportedAt: z.string(),
   household: HouseholdDataSchema,
-  transactions: TransactionsDataSchema,
   snapshots: SnapshotsDataSchema,
 });
 
@@ -46,7 +43,6 @@ import { AccountsTab } from "./components/accounts-tab";
 import { FundsTab } from "./components/funds-tab";
 import { PlanningTab } from "./components/planning-tab";
 import { IhtTab } from "./components/iht-tab";
-import { TransactionsTab } from "./components/transactions-tab";
 import { CommitmentsTab } from "./components/commitments-tab";
 import { SettingsSummaryBar } from "./components/settings-summary-bar";
 
@@ -57,10 +53,8 @@ import { SettingsSummaryBar } from "./components/settings-summary-bar";
 export default function SettingsPage() {
   const {
     household,
-    transactions,
     snapshots,
     updateHousehold,
-    updateTransactions,
     updateSnapshots,
     clearAllData,
     loadExampleData,
@@ -156,7 +150,6 @@ export default function SettingsPage() {
       version: 1 as const,
       exportedAt: new Date().toISOString(),
       household,
-      transactions,
       snapshots,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -196,7 +189,6 @@ export default function SettingsPage() {
           return;
         }
         updateHousehold(result.data.household);
-        updateTransactions(result.data.transactions);
         updateSnapshots(result.data.snapshots);
         setImportError(null);
       } catch {
@@ -288,11 +280,6 @@ export default function SettingsPage() {
             <Shield className="size-3.5" />
             IHT
           </TabsTrigger>
-          <TabsTrigger value="transactions" className="gap-1.5 shrink-0">
-            <ArrowRightLeft className="size-3.5" />
-            <span className="hidden sm:inline">Transactions</span>
-            <span className="sm:hidden">Txns</span>
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="household">
@@ -334,14 +321,6 @@ export default function SettingsPage() {
           <IhtTab
             household={household}
             updateHousehold={updateHousehold}
-          />
-        </TabsContent>
-
-        <TabsContent value="transactions">
-          <TransactionsTab
-            household={household}
-            transactions={transactions}
-            updateTransactions={updateTransactions}
           />
         </TabsContent>
       </Tabs>

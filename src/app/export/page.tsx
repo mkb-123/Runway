@@ -13,22 +13,10 @@ function downloadWorkbook(wb: XLSX.WorkBook, filename: string) {
 }
 
 export default function ExportPage() {
-  const { household, transactions } = useData();
+  const { household } = useData();
 
   function getPersonName(personId: string): string {
     return household.persons.find((p) => p.id === personId)?.name ?? personId;
-  }
-
-  function getAccountName(accountId: string): string {
-    return household.accounts.find((a) => a.id === accountId)?.name ?? accountId;
-  }
-
-  function getFundName(fundId: string): string {
-    return household.funds.find((f) => f.id === fundId)?.name ?? fundId;
-  }
-
-  function getFundTicker(fundId: string): string {
-    return household.funds.find((f) => f.id === fundId)?.ticker ?? "";
   }
 
   function buildNetWorthRows() {
@@ -90,20 +78,6 @@ export default function ExportPage() {
     return rows;
   }
 
-  function buildTransactionRows() {
-    return transactions.transactions.map((tx) => ({
-      Date: tx.date,
-      Account: getAccountName(tx.accountId),
-      Fund: getFundName(tx.fundId),
-      Ticker: getFundTicker(tx.fundId),
-      Type: tx.type.charAt(0).toUpperCase() + tx.type.slice(1),
-      Units: tx.units,
-      "Price Per Unit": tx.pricePerUnit,
-      Amount: tx.amount,
-      Notes: tx.notes ?? "",
-    }));
-  }
-
   function exportNetWorth() {
     const ws = XLSX.utils.json_to_sheet(buildNetWorthRows());
     const wb = XLSX.utils.book_new();
@@ -118,18 +92,10 @@ export default function ExportPage() {
     downloadWorkbook(wb, "holdings-detail.xlsx");
   }
 
-  function exportTransactions() {
-    const ws = XLSX.utils.json_to_sheet(buildTransactionRows());
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-    downloadWorkbook(wb, "transaction-history.xlsx");
-  }
-
   function exportFullWorkbook() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(buildNetWorthRows()), "Net Worth");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(buildHoldingsRows()), "Holdings");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(buildTransactionRows()), "Transactions");
     downloadWorkbook(wb, "net-worth-full-export.xlsx");
   }
 
@@ -145,13 +111,8 @@ export default function ExportPage() {
       action: exportHoldings,
     },
     {
-      title: "Transaction History",
-      description: "Export all recorded transactions including buys, sells, dividends, and contributions. Includes dates, amounts, prices, and notes.",
-      action: exportTransactions,
-    },
-    {
       title: "Full Workbook",
-      description: "Export a multi-sheet Excel workbook containing all of the above: Net Worth, Holdings, and Transactions in separate tabs.",
+      description: "Export a multi-sheet Excel workbook containing all of the above: Net Worth and Holdings in separate tabs.",
       action: exportFullWorkbook,
     },
   ];

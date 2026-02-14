@@ -223,7 +223,7 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
 // ============================================================
 
 export default function Home() {
-  const { snapshots: snapshotsData, transactions: transactionsData } = useData();
+  const { snapshots: snapshotsData } = useData();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
   const totalNetWorth = scenarioData.getTotalNetWorth();
@@ -260,8 +260,8 @@ export default function Home() {
 
   // --- Recommendations ---
   const recommendations = useMemo(
-    () => generateRecommendations(household, transactionsData),
-    [household, transactionsData]
+    () => generateRecommendations(household),
+    [household]
   );
 
   const filteredRecommendations = useMemo(() => {

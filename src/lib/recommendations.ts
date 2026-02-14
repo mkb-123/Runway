@@ -10,7 +10,6 @@
 
 import type {
   HouseholdData,
-  TransactionsData,
   PersonIncome,
   Person,
   Account,
@@ -214,8 +213,7 @@ export function analyzePensionHeadroom(ctx: PersonContext): Recommendation[] {
 
 /** 4. Bed & ISA opportunity */
 export function analyzeBedAndISA(
-  ctx: PersonContext,
-  transactions: TransactionsData
+  ctx: PersonContext
 ): Recommendation[] {
   const { person, accounts, contributions } = ctx;
   const isaRemaining =
@@ -225,10 +223,7 @@ export function analyzeBedAndISA(
 
   if (giaValue <= 0 || isaRemaining <= 0) return [];
 
-  const giaTransactions = transactions.transactions.filter((tx) =>
-    giaAccounts.some((a) => a.id === tx.accountId)
-  );
-  const unrealisedGains = getUnrealisedGains(giaAccounts, giaTransactions);
+  const unrealisedGains = getUnrealisedGains(giaAccounts);
   const totalGain = unrealisedGains.reduce(
     (sum, ug) => sum + ug.unrealisedGain,
     0
@@ -451,13 +446,12 @@ export function analyzeSavingsRate(household: HouseholdData): Recommendation[] {
 // --- Per-person analyzers (applied for each person) ---
 
 const perPersonAnalyzers: ((
-  ctx: PersonContext,
-  transactions: TransactionsData
+  ctx: PersonContext
 ) => Recommendation[])[] = [
   (ctx) => analyzeSalaryTaper(ctx),
   (ctx) => analyzeISAUsage(ctx),
   (ctx) => analyzePensionHeadroom(ctx),
-  (ctx, tx) => analyzeBedAndISA(ctx, tx),
+  (ctx) => analyzeBedAndISA(ctx),
   (ctx) => analyzeGIAOverweight(ctx),
 ];
 
@@ -484,8 +478,7 @@ const priorityOrder: Record<RecommendationPriority, number> = {
 // --- Public API ---
 
 export function generateRecommendations(
-  household: HouseholdData,
-  transactions: TransactionsData
+  household: HouseholdData
 ): Recommendation[] {
   const recommendations: Recommendation[] = [];
   const { persons, accounts, income, annualContributions } = household;
@@ -510,7 +503,7 @@ export function generateRecommendations(
     };
 
     for (const analyze of perPersonAnalyzers) {
-      recommendations.push(...analyze(ctx, transactions));
+      recommendations.push(...analyze(ctx));
     }
   }
 

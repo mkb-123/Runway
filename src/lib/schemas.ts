@@ -48,13 +48,6 @@ export const TaxWrapperSchema = z.enum([
   "premium_bonds",
 ]);
 
-export const TransactionTypeSchema = z.enum([
-  "buy",
-  "sell",
-  "dividend",
-  "contribution",
-]);
-
 export const StudentLoanPlanSchema = z.enum([
   "plan1",
   "plan2",
@@ -222,20 +215,6 @@ export const IHTConfigSchema = z.object({
   gifts: z.array(GiftSchema),
 });
 
-// --- Transactions ---
-
-export const TransactionSchema = z.object({
-  id: z.string().min(1),
-  accountId: z.string().min(1),
-  fundId: z.string().min(1),
-  type: TransactionTypeSchema,
-  date: z.string(),
-  units: z.number().min(0),
-  pricePerUnit: z.number().min(0),
-  amount: z.number().min(0),
-  notes: z.string().optional(),
-});
-
 // --- Snapshots ---
 
 export const SnapshotByPersonSchema = z.object({
@@ -278,10 +257,6 @@ export const HouseholdDataSchema = z.object({
   }),
   iht: IHTConfigSchema,
   estimatedAnnualExpenses: z.number().min(0),
-});
-
-export const TransactionsDataSchema = z.object({
-  transactions: z.array(TransactionSchema),
 });
 
 export const SnapshotsDataSchema = z.object({

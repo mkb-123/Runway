@@ -27,7 +27,6 @@ import { formatCurrency, formatPercent } from "@/lib/format";
 import {
   getUnrealisedGains,
   calculateBedAndISA,
-  calculateGainsForTaxYear,
   determineCgtRate,
   calculateBedAndISABreakEven,
 } from "@/lib/cgt";
@@ -37,12 +36,11 @@ import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
 import type { PersonIncome } from "@/types";
 
 export default function TaxPlanningPage() {
-  const { transactions: transactionsData, getAccountsForPerson } = useData();
+  const { getAccountsForPerson } = useData();
   const { selectedView } = usePersonView();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
   const getNetWorthByWrapper = scenarioData.getNetWorthByWrapper;
-  const { transactions } = transactionsData;
 
   const persons = useMemo(() => {
     if (selectedView === "household") return household.persons;
@@ -72,10 +70,6 @@ export default function TaxPlanningPage() {
         );
         const personAccounts = getAccountsForPerson(person.id);
         const personGiaAccounts = personAccounts.filter((a) => a.type === "gia");
-        const personGiaAccountIds = new Set(personGiaAccounts.map((a) => a.id));
-        const personGiaTransactions = transactions.filter((tx) =>
-          personGiaAccountIds.has(tx.accountId)
-        );
 
         // GIA value
         const giaValue = personGiaAccounts.reduce(
@@ -92,22 +86,14 @@ export default function TaxPlanningPage() {
         const pensionRemaining = Math.max(0, pensionAllowance - pensionUsed);
 
         // Unrealised gains in GIA
-        const unrealisedGains = getUnrealisedGains(
-          personGiaAccounts,
-          personGiaTransactions
-        );
+        const unrealisedGains = getUnrealisedGains(personGiaAccounts);
         const totalUnrealisedGain = unrealisedGains.reduce(
           (sum, ug) => sum + ug.unrealisedGain,
           0
         );
 
-        // Calculate realised gains for this person
-        const personTaxYearGains = calculateGainsForTaxYear(
-          personGiaTransactions,
-          currentTaxYear
-        );
-        const usedAllowance = Math.max(0, personTaxYearGains.netGain);
-        const remainingCgtAllowance = Math.max(0, cgtAnnualExempt - usedAllowance);
+        // Without transaction history, assume full CGT allowance is available
+        const remainingCgtAllowance = cgtAnnualExempt;
 
         // Determine CGT rate based on income (accounting for pension method)
         const cgtRate = personIncome
@@ -144,7 +130,6 @@ export default function TaxPlanningPage() {
           pensionRemaining,
           unrealisedGains,
           totalUnrealisedGain,
-          usedAllowance,
           remainingCgtAllowance,
           cgtRate,
           bedAndISA,
@@ -152,7 +137,7 @@ export default function TaxPlanningPage() {
           isHigherRate,
         };
       }),
-    [persons, income, annualContributions, transactions, getAccountsForPerson, isaAllowance, pensionAllowance, cgtAnnualExempt]
+    [persons, income, annualContributions, getAccountsForPerson, isaAllowance, pensionAllowance, cgtAnnualExempt]
   );
 
   // Pension modelling scenarios

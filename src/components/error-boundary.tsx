@@ -34,7 +34,6 @@ export class ErrorBoundary extends Component<Props, State> {
   handleResetData = () => {
     try {
       localStorage.removeItem("nw-household");
-      localStorage.removeItem("nw-transactions");
       localStorage.removeItem("nw-snapshots");
     } catch {
       // localStorage may be unavailable

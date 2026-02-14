@@ -17,7 +17,6 @@ import {
 import type { ReactNode } from "react";
 import type {
   HouseholdData,
-  TransactionsData,
   SnapshotsData,
   Person,
   Account,
@@ -30,18 +29,15 @@ import { roundPence } from "@/lib/format";
 import { z } from "zod";
 import {
   HouseholdDataSchema,
-  TransactionsDataSchema,
   SnapshotsDataSchema,
 } from "@/lib/schemas";
 
 import householdJson from "../../data/household.json";
-import transactionsJson from "../../data/transactions.json";
 import snapshotsJson from "../../data/snapshots.json";
 
 // --- Default data from JSON files (validated at startup) ---
 
 const defaultHousehold = HouseholdDataSchema.parse(householdJson);
-const defaultTransactions = TransactionsDataSchema.parse(transactionsJson);
 const defaultSnapshots = SnapshotsDataSchema.parse(snapshotsJson);
 
 // Empty data for "Clear All"
@@ -64,24 +60,20 @@ const emptyHousehold: HouseholdData = {
   committedOutgoings: [],
   dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
 };
-const emptyTransactions: TransactionsData = { transactions: [] };
 const emptySnapshots: SnapshotsData = { snapshots: [] };
 
 // --- localStorage keys ---
 
 const LS_KEY_HOUSEHOLD = "nw-household";
-const LS_KEY_TRANSACTIONS = "nw-transactions";
 const LS_KEY_SNAPSHOTS = "nw-snapshots";
 
 // --- Context value type ---
 
 interface DataContextValue {
   household: HouseholdData;
-  transactions: TransactionsData;
   snapshots: SnapshotsData;
   isHydrated: boolean;
   updateHousehold: (data: HouseholdData) => void;
-  updateTransactions: (data: TransactionsData) => void;
   updateSnapshots: (data: SnapshotsData) => void;
   resetToDefaults: () => void;
   clearAllData: () => void;
@@ -143,19 +135,16 @@ function removeFromLocalStorage(key: string): void {
 export function DataProvider({ children }: { children: ReactNode }) {
   // Initialize with JSON defaults for SSR consistency
   const [household, setHousehold] = useState<HouseholdData>(defaultHousehold);
-  const [transactions, setTransactions] = useState<TransactionsData>(defaultTransactions);
   const [snapshots, setSnapshots] = useState<SnapshotsData>(defaultSnapshots);
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Hydrate from localStorage on mount (client only)
   useEffect(() => {
     const storedHousehold = loadFromLocalStorage(LS_KEY_HOUSEHOLD, HouseholdDataSchema);
-    const storedTransactions = loadFromLocalStorage(LS_KEY_TRANSACTIONS, TransactionsDataSchema);
     const storedSnapshots = loadFromLocalStorage(LS_KEY_SNAPSHOTS, SnapshotsDataSchema);
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard Next.js hydration pattern: must read localStorage in effect (unavailable during SSR) and sync into state
     if (storedHousehold) setHousehold(storedHousehold);
-    if (storedTransactions) setTransactions(storedTransactions);
     if (storedSnapshots) setSnapshots(storedSnapshots);
 
     setIsHydrated(true);
@@ -168,11 +157,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     saveToLocalStorage(LS_KEY_HOUSEHOLD, data);
   }, []);
 
-  const updateTransactions = useCallback((data: TransactionsData) => {
-    setTransactions(data);
-    saveToLocalStorage(LS_KEY_TRANSACTIONS, data);
-  }, []);
-
   const updateSnapshots = useCallback((data: SnapshotsData) => {
     setSnapshots(data);
     saveToLocalStorage(LS_KEY_SNAPSHOTS, data);
@@ -180,28 +164,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const resetToDefaults = useCallback(() => {
     setHousehold(defaultHousehold);
-    setTransactions(defaultTransactions);
     setSnapshots(defaultSnapshots);
     removeFromLocalStorage(LS_KEY_HOUSEHOLD);
-    removeFromLocalStorage(LS_KEY_TRANSACTIONS);
     removeFromLocalStorage(LS_KEY_SNAPSHOTS);
   }, []);
 
   const clearAllData = useCallback(() => {
     setHousehold(emptyHousehold);
-    setTransactions(emptyTransactions);
     setSnapshots(emptySnapshots);
     saveToLocalStorage(LS_KEY_HOUSEHOLD, emptyHousehold);
-    saveToLocalStorage(LS_KEY_TRANSACTIONS, emptyTransactions);
     saveToLocalStorage(LS_KEY_SNAPSHOTS, emptySnapshots);
   }, []);
 
   const loadExampleData = useCallback(() => {
     setHousehold(defaultHousehold);
-    setTransactions(defaultTransactions);
     setSnapshots(defaultSnapshots);
     saveToLocalStorage(LS_KEY_HOUSEHOLD, defaultHousehold);
-    saveToLocalStorage(LS_KEY_TRANSACTIONS, defaultTransactions);
     saveToLocalStorage(LS_KEY_SNAPSHOTS, defaultSnapshots);
   }, []);
 
@@ -302,11 +280,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const value = useMemo<DataContextValue>(
     () => ({
       household,
-      transactions,
       snapshots,
       isHydrated,
       updateHousehold,
-      updateTransactions,
       updateSnapshots,
       resetToDefaults,
       clearAllData,
@@ -322,11 +298,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }),
     [
       household,
-      transactions,
       snapshots,
       isHydrated,
       updateHousehold,
-      updateTransactions,
       updateSnapshots,
       resetToDefaults,
       clearAllData,

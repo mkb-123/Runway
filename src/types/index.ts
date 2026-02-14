@@ -37,8 +37,6 @@ export type TaxWrapper =
   | "cash"
   | "premium_bonds";
 
-export type TransactionType = "buy" | "sell" | "dividend" | "contribution";
-
 export type StudentLoanPlan = "plan1" | "plan2" | "plan4" | "plan5" | "postgrad" | "none";
 
 // --- Core Data Structures ---
@@ -225,20 +223,6 @@ export interface IHTConfig {
   gifts: Gift[];
 }
 
-// --- Transactions (CGT) ---
-
-export interface Transaction {
-  id: string;
-  accountId: string;
-  fundId: string;
-  type: TransactionType;
-  date: string; // ISO date
-  units: number;
-  pricePerUnit: number;
-  amount: number; // total = units * pricePerUnit
-  notes?: string;
-}
-
 // --- Snapshots ---
 
 export interface SnapshotByPerson {
@@ -279,10 +263,6 @@ export interface HouseholdData {
   estimatedAnnualExpenses: number;
   committedOutgoings: CommittedOutgoing[];
   dashboardConfig: DashboardConfig;
-}
-
-export interface TransactionsData {
-  transactions: Transaction[];
 }
 
 export interface SnapshotsData {
