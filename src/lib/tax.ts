@@ -4,6 +4,7 @@
 
 import type { PersonIncome, StudentLoanPlan } from "@/types";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
+import { roundPence } from "@/lib/format";
 
 // --- Types ---
 
@@ -186,7 +187,7 @@ export function calculateIncomeTax(
   const effectiveRate = adjustedGross > 0 ? totalTax / adjustedGross : 0;
 
   return {
-    tax: Math.round(totalTax * 100) / 100,
+    tax: roundPence(totalTax),
     effectiveRate: Math.round(effectiveRate * 10000) / 10000,
     breakdown,
   };
@@ -246,7 +247,7 @@ export function calculateNI(
   }
 
   return {
-    ni: Math.round(totalNI * 100) / 100,
+    ni: roundPence(totalNI),
     breakdown,
   };
 }
@@ -265,7 +266,7 @@ export function calculateStudentLoan(
 
   const { threshold, rate } = planConfig;
   const repayable = Math.max(0, grossSalary - threshold);
-  return Math.round(repayable * rate * 100) / 100;
+  return roundPence(repayable * rate);
 }
 
 /**
@@ -339,8 +340,8 @@ export function calculateTakeHomePay(income: PersonIncome): TakeHomeResult {
     ni: niResult.ni,
     studentLoan,
     pensionDeduction,
-    takeHome: Math.round(takeHome * 100) / 100,
-    monthlyTakeHome: Math.round((takeHome / 12) * 100) / 100,
+    takeHome: roundPence(takeHome),
+    monthlyTakeHome: roundPence(takeHome / 12),
   };
 }
 
@@ -364,7 +365,7 @@ export function calculateTakeHomePayWithStudentLoan(
   return {
     ...base,
     studentLoan,
-    takeHome: Math.round((base.takeHome - studentLoan) * 100) / 100,
-    monthlyTakeHome: Math.round(((base.takeHome - studentLoan) / 12) * 100) / 100,
+    takeHome: roundPence(base.takeHome - studentLoan),
+    monthlyTakeHome: roundPence((base.takeHome - studentLoan) / 12),
   };
 }

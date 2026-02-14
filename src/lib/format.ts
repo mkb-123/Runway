@@ -3,6 +3,14 @@
 // ============================================================
 
 /**
+ * Round a monetary value to the nearest penny.
+ * Replaces the `Math.round(x * 100) / 100` pattern used throughout the codebase.
+ */
+export function roundPence(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+/**
  * Format a number as GBP currency: "£1,234.56"
  */
 export function formatCurrency(amount: number): string {

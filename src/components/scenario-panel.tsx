@@ -10,7 +10,6 @@
 import { useState } from "react";
 import {
   FlaskConical,
-  X,
   RotateCcw,
   Zap,
   TrendingDown,
@@ -18,7 +17,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -143,45 +141,6 @@ export function ScenarioPanel() {
 
   return (
     <>
-      {/* Persistent scenario mode banner */}
-      {isScenarioMode && (
-        <div className="sticky top-14 z-40 border-b border-amber-300 bg-amber-50 px-4 py-2 dark:border-amber-800 dark:bg-amber-950">
-          <div className="mx-auto flex max-w-screen-2xl items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FlaskConical className="size-4 text-amber-600 dark:text-amber-400" />
-              <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                What-If Mode: {scenarioLabel}
-              </span>
-              <Badge
-                variant="outline"
-                className="border-amber-400 text-amber-700 dark:text-amber-300"
-              >
-                Not saved
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setOpen(true)}
-                className="text-amber-700 dark:text-amber-300"
-              >
-                Edit
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleReset}
-                className="text-amber-700 dark:text-amber-300"
-              >
-                <X className="mr-1 size-3" />
-                Exit
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Trigger button (always visible in nav area) */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>

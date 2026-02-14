@@ -3,8 +3,10 @@
 import * as XLSX from "xlsx";
 import { useData } from "@/context/data-context";
 import { ACCOUNT_TYPE_LABELS, ASSET_CLASS_LABELS, REGION_LABELS } from "@/types";
+import { roundPence } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 function downloadWorkbook(wb: XLSX.WorkBook, filename: string) {
   XLSX.writeFile(wb, filename);
@@ -78,9 +80,9 @@ export default function ExportPage() {
           Units: holding.units,
           "Avg Cost Per Unit": holding.purchasePrice,
           "Current Price Per Unit": holding.currentPrice,
-          "Total Cost": Math.round(totalCost * 100) / 100,
-          "Current Value": Math.round(currentValue * 100) / 100,
-          "Gain / Loss": Math.round(gain * 100) / 100,
+          "Total Cost": roundPence(totalCost),
+          "Current Value": roundPence(currentValue),
+          "Gain / Loss": roundPence(gain),
           "Gain %": Math.round(gainPct * 10000) / 10000,
         });
       }
@@ -162,6 +164,27 @@ export default function ExportPage() {
           Download your financial data as Excel spreadsheets for offline analysis or record keeping.
         </p>
       </div>
+
+      {/* Print Financial Report card */}
+      <Card className="mb-6 border-primary/20 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base sm:text-lg">Print Financial Report</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground sm:text-sm">
+            Generate a print-optimised PDF of your dashboard including net worth summary,
+            wrapper breakdown, charts, and recommendations. Uses your browser&apos;s built-in
+            &ldquo;Save as PDF&rdquo; option.
+          </p>
+          <div className="flex gap-2">
+            <Link href="/" className="flex-1">
+              <Button variant="outline" className="w-full" onClick={() => setTimeout(() => window.print(), 300)}>
+                Print from Dashboard
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
         {exportItems.map((exp) => (

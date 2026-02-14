@@ -26,16 +26,23 @@ import type {
   TaxWrapper,
 } from "@/types";
 import { getAccountTaxWrapper } from "@/types";
+import { roundPence } from "@/lib/format";
+import { z } from "zod";
+import {
+  HouseholdDataSchema,
+  TransactionsDataSchema,
+  SnapshotsDataSchema,
+} from "@/lib/schemas";
 
 import householdJson from "../../data/household.json";
 import transactionsJson from "../../data/transactions.json";
 import snapshotsJson from "../../data/snapshots.json";
 
-// --- Default data from JSON files ---
+// --- Default data from JSON files (validated at startup) ---
 
-const defaultHousehold = householdJson as unknown as HouseholdData;
-const defaultTransactions = transactionsJson as unknown as TransactionsData;
-const defaultSnapshots = snapshotsJson as unknown as SnapshotsData;
+const defaultHousehold = HouseholdDataSchema.parse(householdJson);
+const defaultTransactions = TransactionsDataSchema.parse(transactionsJson);
+const defaultSnapshots = SnapshotsDataSchema.parse(snapshotsJson);
 
 // --- localStorage keys ---
 
@@ -71,12 +78,18 @@ const DataContext = createContext<DataContextValue | null>(null);
 
 // --- Safe localStorage helpers ---
 
-function loadFromLocalStorage<T>(key: string): T | null {
+function loadFromLocalStorage<T>(key: string, schema: z.ZodType<T>): T | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(key);
     if (raw === null) return null;
-    return JSON.parse(raw) as T;
+    const parsed = JSON.parse(raw);
+    const result = schema.safeParse(parsed);
+    if (result.success) {
+      return result.data;
+    }
+    console.warn(`[Runway] Invalid data in localStorage key "${key}":`, result.error.issues);
+    return null;
   } catch {
     return null;
   }
@@ -111,9 +124,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Hydrate from localStorage on mount (client only)
   useEffect(() => {
-    const storedHousehold = loadFromLocalStorage<HouseholdData>(LS_KEY_HOUSEHOLD);
-    const storedTransactions = loadFromLocalStorage<TransactionsData>(LS_KEY_TRANSACTIONS);
-    const storedSnapshots = loadFromLocalStorage<SnapshotsData>(LS_KEY_SNAPSHOTS);
+    const storedHousehold = loadFromLocalStorage(LS_KEY_HOUSEHOLD, HouseholdDataSchema);
+    const storedTransactions = loadFromLocalStorage(LS_KEY_TRANSACTIONS, TransactionsDataSchema);
+    const storedSnapshots = loadFromLocalStorage(LS_KEY_SNAPSHOTS, SnapshotsDataSchema);
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard Next.js hydration pattern: must read localStorage in effect (unavailable during SSR) and sync into state
     if (storedHousehold) setHousehold(storedHousehold);
@@ -192,7 +205,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return {
         personId: person.id,
         name: person.name,
-        value: Math.round(value * 100) / 100,
+        value: roundPence(value),
       };
     });
   }, [household]);
@@ -210,7 +223,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     return Array.from(totals.entries()).map(([wrapper, value]) => ({
       wrapper,
-      value: Math.round(value * 100) / 100,
+      value: roundPence(value),
     }));
   }, [household]);
 
@@ -229,7 +242,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     return Array.from(totals.entries()).map(([type, value]) => ({
       type,
-      value: Math.round(value * 100) / 100,
+      value: roundPence(value),
     }));
   }, [household]);
 
@@ -238,7 +251,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       (sum, acc) => sum + acc.currentValue,
       0
     );
-    return Math.round(total * 100) / 100;
+    return roundPence(total);
   }, [household]);
 
   // --- Memoize context value ---

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Navigation } from "@/components/layout/navigation";
+import { ScenarioBanner } from "@/components/scenario-banner";
 import { DataProvider } from "@/context/data-context";
 import { ScenarioProvider } from "@/context/scenario-context";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -28,6 +29,7 @@ export default function RootLayout({
                 Skip to main content
               </a>
               <Navigation />
+              <ScenarioBanner />
               <main
                 id="main-content"
                 className="mx-auto max-w-screen-2xl px-4 py-6 sm:px-6 lg:px-8"

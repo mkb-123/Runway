@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useData } from "@/context/data-context";
+import { useScenarioData } from "@/context/use-scenario-data";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import {
   calculateIncomeTax,
@@ -59,7 +60,9 @@ function studentLoanLabel(plan: string): string {
 }
 
 export default function IncomePage() {
-  const { household, getFundById } = useData();
+  const { getFundById } = useData();
+  const scenarioData = useScenarioData();
+  const household = scenarioData.household;
   const { persons, income, bonusStructures, annualContributions, estimatedAnnualExpenses } = household;
 
   // Build per-person income analysis

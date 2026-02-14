@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import { useData } from "@/context/data-context";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { useScenarioData } from "@/context/use-scenario-data";
+import { formatCurrency, formatPercent, roundPence } from "@/lib/format";
 import {
   getAccountTaxWrapper,
   TAX_WRAPPER_LABELS,
@@ -16,7 +17,11 @@ import { AllocationPie } from "@/components/charts/allocation-pie";
 import { AllocationBar } from "@/components/charts/allocation-bar";
 
 export default function AllocationPage() {
-  const { household, getFundById, getNetWorthByWrapper, getTotalNetWorth } = useData();
+  const { getFundById } = useData();
+  const scenarioData = useScenarioData();
+  const household = scenarioData.household;
+  const getNetWorthByWrapper = scenarioData.getNetWorthByWrapper;
+  const getTotalNetWorth = scenarioData.getTotalNetWorth;
 
   const totalNetWorth = useMemo(() => getTotalNetWorth(), [getTotalNetWorth]);
 
@@ -91,21 +96,21 @@ export default function AllocationPage() {
     const assetClassData = Array.from(byAssetClass.entries())
       .map(([key, value]) => ({
         name: ASSET_CLASS_LABELS[key],
-        value: Math.round(value * 100) / 100,
+        value: roundPence(value),
       }))
       .sort((a, b) => b.value - a.value);
 
     const regionData = Array.from(byRegion.entries())
       .map(([key, value]) => ({
         name: REGION_LABELS[key],
-        value: Math.round(value * 100) / 100,
+        value: roundPence(value),
       }))
       .sort((a, b) => b.value - a.value);
 
     const fundData = Array.from(byFund.values())
       .map((f) => ({
         name: f.name,
-        value: Math.round(f.value * 100) / 100,
+        value: roundPence(f.value),
       }))
       .sort((a, b) => b.value - a.value);
 
@@ -117,7 +122,7 @@ export default function AllocationPage() {
     const providerData = Array.from(byProvider.entries())
       .map(([name, value]) => ({
         name,
-        value: Math.round(value * 100) / 100,
+        value: roundPence(value),
       }))
       .sort((a, b) => b.value - a.value);
 

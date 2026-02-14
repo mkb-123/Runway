@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useData } from "@/context/data-context";
+import { useScenarioData } from "@/context/use-scenario-data";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/format";
 import { projectScenarios, calculateRequiredPot } from "@/lib/projections";
 import { ProjectionChart } from "@/components/charts/projection-chart";
@@ -20,11 +20,12 @@ const PROJECTION_YEARS = 30;
 const SNAPSHOT_INTERVALS = [5, 10, 15, 20, 25, 30];
 
 export default function ProjectionsPage() {
-  const { household, getTotalNetWorth } = useData();
+  const scenarioData = useScenarioData();
+  const household = scenarioData.household;
   const { retirement, annualContributions } = household;
 
-  // Calculate total current pot
-  const currentPot = getTotalNetWorth();
+  // Calculate total current pot (scenario-aware)
+  const currentPot = scenarioData.getTotalNetWorth();
 
   // Calculate total annual contributions across all persons
   const totalAnnualContributions = useMemo(

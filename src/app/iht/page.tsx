@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useData } from "@/context/data-context";
+import { useScenarioData } from "@/context/use-scenario-data";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { getAccountTaxWrapper } from "@/types";
@@ -30,7 +30,9 @@ function yearsSince(dateStr: string): number {
 }
 
 export default function IHTPage() {
-  const { household, getTotalNetWorth } = useData();
+  const scenarioData = useScenarioData();
+  const household = scenarioData.household;
+  const getTotalNetWorth = scenarioData.getTotalNetWorth;
 
   const ihtData = useMemo(() => {
     const ihtConfig = household.iht;
