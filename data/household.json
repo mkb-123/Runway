@@ -28,10 +28,7 @@
       "type": "workplace_pension",
       "provider": "Fidelity",
       "name": "Alex Thompson Workplace Pension",
-      "currentValue": 185000,
-      "holdings": [
-        { "fundId": "fund-1", "units": 2500, "purchasePrice": 60.0, "currentPrice": 74.0 }
-      ]
+      "currentValue": 185000
     },
     {
       "id": "acc-2",
@@ -39,10 +36,7 @@
       "type": "sipp",
       "provider": "Vanguard",
       "name": "Alex Thompson SIPP",
-      "currentValue": 45000,
-      "holdings": [
-        { "fundId": "fund-2", "units": 150, "purchasePrice": 250.0, "currentPrice": 300.0 }
-      ]
+      "currentValue": 45000
     },
     {
       "id": "acc-3",
@@ -50,11 +44,7 @@
       "type": "stocks_and_shares_isa",
       "provider": "Vanguard",
       "name": "Alex Thompson S&S ISA",
-      "currentValue": 120000,
-      "holdings": [
-        { "fundId": "fund-1", "units": 1200, "purchasePrice": 65.0, "currentPrice": 74.0 },
-        { "fundId": "fund-3", "units": 800, "purchasePrice": 40.0, "currentPrice": 42.5 }
-      ]
+      "currentValue": 120000
     },
     {
       "id": "acc-4",
@@ -63,10 +53,7 @@
       "provider": "Hargreaves Lansdown",
       "name": "Alex Thompson GIA",
       "currentValue": 85000,
-      "holdings": [
-        { "fundId": "fund-1", "units": 700, "purchasePrice": 58.0, "currentPrice": 74.0 },
-        { "fundId": "fund-4", "units": 500, "purchasePrice": 110.0, "currentPrice": 120.0 }
-      ]
+      "costBasis": 71600
     },
     {
       "id": "acc-5",
@@ -74,8 +61,7 @@
       "type": "cash_savings",
       "provider": "Marcus",
       "name": "Alex Thompson Cash Savings",
-      "currentValue": 25000,
-      "holdings": []
+      "currentValue": 25000
     },
     {
       "id": "acc-6",
@@ -83,8 +69,7 @@
       "type": "premium_bonds",
       "provider": "NS&I",
       "name": "Alex Thompson Premium Bonds",
-      "currentValue": 30000,
-      "holdings": []
+      "currentValue": 30000
     },
     {
       "id": "acc-7",
@@ -92,10 +77,7 @@
       "type": "workplace_pension",
       "provider": "Aviva",
       "name": "Jordan Thompson Workplace Pension",
-      "currentValue": 65000,
-      "holdings": [
-        { "fundId": "fund-5", "units": 3000, "purchasePrice": 18.0, "currentPrice": 21.67 }
-      ]
+      "currentValue": 65000
     },
     {
       "id": "acc-8",
@@ -103,11 +85,7 @@
       "type": "stocks_and_shares_isa",
       "provider": "Vanguard",
       "name": "Jordan Thompson S&S ISA",
-      "currentValue": 80000,
-      "holdings": [
-        { "fundId": "fund-1", "units": 900, "purchasePrice": 62.0, "currentPrice": 74.0 },
-        { "fundId": "fund-6", "units": 400, "purchasePrice": 25.0, "currentPrice": 28.0 }
-      ]
+      "currentValue": 80000
     },
     {
       "id": "acc-9",
@@ -116,10 +94,7 @@
       "provider": "Hargreaves Lansdown",
       "name": "Jordan Thompson GIA",
       "currentValue": 40000,
-      "holdings": [
-        { "fundId": "fund-1", "units": 400, "purchasePrice": 60.0, "currentPrice": 74.0 },
-        { "fundId": "fund-3", "units": 300, "purchasePrice": 38.0, "currentPrice": 42.5 }
-      ]
+      "costBasis": 35400
     },
     {
       "id": "acc-10",
@@ -127,8 +102,7 @@
       "type": "cash_savings",
       "provider": "Chase",
       "name": "Jordan Thompson Cash Savings",
-      "currentValue": 15000,
-      "holdings": []
+      "currentValue": 15000
     },
     {
       "id": "acc-11",
@@ -136,8 +110,7 @@
       "type": "premium_bonds",
       "provider": "NS&I",
       "name": "Jordan Thompson Premium Bonds",
-      "currentValue": 20000,
-      "holdings": []
+      "currentValue": 20000
     },
     {
       "id": "acc-12",
@@ -145,72 +118,7 @@
       "type": "lifetime_isa",
       "provider": "AJ Bell",
       "name": "Jordan Thompson LISA",
-      "currentValue": 22000,
-      "holdings": [
-        { "fundId": "fund-1", "units": 280, "purchasePrice": 68.0, "currentPrice": 74.0 }
-      ]
-    }
-  ],
-  "funds": [
-    {
-      "id": "fund-1",
-      "name": "Vanguard FTSE Global All Cap Index Fund",
-      "ticker": "VAFTGAG",
-      "isin": "GB00BD3RZ582",
-      "ocf": 0.0023,
-      "assetClass": "equity",
-      "region": "global",
-      "historicalReturns": { "1yr": 0.12, "3yr": 0.08, "5yr": 0.09, "10yr": 0.10 }
-    },
-    {
-      "id": "fund-2",
-      "name": "Vanguard FTSE All-World UCITS ETF (VWRL)",
-      "ticker": "VWRL",
-      "isin": "IE00B3RBWM25",
-      "ocf": 0.0022,
-      "assetClass": "equity",
-      "region": "global",
-      "historicalReturns": { "1yr": 0.11, "3yr": 0.07, "5yr": 0.085, "10yr": 0.095 }
-    },
-    {
-      "id": "fund-3",
-      "name": "Vanguard UK Government Bond Index Fund",
-      "ticker": "VGOV",
-      "isin": "IE00B42WWV65",
-      "ocf": 0.0012,
-      "assetClass": "bonds",
-      "region": "uk",
-      "historicalReturns": { "1yr": 0.02, "3yr": 0.01, "5yr": 0.015, "10yr": 0.02 }
-    },
-    {
-      "id": "fund-4",
-      "name": "iShares UK Property UCITS ETF",
-      "ticker": "IUKP",
-      "isin": "IE00B1TXHL60",
-      "ocf": 0.004,
-      "assetClass": "property",
-      "region": "uk",
-      "historicalReturns": { "1yr": 0.05, "3yr": 0.03, "5yr": 0.04, "10yr": 0.06 }
-    },
-    {
-      "id": "fund-5",
-      "name": "HSBC FTSE All-World Index Fund",
-      "ticker": "HMWO",
-      "isin": "GB00BMJJJF91",
-      "ocf": 0.0013,
-      "assetClass": "equity",
-      "region": "global",
-      "historicalReturns": { "1yr": 0.115, "3yr": 0.075, "5yr": 0.088, "10yr": 0.098 }
-    },
-    {
-      "id": "fund-6",
-      "name": "Vanguard LifeStrategy 80% Equity Fund",
-      "ticker": "VLS80",
-      "isin": "GB00B4PQW151",
-      "ocf": 0.0022,
-      "assetClass": "mixed",
-      "region": "global",
-      "historicalReturns": { "1yr": 0.09, "3yr": 0.065, "5yr": 0.07, "10yr": 0.08 }
+      "currentValue": 22000
     }
   ],
   "income": [
@@ -238,21 +146,18 @@
           "grantDate": "2024-03-15",
           "vestingDate": "2025-03-15",
           "amount": 15000,
-          "fundId": "fund-1",
           "estimatedAnnualReturn": 0.08
         },
         {
           "grantDate": "2024-03-15",
           "vestingDate": "2026-03-15",
           "amount": 15000,
-          "fundId": "fund-1",
           "estimatedAnnualReturn": 0.08
         },
         {
           "grantDate": "2024-03-15",
           "vestingDate": "2027-03-15",
           "amount": 15000,
-          "fundId": "fund-1",
           "estimatedAnnualReturn": 0.08
         }
       ]
@@ -263,18 +168,54 @@
       "deferredTranches": []
     }
   ],
-  "annualContributions": [
+  "contributions": [
     {
+      "id": "contrib-1",
       "personId": "person-1",
-      "isaContribution": 20000,
-      "pensionContribution": 18750,
-      "giaContribution": 10000
+      "label": "ISA Annual Top-up",
+      "target": "isa",
+      "amount": 20000,
+      "frequency": "annually"
     },
     {
+      "id": "contrib-2",
+      "personId": "person-1",
+      "label": "Pension (Salary Sacrifice)",
+      "target": "pension",
+      "amount": 18750,
+      "frequency": "annually"
+    },
+    {
+      "id": "contrib-3",
+      "personId": "person-1",
+      "label": "GIA Monthly Savings",
+      "target": "gia",
+      "amount": 833,
+      "frequency": "monthly"
+    },
+    {
+      "id": "contrib-4",
       "personId": "person-2",
-      "isaContribution": 20000,
-      "pensionContribution": 6500,
-      "giaContribution": 5000
+      "label": "ISA Annual Top-up",
+      "target": "isa",
+      "amount": 20000,
+      "frequency": "annually"
+    },
+    {
+      "id": "contrib-5",
+      "personId": "person-2",
+      "label": "Pension (Salary Sacrifice)",
+      "target": "pension",
+      "amount": 6500,
+      "frequency": "annually"
+    },
+    {
+      "id": "contrib-6",
+      "personId": "person-2",
+      "label": "GIA Top-up",
+      "target": "gia",
+      "amount": 5000,
+      "frequency": "annually"
     }
   ],
   "retirement": {
@@ -300,7 +241,6 @@
       }
     ]
   },
-  "estimatedAnnualExpenses": 48000,
   "committedOutgoings": [
     {
       "id": "outgoing-1",

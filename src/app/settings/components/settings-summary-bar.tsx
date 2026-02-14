@@ -78,7 +78,7 @@ export function SettingsSummaryBar({ household }: SettingsSummaryBarProps) {
         </>
       )}
       <div className="text-muted-foreground">
-        {household.persons.length} person{household.persons.length !== 1 ? "s" : ""} · {household.accounts.length} account{household.accounts.length !== 1 ? "s" : ""} · {household.funds.length} fund{household.funds.length !== 1 ? "s" : ""}
+        {household.persons.length} person{household.persons.length !== 1 ? "s" : ""} · {household.accounts.length} account{household.accounts.length !== 1 ? "s" : ""}
       </div>
     </div>
   );

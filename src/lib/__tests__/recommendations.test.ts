@@ -7,17 +7,15 @@ import {
   analyzeBedAndISA,
   analyzeEmergencyFund,
   analyzeRetirementProgress,
-  analyzeConcentrationRisk,
   analyzeGIAOverweight,
   analyzeExcessCash,
   analyzeSavingsRate,
 } from "../recommendations";
 import type {
   HouseholdData,
-  TransactionsData,
   Person,
   PersonIncome,
-  AnnualContributions,
+  Contribution,
   Account,
 } from "@/types";
 
@@ -48,14 +46,29 @@ function makeIncome(overrides: Partial<PersonIncome> = {}): PersonIncome {
   };
 }
 
-function makeContributions(overrides: Partial<AnnualContributions> = {}): AnnualContributions {
+/** Create contribution totals shape used by per-person analyzer contexts */
+function makeContributionTotals(overrides: Partial<{ isaContribution: number; pensionContribution: number; giaContribution: number }> = {}) {
   return {
-    personId: "person-1",
     isaContribution: 0,
     pensionContribution: 6000,
     giaContribution: 0,
     ...overrides,
   };
+}
+
+/** Create actual Contribution[] for HouseholdData */
+function makeContributions(
+  personId: string = "person-1",
+  totals: { isaContribution?: number; pensionContribution?: number; giaContribution?: number } = {}
+): Contribution[] {
+  const result: Contribution[] = [];
+  const isa = totals.isaContribution ?? 0;
+  const pension = totals.pensionContribution ?? 6000;
+  const gia = totals.giaContribution ?? 0;
+  if (isa > 0) result.push({ id: `c-isa-${personId}`, personId, label: "ISA", target: "isa", amount: isa, frequency: "annually" });
+  if (pension > 0) result.push({ id: `c-pension-${personId}`, personId, label: "Pension", target: "pension", amount: pension, frequency: "annually" });
+  if (gia > 0) result.push({ id: `c-gia-${personId}`, personId, label: "GIA", target: "gia", amount: gia, frequency: "annually" });
+  return result;
 }
 
 function makeAccount(overrides: Partial<Account> = {}): Account {
@@ -66,7 +79,6 @@ function makeAccount(overrides: Partial<Account> = {}): Account {
     provider: "Vanguard",
     name: "Test ISA",
     currentValue: 50000,
-    holdings: [],
     ...overrides,
   };
 }
@@ -75,10 +87,9 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
   return {
     persons: [makePerson()],
     accounts: [makeAccount()],
-    funds: [],
     income: [makeIncome()],
     bonusStructures: [],
-    annualContributions: [makeContributions()],
+    contributions: makeContributions(),
     retirement: {
       targetAnnualIncome: 30000,
       withdrawalRate: 0.04,
@@ -94,12 +105,11 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
       passingToDirectDescendants: false,
       gifts: [],
     },
-    estimatedAnnualExpenses: 24000,
+    committedOutgoings: [],
+    dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
     ...overrides,
   };
 }
-
-const emptyTransactions: TransactionsData = { transactions: [] };
 
 // --- Tests ---
 
@@ -113,7 +123,7 @@ describe("analyzeSalaryTaper", () => {
     const ctx = {
       person: makePerson(),
       income,
-      contributions: makeContributions({ pensionContribution: 5000 }),
+      contributions: makeContributionTotals({ pensionContribution: 5000 }),
       accounts: [],
       adjustedGross: 110000,
       allAccounts: [],
@@ -130,7 +140,7 @@ describe("analyzeSalaryTaper", () => {
     const ctx = {
       person: makePerson(),
       income: makeIncome({ grossSalary: 80000 }),
-      contributions: makeContributions(),
+      contributions: makeContributionTotals(),
       accounts: [],
       adjustedGross: 77000,
       allAccounts: [],
@@ -143,7 +153,7 @@ describe("analyzeSalaryTaper", () => {
     const ctx = {
       person: makePerson(),
       income: makeIncome({ grossSalary: 200000 }),
-      contributions: makeContributions(),
+      contributions: makeContributionTotals(),
       accounts: [],
       adjustedGross: 197000,
       allAccounts: [],
@@ -158,7 +168,7 @@ describe("analyzeISAUsage", () => {
     const ctx = {
       person: makePerson(),
       income: makeIncome(),
-      contributions: makeContributions({ isaContribution: 12000 }),
+      contributions: makeContributionTotals({ isaContribution: 12000 }),
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
@@ -173,7 +183,7 @@ describe("analyzeISAUsage", () => {
     const ctx = {
       person: makePerson(),
       income: makeIncome(),
-      contributions: makeContributions({ isaContribution: 0 }),
+      contributions: makeContributionTotals({ isaContribution: 0 }),
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
@@ -189,7 +199,7 @@ describe("analyzeISAUsage", () => {
     const ctx = {
       person: makePerson(),
       income: makeIncome(),
-      contributions: makeContributions({ isaContribution: 20000 }),
+      contributions: makeContributionTotals({ isaContribution: 20000 }),
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
@@ -204,7 +214,7 @@ describe("analyzePensionHeadroom", () => {
     const ctx = {
       person: makePerson(),
       income: makeIncome(),
-      contributions: makeContributions({ pensionContribution: 10000 }),
+      contributions: makeContributionTotals({ pensionContribution: 10000 }),
       accounts: [],
       adjustedGross: 80000,
       allAccounts: [],
@@ -219,7 +229,7 @@ describe("analyzePensionHeadroom", () => {
     const ctx = {
       person: makePerson(),
       income: makeIncome(),
-      contributions: makeContributions({ pensionContribution: 55000 }),
+      contributions: makeContributionTotals({ pensionContribution: 55000 }),
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
@@ -245,7 +255,7 @@ describe("analyzeGIAOverweight", () => {
     const ctx = {
       person: makePerson(),
       income: makeIncome(),
-      contributions: makeContributions(),
+      contributions: makeContributionTotals(),
       accounts: [giaAccount],
       adjustedGross: 60000,
       allAccounts: [giaAccount, isaAccount],
@@ -271,7 +281,7 @@ describe("analyzeGIAOverweight", () => {
     const ctx = {
       person: makePerson(),
       income: makeIncome(),
-      contributions: makeContributions(),
+      contributions: makeContributionTotals(),
       accounts: [giaAccount],
       adjustedGross: 60000,
       allAccounts: [giaAccount, isaAccount],
@@ -355,55 +365,6 @@ describe("analyzeEmergencyFund", () => {
   });
 });
 
-describe("analyzeConcentrationRisk", () => {
-  it("warns when single fund exceeds 40% of holdings", () => {
-    const household = makeHousehold({
-      accounts: [
-        makeAccount({
-          holdings: [
-            { fundId: "fund-a", units: 100, purchasePrice: 10, currentPrice: 90 },
-            { fundId: "fund-b", units: 10, purchasePrice: 10, currentPrice: 10 },
-          ],
-        }),
-      ],
-      funds: [
-        {
-          id: "fund-a",
-          name: "Big Fund",
-          ticker: "BIG",
-          isin: "XX",
-          ocf: 0.001,
-          assetClass: "equity",
-          region: "global",
-        },
-      ],
-    });
-    // fund-a: 100*90 = 9000, fund-b: 10*10 = 100. total = 9100.
-    // fund-a = 98.9% -> triggers
-
-    const recs = analyzeConcentrationRisk(household);
-    expect(recs).toHaveLength(1);
-    expect(recs[0].id).toContain("concentration");
-  });
-
-  it("returns nothing with diversified holdings", () => {
-    const household = makeHousehold({
-      accounts: [
-        makeAccount({
-          holdings: [
-            { fundId: "fund-a", units: 100, purchasePrice: 10, currentPrice: 10 },
-            { fundId: "fund-b", units: 100, purchasePrice: 10, currentPrice: 10 },
-            { fundId: "fund-c", units: 100, purchasePrice: 10, currentPrice: 10 },
-          ],
-        }),
-      ],
-    });
-    // Each fund is 33% -> none > 40%
-
-    expect(analyzeConcentrationRisk(household)).toHaveLength(0);
-  });
-});
-
 describe("generateRecommendations", () => {
   it("returns recommendations sorted by priority (high first)", () => {
     const household = makeHousehold({
@@ -417,7 +378,7 @@ describe("generateRecommendations", () => {
       ],
     });
 
-    const recs = generateRecommendations(household, emptyTransactions);
+    const recs = generateRecommendations(household);
     expect(recs.length).toBeGreaterThan(0);
 
     // Verify sort order
@@ -430,10 +391,10 @@ describe("generateRecommendations", () => {
 
   it("includes person name and id on per-person recommendations", () => {
     const household = makeHousehold({
-      annualContributions: [makeContributions({ isaContribution: 0 })],
+      contributions: makeContributions("person-1", { isaContribution: 0 }),
     });
 
-    const recs = generateRecommendations(household, emptyTransactions);
+    const recs = generateRecommendations(household);
     const personRecs = recs.filter((r) => r.personId);
 
     for (const rec of personRecs) {
@@ -448,7 +409,7 @@ describe("generateRecommendations", () => {
       // Only person-1 has income/contributions
     });
 
-    const recs = generateRecommendations(household, emptyTransactions);
+    const recs = generateRecommendations(household);
     const bobRecs = recs.filter((r) => r.personId === "person-2");
     expect(bobRecs).toHaveLength(0);
   });
@@ -458,49 +419,25 @@ describe("generateRecommendations", () => {
 
 describe("analyzeBedAndISA", () => {
   it("recommends zero-cost Bed & ISA when gains within CGT allowance", () => {
-    const giaAccount = makeAccount({
-      id: "gia-1",
+    const smallGainAccount = makeAccount({
+      id: "gia-2",
       type: "gia",
-      currentValue: 30000,
-      holdings: [
-        { fundId: "fund-1", units: 100, purchasePrice: 200, currentPrice: 300 },
-      ],
+      currentValue: 10300,
+      costBasis: 10000,
     });
 
     const ctx = {
       person: makePerson(),
       income: makeIncome(),
-      contributions: makeContributions({ isaContribution: 5000 }),
-      accounts: [giaAccount],
-      adjustedGross: 60000,
-      allAccounts: [giaAccount],
-    };
-
-    // GIA value: 30,000, ISA remaining: 15,000
-    // Unrealised gain: 100 * (300-200) = 10,000 - but we use transactions for pool
-    // With no transactions, it uses holding purchasePrice -> gain = 100*(300-200) = 10,000
-    // Wait, 10,000 > 3,000 CGT allowance, so analyzeBedAndISA filters this out
-
-    // Let's make the gain within CGT allowance
-    const smallGainAccount = makeAccount({
-      id: "gia-2",
-      type: "gia",
-      currentValue: 10300,
-      holdings: [
-        { fundId: "fund-1", units: 100, purchasePrice: 100, currentPrice: 103 },
-      ],
-    });
-
-    const ctx2 = {
-      person: makePerson(),
-      income: makeIncome(),
-      contributions: makeContributions({ isaContribution: 5000 }),
+      contributions: makeContributionTotals({ isaContribution: 5000 }),
       accounts: [smallGainAccount],
       adjustedGross: 60000,
       allAccounts: [smallGainAccount],
     };
 
-    const recs = analyzeBedAndISA(ctx2, emptyTransactions);
+    // Unrealised gain: 10300 - 10000 = 300, within CGT allowance
+
+    const recs = analyzeBedAndISA(ctx);
     expect(recs).toHaveLength(1);
     expect(recs[0].id).toContain("bed-isa-free");
     expect(recs[0].priority).toBe("high");
@@ -512,19 +449,18 @@ describe("analyzeBedAndISA", () => {
       id: "gia-1",
       type: "gia",
       currentValue: 0,
-      holdings: [],
     });
 
     const ctx = {
       person: makePerson(),
       income: makeIncome(),
-      contributions: makeContributions({ isaContribution: 5000 }),
+      contributions: makeContributionTotals({ isaContribution: 5000 }),
       accounts: [emptyGia],
       adjustedGross: 60000,
       allAccounts: [emptyGia],
     };
 
-    expect(analyzeBedAndISA(ctx, emptyTransactions)).toHaveLength(0);
+    expect(analyzeBedAndISA(ctx)).toHaveLength(0);
   });
 
   it("returns nothing when ISA fully used", () => {
@@ -532,21 +468,19 @@ describe("analyzeBedAndISA", () => {
       id: "gia-1",
       type: "gia",
       currentValue: 10000,
-      holdings: [
-        { fundId: "fund-1", units: 100, purchasePrice: 80, currentPrice: 100 },
-      ],
+      costBasis: 8000,
     });
 
     const ctx = {
       person: makePerson(),
       income: makeIncome(),
-      contributions: makeContributions({ isaContribution: 20000 }),
+      contributions: makeContributionTotals({ isaContribution: 20000 }),
       accounts: [giaAccount],
       adjustedGross: 60000,
       allAccounts: [giaAccount],
     };
 
-    expect(analyzeBedAndISA(ctx, emptyTransactions)).toHaveLength(0);
+    expect(analyzeBedAndISA(ctx)).toHaveLength(0);
   });
 });
 
@@ -633,13 +567,11 @@ describe("analyzeSavingsRate", () => {
   it("warns when savings rate is below 15%", () => {
     const household = makeHousehold({
       income: [makeIncome({ grossSalary: 100000 })],
-      annualContributions: [
-        makeContributions({
-          isaContribution: 5000,
-          pensionContribution: 5000,
-          giaContribution: 0,
-        }),
-      ],
+      contributions: makeContributions("person-1", {
+        isaContribution: 5000,
+        pensionContribution: 5000,
+        giaContribution: 0,
+      }),
     });
     // Total contributions: 10,000 / 100,000 = 10% < 15%
 
@@ -652,13 +584,11 @@ describe("analyzeSavingsRate", () => {
   it("returns nothing when savings rate is >= 15%", () => {
     const household = makeHousehold({
       income: [makeIncome({ grossSalary: 100000 })],
-      annualContributions: [
-        makeContributions({
-          isaContribution: 10000,
-          pensionContribution: 6000,
-          giaContribution: 0,
-        }),
-      ],
+      contributions: makeContributions("person-1", {
+        isaContribution: 10000,
+        pensionContribution: 6000,
+        giaContribution: 0,
+      }),
     });
     // Total: 16,000 / 100,000 = 16% > 15%
 
@@ -668,13 +598,11 @@ describe("analyzeSavingsRate", () => {
   it("flags high priority when savings rate is below 5%", () => {
     const household = makeHousehold({
       income: [makeIncome({ grossSalary: 100000 })],
-      annualContributions: [
-        makeContributions({
-          isaContribution: 2000,
-          pensionContribution: 1000,
-          giaContribution: 0,
-        }),
-      ],
+      contributions: makeContributions("person-1", {
+        isaContribution: 2000,
+        pensionContribution: 1000,
+        giaContribution: 0,
+      }),
     });
     // Total: 3,000 / 100,000 = 3% < 5%
 

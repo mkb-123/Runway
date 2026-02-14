@@ -14,30 +14,12 @@ export type AccountType =
   | "cash_savings"
   | "premium_bonds";
 
-export type AssetClass =
-  | "equity"
-  | "bonds"
-  | "property"
-  | "cash"
-  | "commodities"
-  | "mixed";
-
-export type Region =
-  | "uk"
-  | "us"
-  | "europe"
-  | "asia"
-  | "emerging_markets"
-  | "global";
-
 export type TaxWrapper =
   | "pension"
   | "isa"
   | "gia"
   | "cash"
   | "premium_bonds";
-
-export type TransactionType = "buy" | "sell" | "dividend" | "contribution";
 
 export type StudentLoanPlan = "plan1" | "plan2" | "plan4" | "plan5" | "postgrad" | "none";
 
@@ -54,29 +36,6 @@ export interface Person {
   studentLoanPlan: StudentLoanPlan;
 }
 
-export interface Fund {
-  id: string;
-  name: string;
-  ticker: string;
-  isin: string;
-  ocf: number; // ongoing charge figure, e.g. 0.0022 for 0.22%
-  assetClass: AssetClass;
-  region: Region;
-  historicalReturns?: {
-    "1yr"?: number;
-    "3yr"?: number;
-    "5yr"?: number;
-    "10yr"?: number;
-  };
-}
-
-export interface Holding {
-  fundId: string;
-  units: number;
-  purchasePrice: number; // average cost per unit
-  currentPrice: number;
-}
-
 export interface Account {
   id: string;
   personId: string;
@@ -84,7 +43,7 @@ export interface Account {
   provider: string;
   name: string;
   currentValue: number;
-  holdings: Holding[];
+  costBasis?: number; // total amount originally invested (for CGT estimation on GIA accounts)
 }
 
 // --- Income & Compensation ---
@@ -93,7 +52,6 @@ export interface DeferredBonusTranche {
   grantDate: string;
   vestingDate: string;
   amount: number;
-  fundId?: string;
   estimatedAnnualReturn: number;
 }
 
@@ -113,11 +71,51 @@ export interface PersonIncome {
 
 // --- Contributions & Planning ---
 
-export interface AnnualContributions {
+export type ContributionTarget = "isa" | "pension" | "gia";
+export type ContributionFrequency = "monthly" | "annually";
+
+export const CONTRIBUTION_TARGET_LABELS: Record<ContributionTarget, string> = {
+  isa: "ISA",
+  pension: "Pension",
+  gia: "GIA",
+};
+
+export const CONTRIBUTION_FREQUENCY_LABELS: Record<ContributionFrequency, string> = {
+  monthly: "Monthly",
+  annually: "Annually",
+};
+
+export interface Contribution {
+  id: string;
   personId: string;
-  isaContribution: number;
-  pensionContribution: number; // total employee + employer
-  giaContribution: number;
+  label: string;
+  target: ContributionTarget;
+  amount: number;
+  frequency: ContributionFrequency;
+}
+
+/** Annualise a contribution amount based on its frequency */
+export function annualiseContribution(amount: number, frequency: ContributionFrequency): number {
+  return frequency === "monthly" ? amount * 12 : amount;
+}
+
+/** Get annualised contribution totals for a person */
+export function getPersonContributionTotals(
+  contributions: Contribution[],
+  personId: string
+): { isaContribution: number; pensionContribution: number; giaContribution: number } {
+  const personContribs = contributions.filter((c) => c.personId === personId);
+  return {
+    isaContribution: personContribs
+      .filter((c) => c.target === "isa")
+      .reduce((s, c) => s + annualiseContribution(c.amount, c.frequency), 0),
+    pensionContribution: personContribs
+      .filter((c) => c.target === "pension")
+      .reduce((s, c) => s + annualiseContribution(c.amount, c.frequency), 0),
+    giaContribution: personContribs
+      .filter((c) => c.target === "gia")
+      .reduce((s, c) => s + annualiseContribution(c.amount, c.frequency), 0),
+  };
 }
 
 export interface RetirementConfig {
@@ -225,20 +223,6 @@ export interface IHTConfig {
   gifts: Gift[];
 }
 
-// --- Transactions (CGT) ---
-
-export interface Transaction {
-  id: string;
-  accountId: string;
-  fundId: string;
-  type: TransactionType;
-  date: string; // ISO date
-  units: number;
-  pricePerUnit: number;
-  amount: number; // total = units * pricePerUnit
-  notes?: string;
-}
-
 // --- Snapshots ---
 
 export interface SnapshotByPerson {
@@ -269,20 +253,14 @@ export interface NetWorthSnapshot {
 export interface HouseholdData {
   persons: Person[];
   accounts: Account[];
-  funds: Fund[];
   income: PersonIncome[];
   bonusStructures: BonusStructure[];
-  annualContributions: AnnualContributions[];
+  contributions: Contribution[];
   retirement: RetirementConfig;
   emergencyFund: EmergencyFundConfig;
   iht: IHTConfig;
-  estimatedAnnualExpenses: number;
   committedOutgoings: CommittedOutgoing[];
   dashboardConfig: DashboardConfig;
-}
-
-export interface TransactionsData {
-  transactions: Transaction[];
 }
 
 export interface SnapshotsData {
@@ -328,20 +306,3 @@ export const TAX_WRAPPER_LABELS: Record<TaxWrapper, string> = {
   premium_bonds: "Premium Bonds",
 };
 
-export const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
-  equity: "Equity",
-  bonds: "Bonds",
-  property: "Property",
-  cash: "Cash",
-  commodities: "Commodities",
-  mixed: "Mixed",
-};
-
-export const REGION_LABELS: Record<Region, string> = {
-  uk: "UK",
-  us: "US",
-  europe: "Europe",
-  asia: "Asia",
-  emerging_markets: "Emerging Markets",
-  global: "Global",
-};

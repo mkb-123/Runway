@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/sheet";
 import { useScenario, type ScenarioOverrides } from "@/context/scenario-context";
 import { useData } from "@/context/data-context";
+import { getPersonContributionTotals } from "@/types";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/format";
 import { calculateIncomeTax, calculateNI } from "@/lib/tax";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
@@ -72,8 +73,8 @@ function buildAvoidTaperPreset(household: ReturnType<typeof useData>["household"
 
     if (adjustedGross > UK_TAX_CONSTANTS.personalAllowanceTaperThreshold && adjustedGross <= UK_TAX_CONSTANTS.incomeTax.higherRateUpperLimit) {
       const excess = adjustedGross - UK_TAX_CONSTANTS.personalAllowanceTaperThreshold;
-      const contribs = household.annualContributions.find((c) => c.personId === person.id);
-      const pensionUsed = contribs?.pensionContribution ?? 0;
+      const contribs = getPersonContributionTotals(household.contributions, person.id);
+      const pensionUsed = contribs.pensionContribution;
       const headroom = UK_TAX_CONSTANTS.pensionAnnualAllowance - pensionUsed;
       const additionalSacrifice = Math.min(excess, headroom);
 
@@ -294,7 +295,6 @@ export function ScenarioPanel() {
     Record<string, { isa?: number; pension?: number; gia?: number }>
   >({});
   const [marketShock, setMarketShock] = useState<string>("");
-  const [expensesOverride, setExpensesOverride] = useState<string>("");
 
   // Reset form state when panel closes
   useEffect(() => {
@@ -303,7 +303,6 @@ export function ScenarioPanel() {
       setIncomeOverrides({});
       setContributionOverrides({});
       setMarketShock("");
-      setExpensesOverride("");
     }
   }, [open, isScenarioMode]);
 
@@ -318,10 +317,9 @@ export function ScenarioPanel() {
       Object.keys(pensionOverrides).length > 0 ||
       Object.keys(incomeOverrides).some((k) => incomeOverrides[k] > 0) ||
       Object.keys(contributionOverrides).length > 0 ||
-      marketShock !== "" ||
-      expensesOverride !== ""
+      marketShock !== ""
     );
-  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock, expensesOverride]);
+  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock]);
 
   const applyCustomScenario = useCallback(() => {
     const newOverrides: ScenarioOverrides = {};
@@ -355,7 +353,7 @@ export function ScenarioPanel() {
       ([, val]) => val.isa !== undefined || val.pension !== undefined || val.gia !== undefined
     );
     if (contribChanges.length > 0) {
-      newOverrides.annualContributions = contribChanges.map(([personId, vals]) => ({
+      newOverrides.contributionOverrides = contribChanges.map(([personId, vals]) => ({
         personId,
         ...(vals.isa !== undefined ? { isaContribution: vals.isa } : {}),
         ...(vals.pension !== undefined ? { pensionContribution: vals.pension } : {}),
@@ -369,14 +367,8 @@ export function ScenarioPanel() {
       if (!isNaN(pct)) newOverrides.marketShockPercent = pct / 100;
     }
 
-    // Expenses
-    if (expensesOverride) {
-      const exp = parseFloat(expensesOverride);
-      if (!isNaN(exp)) newOverrides.estimatedAnnualExpenses = exp;
-    }
-
     enableScenario("Custom Scenario", newOverrides);
-  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, expensesOverride, enableScenario]);
+  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, enableScenario]);
 
   const applyPreset = useCallback(
     (preset: SmartPreset) => {
@@ -400,7 +392,6 @@ export function ScenarioPanel() {
           ? String(overrides.marketShockPercent * 100)
           : ""
       );
-      setExpensesOverride("");
     },
     [household, enableScenario]
   );
@@ -411,7 +402,6 @@ export function ScenarioPanel() {
     setIncomeOverrides({});
     setContributionOverrides({});
     setMarketShock("");
-    setExpensesOverride("");
   }, [disableScenario]);
 
   // Total impact summary
@@ -586,8 +576,8 @@ export function ScenarioPanel() {
             </div>
           </Section>
 
-          {/* Market & Expenses */}
-          <Section title="Market & Expenses" icon={TrendingDown}>
+          {/* Market Shock */}
+          <Section title="Market Shock" icon={TrendingDown}>
             <div className="space-y-3">
               <div>
                 <Label className="text-xs text-muted-foreground">
@@ -601,18 +591,6 @@ export function ScenarioPanel() {
                   className="mt-1"
                 />
               </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">
-                  Annual expenses (currently {formatCurrency(household.estimatedAnnualExpenses)})
-                </Label>
-                <Input
-                  type="number"
-                  placeholder={String(household.estimatedAnnualExpenses)}
-                  value={expensesOverride}
-                  onChange={(e) => setExpensesOverride(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
             </div>
           </Section>
 
@@ -620,9 +598,7 @@ export function ScenarioPanel() {
           <Section title="Contribution Changes" icon={Zap}>
             <div className="space-y-4">
               {household.persons.map((person) => {
-                const currentContrib = household.annualContributions.find(
-                  (c) => c.personId === person.id
-                );
+                const currentContrib = getPersonContributionTotals(household.contributions, person.id);
                 return (
                   <div key={person.id} className="space-y-2">
                     <p className="text-xs font-medium">{person.name}</p>
@@ -631,7 +607,7 @@ export function ScenarioPanel() {
                         <Label className="text-xs text-muted-foreground">ISA</Label>
                         <Input
                           type="number"
-                          placeholder={String(currentContrib?.isaContribution ?? 0)}
+                          placeholder={String(currentContrib.isaContribution)}
                           value={contributionOverrides[person.id]?.isa ?? ""}
                           onChange={(e) =>
                             setContributionOverrides((prev) => ({
@@ -649,7 +625,7 @@ export function ScenarioPanel() {
                         <Label className="text-xs text-muted-foreground">Pension</Label>
                         <Input
                           type="number"
-                          placeholder={String(currentContrib?.pensionContribution ?? 0)}
+                          placeholder={String(currentContrib.pensionContribution)}
                           value={contributionOverrides[person.id]?.pension ?? ""}
                           onChange={(e) =>
                             setContributionOverrides((prev) => ({
@@ -667,7 +643,7 @@ export function ScenarioPanel() {
                         <Label className="text-xs text-muted-foreground">GIA</Label>
                         <Input
                           type="number"
-                          placeholder={String(currentContrib?.giaContribution ?? 0)}
+                          placeholder={String(currentContrib.giaContribution)}
                           value={contributionOverrides[person.id]?.gia ?? ""}
                           onChange={(e) =>
                             setContributionOverrides((prev) => ({

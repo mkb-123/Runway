@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
@@ -18,9 +17,8 @@ import {
   calculateTaxEfficiencyScore,
   projectDeferredBonusValue,
 } from "@/lib/projections";
-import type {
-  DeferredBonusTranche,
-} from "@/types";
+import type { DeferredBonusTranche } from "@/types";
+import { getPersonContributionTotals, annualiseContribution, annualiseOutgoing } from "@/types";
 import {
   Table,
   TableHeader,
@@ -69,11 +67,10 @@ function studentLoanLabel(plan: string): string {
 }
 
 export default function IncomePage() {
-  const { getFundById } = useData();
   const { selectedView } = usePersonView();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
-  const { persons: allPersons, income: allIncome, bonusStructures: allBonusStructures, annualContributions: allAnnualContributions, estimatedAnnualExpenses } = household;
+  const { persons: allPersons, income: allIncome, bonusStructures: allBonusStructures, contributions: allContributions, committedOutgoings } = household;
 
   const persons = useMemo(() => {
     if (selectedView === "household") return allPersons;
@@ -90,10 +87,10 @@ export default function IncomePage() {
     return allBonusStructures.filter((b) => b.personId === selectedView);
   }, [allBonusStructures, selectedView]);
 
-  const annualContributions = useMemo(() => {
-    if (selectedView === "household") return allAnnualContributions;
-    return allAnnualContributions.filter((c) => c.personId === selectedView);
-  }, [allAnnualContributions, selectedView]);
+  const contributions = useMemo(() => {
+    if (selectedView === "household") return allContributions;
+    return allContributions.filter((c) => c.personId === selectedView);
+  }, [allContributions, selectedView]);
 
   // Build per-person income analysis
   const personAnalysis = useMemo(
@@ -101,7 +98,7 @@ export default function IncomePage() {
       persons.map((person) => {
         const personIncome = income.find((i) => i.personId === person.id)!;
         const bonus = bonusStructures.find((b) => b.personId === person.id);
-        const contributions = annualContributions.find((c) => c.personId === person.id);
+        const contribTotals = getPersonContributionTotals(contributions, person.id);
 
         // Include cash bonus in total gross employment income for tax purposes
         const cashBonus = bonus?.cashBonusAnnual ?? 0;
@@ -133,14 +130,14 @@ export default function IncomePage() {
           person,
           personIncome,
           bonus,
-          contributions,
+          contributions: contribTotals,
           incomeTaxResult,
           niResult,
           studentLoan,
           takeHome,
         };
       }),
-    [persons, income, bonusStructures, annualContributions]
+    [persons, income, bonusStructures, contributions]
   );
 
   // Compute combined waterfall data
@@ -160,11 +157,11 @@ export default function IncomePage() {
     );
     const combinedTakeHome = personAnalysis.reduce((sum, p) => sum + p.takeHome.takeHome, 0);
     const combinedISA = personAnalysis.reduce(
-      (sum, p) => sum + (p.contributions?.isaContribution ?? 0),
+      (sum, p) => sum + p.contributions.isaContribution,
       0
     );
     const combinedGIA = personAnalysis.reduce(
-      (sum, p) => sum + (p.contributions?.giaContribution ?? 0),
+      (sum, p) => sum + p.contributions.giaContribution,
       0
     );
     // GIA overflow is whatever is directed to GIA from what remains
@@ -180,14 +177,14 @@ export default function IncomePage() {
       { name: "Employee Pension", value: combinedPension, type: "deduction" },
       { name: "Take-Home Pay", value: combinedTakeHome, type: "subtotal" },
       { name: "ISA Contributions", value: combinedISA, type: "deduction" },
-      { name: "Expenses", value: estimatedAnnualExpenses, type: "deduction" },
+      { name: "Committed Outgoings", value: committedOutgoings.reduce((s, o) => s + annualiseOutgoing(o.amount, o.frequency), 0), type: "deduction" },
       { name: "GIA Overflow", value: giaOverflow, type: "subtotal" },
     ];
 
     // Tax Efficiency Score (via lib function)
-    const totISA = personAnalysis.reduce((sum, p) => sum + (p.contributions?.isaContribution ?? 0), 0);
-    const totPension = personAnalysis.reduce((sum, p) => sum + (p.contributions?.pensionContribution ?? 0), 0);
-    const totGIA = personAnalysis.reduce((sum, p) => sum + (p.contributions?.giaContribution ?? 0), 0);
+    const totISA = personAnalysis.reduce((sum, p) => sum + p.contributions.isaContribution, 0);
+    const totPension = personAnalysis.reduce((sum, p) => sum + p.contributions.pensionContribution, 0);
+    const totGIA = personAnalysis.reduce((sum, p) => sum + p.contributions.giaContribution, 0);
     const totSavings = totISA + totPension + totGIA;
     const taxAdvSavings = totISA + totPension;
     const taxEffScore = calculateTaxEfficiencyScore(totISA, totPension, totGIA);
@@ -198,7 +195,7 @@ export default function IncomePage() {
       taxAdvantagedSavings: taxAdvSavings,
       taxEfficiencyScore: taxEffScore,
     };
-  }, [personAnalysis, estimatedAnnualExpenses]);
+  }, [personAnalysis, committedOutgoings]);
 
   return (
     <div className="space-y-8 p-4 md:p-8">
@@ -489,16 +486,12 @@ export default function IncomePage() {
                               <TableHead>Grant Date</TableHead>
                               <TableHead>Vesting Date</TableHead>
                               <TableHead className="text-right">Amount</TableHead>
-                              <TableHead>Fund</TableHead>
                               <TableHead className="text-right">Est. Return</TableHead>
                               <TableHead className="text-right">Projected Value</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {bonus.deferredTranches.map((tranche, idx) => {
-                              const fund = tranche.fundId
-                                ? getFundById(tranche.fundId)
-                                : undefined;
                               const projected = projectedValue(tranche);
                               return (
                                 <TableRow key={idx}>
@@ -506,13 +499,6 @@ export default function IncomePage() {
                                   <TableCell>{formatDate(tranche.vestingDate)}</TableCell>
                                   <TableCell className="text-right">
                                     {formatCurrency(tranche.amount)}
-                                  </TableCell>
-                                  <TableCell>
-                                    {fund ? (
-                                      <Badge variant="secondary">{fund.ticker}</Badge>
-                                    ) : (
-                                      <span className="text-muted-foreground">-</span>
-                                    )}
                                   </TableCell>
                                   <TableCell className="text-right">
                                     {formatPercent(tranche.estimatedAnnualReturn)}
@@ -534,7 +520,7 @@ export default function IncomePage() {
                                   bonus.deferredTranches.reduce((s, t) => s + t.amount, 0)
                                 )}
                               </TableCell>
-                              <TableCell colSpan={2} />
+                              <TableCell />
                               <TableCell className="text-right font-semibold">
                                 {formatCurrency(
                                   bonus.deferredTranches.reduce(

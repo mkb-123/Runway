@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/select";
 import type {
   AccountType,
-  Holding,
   HouseholdData,
 } from "@/types";
 import { ACCOUNT_TYPE_LABELS } from "@/types";
@@ -54,7 +53,6 @@ export function AccountsTab({ household, updateHousehold }: AccountsTabProps) {
       provider: "",
       name: "",
       currentValue: 0,
-      holdings: [],
     });
     updateHousehold(updated);
   }
@@ -62,36 +60,6 @@ export function AccountsTab({ household, updateHousehold }: AccountsTabProps) {
   function removeAccount(index: number) {
     const updated = clone(household);
     updated.accounts.splice(index, 1);
-    updateHousehold(updated);
-  }
-
-  function updateHolding(
-    accountIndex: number,
-    holdingIndex: number,
-    field: keyof Holding,
-    value: string | number
-  ) {
-    const updated = clone(household);
-    setField(updated.accounts[accountIndex].holdings[holdingIndex], field, value);
-    updateHousehold(updated);
-  }
-
-  function addHolding(accountIndex: number) {
-    const updated = clone(household);
-    const defaultFundId =
-      updated.funds.length > 0 ? updated.funds[0].id : "";
-    updated.accounts[accountIndex].holdings.push({
-      fundId: defaultFundId,
-      units: 0,
-      purchasePrice: 0,
-      currentPrice: 0,
-    });
-    updateHousehold(updated);
-  }
-
-  function removeHolding(accountIndex: number, holdingIndex: number) {
-    const updated = clone(household);
-    updated.accounts[accountIndex].holdings.splice(holdingIndex, 1);
     updateHousehold(updated);
   }
 
@@ -116,8 +84,8 @@ export function AccountsTab({ household, updateHousehold }: AccountsTabProps) {
   return (
     <div className="space-y-6 mt-4">
       <p className="text-sm text-muted-foreground">
-        Your ISAs, pensions, GIAs, and cash accounts. Each account holds fund
-        positions tracked in the Holdings section below it.
+        Your ISAs, pensions, GIAs, and cash accounts. Update the current value
+        of each account to keep your net worth up to date.
       </p>
 
       {/* Person selector */}
@@ -249,112 +217,22 @@ export function AccountsTab({ household, updateHousehold }: AccountsTabProps) {
                       }
                       placeholder="0.00"
                     />,
-                    "Total value including all holdings"
+                    "Total current value of this account"
                   )}
-                </div>
-
-                {/* Holdings */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                      Holdings
-                    </h4>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addHolding(aIdx)}
-                    >
-                      + Add Holding
-                    </Button>
-                  </div>
-                  {account.holdings.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      No holdings. Add funds you hold in this account.
-                    </p>
-                  )}
-                  {account.holdings.map((holding, hIdx) => (
-                    <Card key={`${account.id}-holding-${hIdx}`} className="border-dashed">
-                      <CardContent className="pt-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                          {renderField(
-                            "Fund",
-                            <Select
-                              value={holding.fundId}
-                              onValueChange={(val) =>
-                                updateHolding(aIdx, hIdx, "fundId", val)
-                              }
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {household.funds.map((f) => (
-                                  <SelectItem key={f.id} value={f.id}>
-                                    {f.name || f.ticker || "Unnamed"}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>,
-                            "Select from your fund catalogue"
-                          )}
-                          {renderField(
-                            "Units",
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={holding.units}
-                              onChange={(e) =>
-                                updateHolding(aIdx, hIdx, "units", Number(e.target.value))
-                              }
-                            />
-                          )}
-                          {renderField(
-                            "Purchase Price",
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={holding.purchasePrice}
-                              onChange={(e) =>
-                                updateHolding(
-                                  aIdx,
-                                  hIdx,
-                                  "purchasePrice",
-                                  Number(e.target.value)
-                                )
-                              }
-                            />,
-                            "Average price per unit when bought"
-                          )}
-                          {renderField(
-                            "Current Price",
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={holding.currentPrice}
-                              onChange={(e) =>
-                                updateHolding(
-                                  aIdx,
-                                  hIdx,
-                                  "currentPrice",
-                                  Number(e.target.value)
-                                )
-                              }
-                            />,
-                            "Latest price per unit"
-                          )}
-                        </div>
-                        <div className="mt-3 flex justify-end">
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => removeHolding(aIdx, hIdx)}
-                          >
-                            Remove Holding
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {account.type === "gia" &&
+                    renderField(
+                      "Cost Basis",
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={account.costBasis ?? ""}
+                        onChange={(e) =>
+                          updateAccount(aIdx, "costBasis", Number(e.target.value))
+                        }
+                        placeholder="0.00"
+                      />,
+                      "Total amount originally invested (for CGT estimation)"
+                    )}
                 </div>
               </CardContent>
             </Card>

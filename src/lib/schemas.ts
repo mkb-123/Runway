@@ -22,37 +22,12 @@ export const AccountTypeSchema = z.enum([
   "premium_bonds",
 ]);
 
-export const AssetClassSchema = z.enum([
-  "equity",
-  "bonds",
-  "property",
-  "cash",
-  "commodities",
-  "mixed",
-]);
-
-export const RegionSchema = z.enum([
-  "uk",
-  "us",
-  "europe",
-  "asia",
-  "emerging_markets",
-  "global",
-]);
-
 export const TaxWrapperSchema = z.enum([
   "pension",
   "isa",
   "gia",
   "cash",
   "premium_bonds",
-]);
-
-export const TransactionTypeSchema = z.enum([
-  "buy",
-  "sell",
-  "dividend",
-  "contribution",
 ]);
 
 export const StudentLoanPlanSchema = z.enum([
@@ -85,31 +60,6 @@ export const PersonSchema = z.object({
   studentLoanPlan: StudentLoanPlanSchema,
 });
 
-export const FundSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  ticker: z.string(),
-  isin: z.string(),
-  ocf: z.number().min(0),
-  assetClass: AssetClassSchema,
-  region: RegionSchema,
-  historicalReturns: z
-    .object({
-      "1yr": z.number().optional(),
-      "3yr": z.number().optional(),
-      "5yr": z.number().optional(),
-      "10yr": z.number().optional(),
-    })
-    .optional(),
-});
-
-export const HoldingSchema = z.object({
-  fundId: z.string().min(1),
-  units: z.number().min(0),
-  purchasePrice: z.number().min(0),
-  currentPrice: z.number().min(0),
-});
-
 export const AccountSchema = z.object({
   id: z.string().min(1),
   personId: z.string().min(1),
@@ -117,7 +67,7 @@ export const AccountSchema = z.object({
   provider: z.string(),
   name: z.string(),
   currentValue: z.number().min(0),
-  holdings: z.array(HoldingSchema),
+  costBasis: z.number().min(0).optional(),
 });
 
 // --- Income & Compensation ---
@@ -126,7 +76,6 @@ export const DeferredBonusTrancheSchema = z.object({
   grantDate: z.string(),
   vestingDate: z.string(),
   amount: z.number().min(0),
-  fundId: z.string().optional(),
   estimatedAnnualReturn: z.number(),
 });
 
@@ -146,11 +95,16 @@ export const PersonIncomeSchema = z.object({
 
 // --- Contributions & Planning ---
 
-export const AnnualContributionsSchema = z.object({
+export const ContributionTargetSchema = z.enum(["isa", "pension", "gia"]);
+export const ContributionFrequencySchema = z.enum(["monthly", "annually"]);
+
+export const ContributionSchema = z.object({
+  id: z.string().min(1),
   personId: z.string().min(1),
-  isaContribution: z.number().min(0),
-  pensionContribution: z.number().min(0),
-  giaContribution: z.number().min(0),
+  label: z.string(),
+  target: ContributionTargetSchema,
+  amount: z.number().min(0),
+  frequency: ContributionFrequencySchema,
 });
 
 export const RetirementConfigSchema = z.object({
@@ -222,20 +176,6 @@ export const IHTConfigSchema = z.object({
   gifts: z.array(GiftSchema),
 });
 
-// --- Transactions ---
-
-export const TransactionSchema = z.object({
-  id: z.string().min(1),
-  accountId: z.string().min(1),
-  fundId: z.string().min(1),
-  type: TransactionTypeSchema,
-  date: z.string(),
-  units: z.number().min(0),
-  pricePerUnit: z.number().min(0),
-  amount: z.number().min(0),
-  notes: z.string().optional(),
-});
-
 // --- Snapshots ---
 
 export const SnapshotByPersonSchema = z.object({
@@ -266,10 +206,9 @@ export const NetWorthSnapshotSchema = z.object({
 export const HouseholdDataSchema = z.object({
   persons: z.array(PersonSchema),
   accounts: z.array(AccountSchema),
-  funds: z.array(FundSchema),
   income: z.array(PersonIncomeSchema),
   bonusStructures: z.array(BonusStructureSchema),
-  annualContributions: z.array(AnnualContributionsSchema),
+  contributions: z.array(ContributionSchema),
   retirement: RetirementConfigSchema,
   emergencyFund: EmergencyFundConfigSchema,
   committedOutgoings: z.array(CommittedOutgoingSchema).default([]),
@@ -277,11 +216,6 @@ export const HouseholdDataSchema = z.object({
     heroMetrics: ["net_worth", "fire_progress", "retirement_countdown"],
   }),
   iht: IHTConfigSchema,
-  estimatedAnnualExpenses: z.number().min(0),
-});
-
-export const TransactionsDataSchema = z.object({
-  transactions: z.array(TransactionSchema),
 });
 
 export const SnapshotsDataSchema = z.object({

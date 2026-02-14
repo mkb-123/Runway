@@ -30,9 +30,15 @@ import type {
   PersonIncome,
   BonusStructure,
   DeferredBonusTranche,
-  AnnualContributions,
+  Contribution,
+  ContributionTarget,
+  ContributionFrequency,
   StudentLoanPlan,
   HouseholdData,
+} from "@/types";
+import {
+  CONTRIBUTION_TARGET_LABELS,
+  CONTRIBUTION_FREQUENCY_LABELS,
 } from "@/types";
 import { clone, setField, renderField } from "./field-helpers";
 import { FieldWarning } from "./field-warning";
@@ -102,12 +108,7 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
       cashBonusAnnual: 0,
       deferredTranches: [],
     });
-    updated.annualContributions.push({
-      personId: newPerson.id,
-      isaContribution: 0,
-      pensionContribution: 0,
-      giaContribution: 0,
-    });
+    // No default contributions — user adds them explicitly
     updateHousehold(updated);
   }
 
@@ -120,8 +121,8 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
     updated.bonusStructures = updated.bonusStructures.filter(
       (b: BonusStructure) => b.personId !== personId
     );
-    updated.annualContributions = updated.annualContributions.filter(
-      (c: AnnualContributions) => c.personId !== personId
+    updated.contributions = updated.contributions.filter(
+      (c: Contribution) => c.personId !== personId
     );
     updateHousehold(updated);
   }
@@ -178,9 +179,37 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
   // Contribution helpers
   // ----------------------------------------------------------
 
-  function updateContribution(index: number, field: keyof AnnualContributions, value: number) {
+  function addContribution(personId: string) {
     const updated = clone(household);
-    setField(updated.annualContributions[index], field, value);
+    updated.contributions.push({
+      id: `contrib-${Date.now()}`,
+      personId,
+      label: "",
+      target: "isa" as ContributionTarget,
+      amount: 0,
+      frequency: "monthly" as ContributionFrequency,
+    });
+    updateHousehold(updated);
+  }
+
+  function updateContributionField(
+    contribId: string,
+    field: keyof Contribution,
+    value: string | number
+  ) {
+    const updated = clone(household);
+    const contrib = updated.contributions.find((c: Contribution) => c.id === contribId);
+    if (contrib) {
+      setField(contrib, field, value);
+      updateHousehold(updated);
+    }
+  }
+
+  function removeContribution(contribId: string) {
+    const updated = clone(household);
+    updated.contributions = updated.contributions.filter(
+      (c: Contribution) => c.id !== contribId
+    );
     updateHousehold(updated);
   }
 
@@ -235,10 +264,9 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
         const income = incomeIdx >= 0 ? household.income[incomeIdx] : null;
         const bonusIdx = household.bonusStructures.findIndex((b) => b.personId === person.id);
         const bonus = bonusIdx >= 0 ? household.bonusStructures[bonusIdx] : null;
-        const contribIdx = household.annualContributions.findIndex(
+        const personContributions = household.contributions.filter(
           (c) => c.personId === person.id
         );
-        const contrib = contribIdx >= 0 ? household.annualContributions[contribIdx] : null;
 
         const accountCount = household.accounts.filter(
           (a) => a.personId === person.id
@@ -619,96 +647,123 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                 </Collapsible>
               )}
 
-              {/* Annual Contributions */}
-              {contrib && (
-                <Collapsible defaultOpen>
-                  <SectionHeader title="Annual Contributions" />
-                  <CollapsibleContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2 pb-4">
-                      {renderField(
-                        "ISA Contribution",
-                        <>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={contrib.isaContribution}
-                            onChange={(e) =>
-                              updateContribution(
-                                contribIdx,
-                                "isaContribution",
-                                Number(e.target.value)
-                              )
-                            }
-                            placeholder="0.00"
-                          />
-                          <FieldWarning
-                            value={contrib.isaContribution}
-                            min={0}
-                            max={20000}
-                            label="ISA contribution"
-                            isCurrency
-                            maxLabel="the £20,000 annual ISA allowance"
-                          />
-                        </>,
-                        "Annual ISA allowance is £20,000 per person"
-                      )}
-                      {renderField(
-                        "Pension Contribution",
-                        <>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={contrib.pensionContribution}
-                            onChange={(e) =>
-                              updateContribution(
-                                contribIdx,
-                                "pensionContribution",
-                                Number(e.target.value)
-                              )
-                            }
-                            placeholder="0.00"
-                          />
-                          <FieldWarning
-                            value={contrib.pensionContribution}
-                            min={0}
-                            max={60000}
-                            label="pension contribution"
-                            isCurrency
-                            maxLabel="the £60,000 annual allowance"
-                          />
-                        </>,
-                        "Additional pension contributions (annual allowance £60,000)"
-                      )}
-                      {renderField(
-                        "GIA Contribution",
-                        <>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={contrib.giaContribution}
-                            onChange={(e) =>
-                              updateContribution(
-                                contribIdx,
-                                "giaContribution",
-                                Number(e.target.value)
-                              )
-                            }
-                            placeholder="0.00"
-                          />
-                          <FieldWarning
-                            value={contrib.giaContribution}
-                            min={0}
-                            max={500000}
-                            label="GIA contribution"
-                            isCurrency
-                          />
-                        </>,
-                        "General Investment Account — no tax wrapper, subject to CGT"
-                      )}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
+              {/* Contributions */}
+              <Collapsible defaultOpen>
+                <SectionHeader title="Contributions" />
+                <CollapsibleContent>
+                  <div className="pt-2 pb-4 space-y-3">
+                    {personContributions.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No contributions yet. Add ISA, pension, or GIA contributions.
+                      </p>
+                    )}
+                    {personContributions.map((contrib) => (
+                      <Card key={contrib.id} className="border-dashed">
+                        <CardContent className="pt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                            {renderField(
+                              "Label",
+                              <Input
+                                value={contrib.label}
+                                onChange={(e) =>
+                                  updateContributionField(contrib.id, "label", e.target.value)
+                                }
+                                placeholder="e.g. Monthly ISA"
+                              />,
+                              "A short description for this contribution"
+                            )}
+                            {renderField(
+                              "Target",
+                              <Select
+                                value={contrib.target}
+                                onValueChange={(val) =>
+                                  updateContributionField(contrib.id, "target", val)
+                                }
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(CONTRIBUTION_TARGET_LABELS).map(
+                                    ([value, label]) => (
+                                      <SelectItem key={value} value={value}>
+                                        {label}
+                                      </SelectItem>
+                                    )
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            )}
+                            {renderField(
+                              "Amount",
+                              <>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={contrib.amount}
+                                  onChange={(e) =>
+                                    updateContributionField(
+                                      contrib.id,
+                                      "amount",
+                                      Number(e.target.value)
+                                    )
+                                  }
+                                  placeholder="0.00"
+                                />
+                                <FieldWarning
+                                  value={contrib.amount}
+                                  min={0}
+                                  max={contrib.target === "isa" ? 20000 : 500000}
+                                  label="contribution amount"
+                                  isCurrency
+                                />
+                              </>
+                            )}
+                            {renderField(
+                              "Frequency",
+                              <Select
+                                value={contrib.frequency}
+                                onValueChange={(val) =>
+                                  updateContributionField(contrib.id, "frequency", val)
+                                }
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(CONTRIBUTION_FREQUENCY_LABELS).map(
+                                    ([value, label]) => (
+                                      <SelectItem key={value} value={value}>
+                                        {label}
+                                      </SelectItem>
+                                    )
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            )}
+                            <div className="flex items-end">
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => removeContribution(contrib.id)}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addContribution(person.id)}
+                    >
+                      + Add Contribution
+                    </Button>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </CardContent>
           </Card>
         );

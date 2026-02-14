@@ -6,12 +6,10 @@ import { useState } from "react";
 import {
   LayoutDashboard,
   Landmark,
-  Briefcase,
   TrendingUp,
   Sunset,
   Wallet,
   Calculator,
-  PieChart,
   Shield,
   Download,
   Settings,
@@ -40,8 +38,6 @@ const navGroups = [
     links: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/accounts", label: "Accounts", icon: Landmark },
-      { href: "/holdings", label: "Holdings", icon: Briefcase },
-      { href: "/allocation", label: "Allocation", icon: PieChart },
       { href: "/income", label: "Income", icon: Wallet },
     ],
   },

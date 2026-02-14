@@ -8,13 +8,13 @@
                        │  Final decision maker│
                        └─────────┬───────────┘
                                  │
-     ┌───────────┬───────────┬───┴────┬───────────┬───────────┬───────────┬───────────┐
-     │           │           │        │           │           │           │           │
-┌────┴─────┐ ┌──┴────┐ ┌────┴───┐ ┌──┴──────┐ ┌──┴──────────┐ ┌──┴──────────┐ ┌──┴──────────┐
-│  Mobile  │ │Chart- │ │Finan-  │ │Devil's  │ │ HNW Customer│ │ HNW Customer│ │   Senior    │
-│  Web     │ │  ing  │ │ cial   │ │Advocate │ │  (James)    │ │  (Priya)    │ │    Web      │
-│ Designer │ │Expert │ │Advisor │ │         │ │             │ │             │ │  Architect  │
-└──────────┘ └───────┘ └────────┘ └─────────┘ └─────────────┘ └─────────────┘ └─────────────┘
+     ┌───────────┬───────────┬───┴────┬───────────┬───────────┬───────────┬───────────┬───────────┐
+     │           │           │        │           │           │           │           │           │
+┌────┴─────┐ ┌──┴────┐ ┌────┴───┐ ┌──┴──────┐ ┌──┴──────────┐ ┌──┴──────────┐ ┌──┴──────────┐ ┌──┴──────────┐
+│  Mobile  │ │Chart- │ │Finan-  │ │Devil's  │ │ HNW Customer│ │ HNW Customer│ │   Senior    │ │     QA      │
+│  Web     │ │  ing  │ │ cial   │ │Advocate │ │  (James)    │ │  (Priya)    │ │    Web      │ │  Engineer   │
+│ Designer │ │Expert │ │Advisor │ │         │ │             │ │             │ │  Architect  │ │   (Sam)     │
+└──────────┘ └───────┘ └────────┘ └─────────┘ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
 ```
 
 ## When to Convene the Team
@@ -86,7 +86,13 @@ Each agent responds in character, using their defined response format:
    - Checks for inline computation, duplication, and testability.
    - Assesses overall code architecture and maintainability.
 
-**6. Devil's Advocate speaks last**
+**6. QA Engineer (Sam) speaks seventh**
+   - Hunts for cross-page inconsistencies, duplicated concepts, and confusing labels.
+   - Tests edge cases: empty data, single-person households, zero values, boundary conditions.
+   - Cross-references every data field across Settings and display pages.
+   - Rates each issue by severity (P0–P3).
+
+**7. Devil's Advocate speaks last**
    - Challenges the consensus.
    - Identifies failure modes and edge cases.
    - Delivers the "kill question" and risk rating.
@@ -122,6 +128,7 @@ As Team Lead, I (Claude) will:
 - Mobile Web Designer: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Charting Expert: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Senior Web Architect: [SUPPORT / CONCERN / OPPOSE] — [one line]
+- QA Engineer (Sam): [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Devil's Advocate: [SUPPORT / CONCERN / OPPOSE] — [one line]
 
 ### Key Modifications (if any)
