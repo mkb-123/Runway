@@ -8,8 +8,8 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Net Worth Tracker",
-  description: "Personal household net worth tracker",
+  title: "Runway",
+  description: "UK household net worth tracker and financial planner",
 };
 
 export default function RootLayout({

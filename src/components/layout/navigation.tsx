@@ -85,7 +85,7 @@ export function Navigation() {
         {/* Logo / App Title */}
         <Link href="/" className="mr-6 flex items-center gap-2 font-semibold">
           <Landmark className="size-5 text-primary" />
-          <span className="hidden sm:inline-block">Runway</span>
+          <span>Runway</span>
         </Link>
 
         {/* Desktop Navigation */}
