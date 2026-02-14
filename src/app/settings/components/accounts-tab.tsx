@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,7 @@ import type {
   HouseholdData,
 } from "@/types";
 import { ACCOUNT_TYPE_LABELS } from "@/types";
+import { cn } from "@/lib/utils";
 import { clone, setField, renderField } from "./field-helpers";
 
 interface AccountsTabProps {
@@ -107,6 +109,10 @@ export function AccountsTab({ household, updateHousehold }: AccountsTabProps) {
     .map((a, idx) => ({ account: a, originalIndex: idx }))
     .filter(({ account }) => !personIds.has(account.personId));
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- component, not conditional
+  const [selectedPersonIdx, setSelectedPersonIdx] = useState(0);
+  const clampedIdx = Math.min(selectedPersonIdx, Math.max(0, household.persons.length - 1));
+
   return (
     <div className="space-y-6 mt-4">
       <p className="text-sm text-muted-foreground">
@@ -114,7 +120,36 @@ export function AccountsTab({ household, updateHousehold }: AccountsTabProps) {
         positions tracked in the Holdings section below it.
       </p>
 
-      {accountsByPerson.map(({ person, accounts }) => (
+      {/* Person selector */}
+      {household.persons.length > 1 && (
+        <div
+          className="inline-flex items-center rounded-lg bg-muted p-1 text-sm"
+          role="tablist"
+          aria-label="Person selector"
+        >
+          {household.persons.map((p, idx) => (
+            <button
+              key={p.id}
+              role="tab"
+              aria-selected={clampedIdx === idx}
+              onClick={() => setSelectedPersonIdx(idx)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "min-h-[36px] min-w-[44px]",
+                clampedIdx === idx
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {p.name || "Unnamed"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {accountsByPerson.filter((_, idx) =>
+        household.persons.length <= 1 || idx === clampedIdx
+      ).map(({ person, accounts }) => (
         <div key={person.id} className="space-y-3">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
             {person.name || "Unnamed"}&apos;s Accounts

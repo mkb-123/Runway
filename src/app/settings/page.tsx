@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Users,
   Landmark,
@@ -11,8 +11,16 @@ import {
   Receipt,
   CheckCircle2,
   Circle,
+  Download,
+  Upload,
 } from "lucide-react";
 import { useData } from "@/context/data-context";
+import {
+  HouseholdDataSchema,
+  TransactionsDataSchema,
+  SnapshotsDataSchema,
+} from "@/lib/schemas";
+import { z } from "zod";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -23,6 +31,15 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+
+const RunwayExportSchema = z.object({
+  _runway: z.literal(true),
+  version: z.literal(1),
+  exportedAt: z.string(),
+  household: HouseholdDataSchema,
+  transactions: TransactionsDataSchema,
+  snapshots: SnapshotsDataSchema,
+});
 
 import { HouseholdTab } from "./components/household-tab";
 import { AccountsTab } from "./components/accounts-tab";
@@ -41,12 +58,17 @@ export default function SettingsPage() {
   const {
     household,
     transactions,
+    snapshots,
     updateHousehold,
     updateTransactions,
-    resetToDefaults,
+    updateSnapshots,
+    clearAllData,
+    loadExampleData,
   } = useData();
 
   const [activeTab, setActiveTab] = useState("household");
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ----------------------------------------------------------
   // Quick Setup completeness
@@ -104,14 +126,86 @@ export default function SettingsPage() {
   // Reset
   // ----------------------------------------------------------
 
-  function handleReset() {
+  function handleClearAll() {
     if (
       window.confirm(
-        "Are you sure you want to reset all data to defaults? This cannot be undone."
+        "Are you sure you want to clear all data? This will remove everything and cannot be undone."
       )
     ) {
-      resetToDefaults();
+      clearAllData();
     }
+  }
+
+  function handleLoadExample() {
+    if (
+      window.confirm(
+        "Load example data? This will replace all current data with a sample household."
+      )
+    ) {
+      loadExampleData();
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Export / Import
+  // ----------------------------------------------------------
+
+  function handleExport() {
+    const payload = {
+      _runway: true as const,
+      version: 1 as const,
+      exportedAt: new Date().toISOString(),
+      household,
+      transactions,
+      snapshots,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `runway-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    setImportError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const raw = JSON.parse(reader.result as string);
+        const result = RunwayExportSchema.safeParse(raw);
+        if (!result.success) {
+          const issues = result.error.issues
+            .slice(0, 3)
+            .map((i) => `${i.path.join(".")}: ${i.message}`)
+            .join("; ");
+          setImportError(`Invalid file: ${issues}`);
+          return;
+        }
+        if (
+          !window.confirm(
+            "Import this file? All current data will be replaced."
+          )
+        ) {
+          return;
+        }
+        updateHousehold(result.data.household);
+        updateTransactions(result.data.transactions);
+        updateSnapshots(result.data.snapshots);
+        setImportError(null);
+      } catch {
+        setImportError("Could not parse file. Make sure it is valid JSON.");
+      }
+    };
+    reader.readAsText(file);
+    // Reset so the same file can be re-selected
+    e.target.value = "";
   }
 
   // ----------------------------------------------------------
@@ -252,19 +346,49 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Danger Zone */}
-      <Card className="border-destructive/50">
+      {/* Data Management */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-destructive">Danger Zone</CardTitle>
+          <CardTitle>Data Management</CardTitle>
           <CardDescription>
-            Reset all data back to the original default values. This will remove
-            all your customisations and cannot be undone.
+            Export your data as JSON to back up or transfer between devices.
+            Import a previously exported file to restore.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant="destructive" onClick={handleReset}>
-            Reset to Defaults
-          </Button>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-3">
+            <Button variant="outline" className="gap-1.5" onClick={handleExport}>
+              <Download className="size-3.5" />
+              Export JSON
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="size-3.5" />
+              Import JSON
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={handleImport}
+            />
+          </div>
+          {importError && (
+            <p className="text-sm text-destructive">{importError}</p>
+          )}
+          <hr className="border-border" />
+          <div className="flex flex-wrap gap-3">
+            <Button variant="outline" onClick={handleLoadExample}>
+              Load Example Data
+            </Button>
+            <Button variant="destructive" onClick={handleClearAll}>
+              Clear All Data
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

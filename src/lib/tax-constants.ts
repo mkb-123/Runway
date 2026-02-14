@@ -36,8 +36,8 @@ export const UK_TAX_CONSTANTS = {
   // --- Capital Gains Tax ---
   cgt: {
     annualExemptAmount: 3_000,
-    basicRate: 0.1,
-    higherRate: 0.2,
+    basicRate: 0.18,
+    higherRate: 0.24,
   },
 
   // --- ISA ---
@@ -51,7 +51,7 @@ export const UK_TAX_CONSTANTS = {
   dividendAllowance: 500,
   dividendBasicRate: 0.0875,
   dividendHigherRate: 0.3375,
-  dividendAdditionalRate: 0.3938,
+  dividendAdditionalRate: 0.3935,
 
   // --- Personal Savings Allowance ---
   personalSavingsAllowance: {
@@ -64,6 +64,7 @@ export const UK_TAX_CONSTANTS = {
   iht: {
     nilRateBand: 325_000,
     residenceNilRateBand: 175_000,
+    rnrbTaperThreshold: 2_000_000, // RNRB tapers by £1 for every £2 above this
     rate: 0.4,
   },
 
