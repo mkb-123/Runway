@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import type {
   Person,
   Account,
@@ -186,13 +188,49 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
   // Render
   // ----------------------------------------------------------
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- component, not conditional
+  const [selectedPersonIdx, setSelectedPersonIdx] = useState(0);
+
+  // Clamp index if persons list shrinks
+  const clampedIdx = Math.min(selectedPersonIdx, Math.max(0, household.persons.length - 1));
+
   return (
     <div className="space-y-4 mt-4">
       <p className="text-sm text-muted-foreground">
         Each person&apos;s details, income, and contribution targets in one place.
       </p>
 
-      {household.persons.map((person, pIdx) => {
+      {/* Person selector — avoids scrolling past everyone */}
+      {household.persons.length > 1 && (
+        <div
+          className="inline-flex items-center rounded-lg bg-muted p-1 text-sm"
+          role="tablist"
+          aria-label="Person selector"
+        >
+          {household.persons.map((p, idx) => (
+            <button
+              key={p.id}
+              role="tab"
+              aria-selected={clampedIdx === idx}
+              onClick={() => setSelectedPersonIdx(idx)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "min-h-[36px] min-w-[44px]",
+                clampedIdx === idx
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {p.name || "New Person"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {household.persons.filter((_, idx) =>
+        household.persons.length <= 1 || idx === clampedIdx
+      ).map((person) => {
+        const pIdx = household.persons.indexOf(person);
         const incomeIdx = household.income.findIndex((i) => i.personId === person.id);
         const income = incomeIdx >= 0 ? household.income[incomeIdx] : null;
         const bonusIdx = household.bonusStructures.findIndex((b) => b.personId === person.id);

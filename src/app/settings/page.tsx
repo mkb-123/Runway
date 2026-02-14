@@ -43,7 +43,8 @@ export default function SettingsPage() {
     transactions,
     updateHousehold,
     updateTransactions,
-    resetToDefaults,
+    clearAllData,
+    loadExampleData,
   } = useData();
 
   const [activeTab, setActiveTab] = useState("household");
@@ -104,13 +105,23 @@ export default function SettingsPage() {
   // Reset
   // ----------------------------------------------------------
 
-  function handleReset() {
+  function handleClearAll() {
     if (
       window.confirm(
-        "Are you sure you want to reset all data to defaults? This cannot be undone."
+        "Are you sure you want to clear all data? This will remove everything and cannot be undone."
       )
     ) {
-      resetToDefaults();
+      clearAllData();
+    }
+  }
+
+  function handleLoadExample() {
+    if (
+      window.confirm(
+        "Load example data? This will replace all current data with a sample household."
+      )
+    ) {
+      loadExampleData();
     }
   }
 
@@ -252,18 +263,21 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Danger Zone */}
-      <Card className="border-destructive/50">
+      {/* Data Management */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-destructive">Danger Zone</CardTitle>
+          <CardTitle>Data Management</CardTitle>
           <CardDescription>
-            Reset all data back to the original default values. This will remove
-            all your customisations and cannot be undone.
+            Clear all data to start fresh, or load a pre-built example household
+            to explore Runway&apos;s features.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant="destructive" onClick={handleReset}>
-            Reset to Defaults
+        <CardContent className="flex flex-wrap gap-3">
+          <Button variant="outline" onClick={handleLoadExample}>
+            Load Example Data
+          </Button>
+          <Button variant="destructive" onClick={handleClearAll}>
+            Clear All Data
           </Button>
         </CardContent>
       </Card>

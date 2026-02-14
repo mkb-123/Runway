@@ -44,6 +44,29 @@ const defaultHousehold = HouseholdDataSchema.parse(householdJson);
 const defaultTransactions = TransactionsDataSchema.parse(transactionsJson);
 const defaultSnapshots = SnapshotsDataSchema.parse(snapshotsJson);
 
+// Empty data for "Clear All"
+const emptyHousehold: HouseholdData = {
+  persons: [],
+  accounts: [],
+  funds: [],
+  income: [],
+  bonusStructures: [],
+  annualContributions: [],
+  retirement: {
+    targetAnnualIncome: 0,
+    withdrawalRate: 0.04,
+    includeStatePension: true,
+    scenarioRates: [0.05, 0.07, 0.09],
+  },
+  emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+  iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
+  estimatedAnnualExpenses: 0,
+  committedOutgoings: [],
+  dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
+};
+const emptyTransactions: TransactionsData = { transactions: [] };
+const emptySnapshots: SnapshotsData = { snapshots: [] };
+
 // --- localStorage keys ---
 
 const LS_KEY_HOUSEHOLD = "nw-household";
@@ -61,6 +84,8 @@ interface DataContextValue {
   updateTransactions: (data: TransactionsData) => void;
   updateSnapshots: (data: SnapshotsData) => void;
   resetToDefaults: () => void;
+  clearAllData: () => void;
+  loadExampleData: () => void;
   // Computed helpers
   getPersonById: (id: string) => Person | undefined;
   getAccountById: (id: string) => Account | undefined;
@@ -160,6 +185,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
     removeFromLocalStorage(LS_KEY_HOUSEHOLD);
     removeFromLocalStorage(LS_KEY_TRANSACTIONS);
     removeFromLocalStorage(LS_KEY_SNAPSHOTS);
+  }, []);
+
+  const clearAllData = useCallback(() => {
+    setHousehold(emptyHousehold);
+    setTransactions(emptyTransactions);
+    setSnapshots(emptySnapshots);
+    saveToLocalStorage(LS_KEY_HOUSEHOLD, emptyHousehold);
+    saveToLocalStorage(LS_KEY_TRANSACTIONS, emptyTransactions);
+    saveToLocalStorage(LS_KEY_SNAPSHOTS, emptySnapshots);
+  }, []);
+
+  const loadExampleData = useCallback(() => {
+    setHousehold(defaultHousehold);
+    setTransactions(defaultTransactions);
+    setSnapshots(defaultSnapshots);
+    saveToLocalStorage(LS_KEY_HOUSEHOLD, defaultHousehold);
+    saveToLocalStorage(LS_KEY_TRANSACTIONS, defaultTransactions);
+    saveToLocalStorage(LS_KEY_SNAPSHOTS, defaultSnapshots);
   }, []);
 
   // --- Computed helpers ---
@@ -266,6 +309,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       updateTransactions,
       updateSnapshots,
       resetToDefaults,
+      clearAllData,
+      loadExampleData,
       getPersonById,
       getAccountById,
       getFundById,
@@ -284,6 +329,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       updateTransactions,
       updateSnapshots,
       resetToDefaults,
+      clearAllData,
+      loadExampleData,
       getPersonById,
       getAccountById,
       getFundById,
