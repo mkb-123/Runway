@@ -22,6 +22,7 @@ import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
+import { EmptyState } from "@/components/empty-state";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import {
   getUnrealisedGains,
@@ -230,7 +231,7 @@ export default function TaxPlanningPage() {
   );
 
   return (
-    <div className="space-y-8 p-6">
+    <div className="space-y-8 p-4 md:p-8">
       {/* Page Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -243,6 +244,10 @@ export default function TaxPlanningPage() {
         </div>
         <PersonToggle />
       </div>
+
+      {persons.length === 0 && (
+        <EmptyState message="No household data yet. Add people and accounts to see tax planning strategies." settingsTab="household" />
+      )}
 
       {/* Bed & ISA Planner */}
       <Card>

@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GainLossChart } from "@/components/charts/gain-loss-chart";
 import { FeeImpactChart } from "@/components/charts/fee-impact-chart";
 import { FundPerformanceChart } from "@/components/charts/fund-performance-chart";
+import { EmptyState } from "@/components/empty-state";
 
 interface FundHoldingRow {
   accountId: string;
@@ -134,6 +135,10 @@ export default function HoldingsPage() {
         </div>
         <PersonToggle />
       </div>
+
+      {fundGroups.length === 0 && (
+        <EmptyState message="No fund holdings yet. Add accounts with fund positions in Settings." settingsTab="accounts" />
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

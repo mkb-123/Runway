@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
 
 export default function AccountsPage() {
   const { household } = useData();
@@ -60,6 +61,10 @@ export default function AccountsPage() {
         </div>
         <PersonToggle />
       </div>
+
+      {accountsByPerson.length === 0 && (
+        <EmptyState message="No accounts yet. Add your ISAs, pensions, and savings accounts to get started." settingsTab="accounts" />
+      )}
 
       {accountsByPerson.map(({ person, accounts: personAccounts, totalValue }) => (
         <section key={person.id} className="space-y-4">

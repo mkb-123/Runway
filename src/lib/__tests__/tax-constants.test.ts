@@ -55,9 +55,10 @@ describe("UK_TAX_CONSTANTS", () => {
     expect(UK_TAX_CONSTANTS.pensionTaxFreeLumpSum).toBe(268275);
   });
 
-  it("has correct IHT thresholds", () => {
+  it("has correct IHT thresholds including RNRB taper", () => {
     expect(UK_TAX_CONSTANTS.iht.nilRateBand).toBe(325000);
     expect(UK_TAX_CONSTANTS.iht.residenceNilRateBand).toBe(175000);
+    expect(UK_TAX_CONSTANTS.iht.rnrbTaperThreshold).toBe(2000000);
     expect(UK_TAX_CONSTANTS.iht.rate).toBe(0.4);
   });
 
@@ -67,8 +68,11 @@ describe("UK_TAX_CONSTANTS", () => {
     expect(UK_TAX_CONSTANTS.statePension.minimumQualifyingYears).toBe(10);
   });
 
-  it("has correct dividend allowance", () => {
+  it("has correct dividend rates (2024/25)", () => {
     expect(UK_TAX_CONSTANTS.dividendAllowance).toBe(500);
+    expect(UK_TAX_CONSTANTS.dividendBasicRate).toBe(0.0875);
+    expect(UK_TAX_CONSTANTS.dividendHigherRate).toBe(0.3375);
+    expect(UK_TAX_CONSTANTS.dividendAdditionalRate).toBe(0.3935);
   });
 
   it("has correct marriage allowance", () => {

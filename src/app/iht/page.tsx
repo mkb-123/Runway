@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
+import { EmptyState } from "@/components/empty-state";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { getAccountTaxWrapper } from "@/types";
@@ -203,7 +204,7 @@ export default function IHTPage() {
   } = ihtData;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4 md:p-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
@@ -216,6 +217,10 @@ export default function IHTPage() {
         </div>
         <PersonToggle />
       </div>
+
+      {household.persons.length === 0 && (
+        <EmptyState message="No household data yet. Add people and accounts to estimate your IHT position." settingsTab="household" />
+      )}
 
       {/* Estate Value Estimator */}
       <Card>

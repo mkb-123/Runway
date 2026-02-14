@@ -157,10 +157,10 @@ export default function ExportPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 p-4 md:p-8">
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Export Data</h1>
-        <p className="text-sm text-muted-foreground sm:text-base">
+        <p className="text-sm text-muted-foreground">
           Download your financial data as Excel spreadsheets for offline analysis or record keeping.
         </p>
       </div>

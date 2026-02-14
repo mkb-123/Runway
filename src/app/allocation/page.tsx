@@ -5,6 +5,7 @@ import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
+import { EmptyState } from "@/components/empty-state";
 import { formatCurrency, formatPercent, roundPence } from "@/lib/format";
 import {
   getAccountTaxWrapper,
@@ -181,7 +182,7 @@ export default function AllocationPage() {
   const taxExposedPct = totalNetWorth > 0 ? taxExposed / totalNetWorth : 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4 md:p-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
@@ -194,6 +195,10 @@ export default function AllocationPage() {
         </div>
         <PersonToggle />
       </div>
+
+      {filteredAccounts.length === 0 && (
+        <EmptyState message="No accounts yet. Add investment accounts and fund holdings to see your allocation." settingsTab="accounts" />
+      )}
 
       {/* Row 1: Asset Class + Region */}
       <div className="grid gap-6 md:grid-cols-2">
