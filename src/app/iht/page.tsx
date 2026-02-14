@@ -7,6 +7,11 @@ import { PersonToggle } from "@/components/person-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
+import {
+  calculateIHT,
+  calculateYearsUntilIHTExceeded,
+  yearsSince,
+} from "@/lib/iht";
 import { getAccountTaxWrapper } from "@/types";
 import type { TaxWrapper } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,17 +25,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AllocationPie } from "@/components/charts/allocation-pie";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function yearsSince(dateStr: string): number {
-  const giftDate = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - giftDate.getTime();
-  return diffMs / (1000 * 60 * 60 * 24 * 365.25);
-}
 
 export default function IHTPage() {
   const scenarioData = useScenarioData();
@@ -81,29 +75,27 @@ export default function IHTPage() {
       .filter((g) => !g.fallenOut)
       .reduce((sum, g) => sum + g.amount, 0);
 
-    // --- IHT Thresholds ---
+    // --- IHT Thresholds & Liability (via src/lib/iht.ts) ---
     const numberOfPersons = selectedView === "household" ? household.persons.length : 1;
     const nilRateBandPerPerson = ihtConstants.nilRateBand;
-    const totalNilRateBand = Math.max(
-      0,
-      nilRateBandPerPerson * numberOfPersons - giftsWithin7Years
-    );
-
-    // RNRB tapers by £1 for every £2 the estate exceeds the taper threshold
     const rnrbPerPerson = ihtConfig.passingToDirectDescendants
       ? ihtConstants.residenceNilRateBand
       : 0;
-    const grossRnrb = rnrbPerPerson * numberOfPersons;
-    const rnrbTaperReduction = Math.max(
-      0,
-      Math.floor((inEstate - ihtConstants.rnrbTaperThreshold) / 2)
-    );
-    const totalResidenceNilRateBand = Math.max(0, grossRnrb - rnrbTaperReduction);
-    const combinedThreshold = totalNilRateBand + totalResidenceNilRateBand;
 
-    // --- IHT Liability ---
-    const taxableAmount = Math.max(0, inEstate - combinedThreshold);
-    const ihtLiability = taxableAmount * ihtConstants.rate;
+    const ihtResult = calculateIHT(
+      inEstate,
+      numberOfPersons,
+      giftsWithin7Years,
+      ihtConfig.passingToDirectDescendants
+    );
+
+    const {
+      effectiveNRB: totalNilRateBand,
+      effectiveRNRB: totalResidenceNilRateBand,
+      combinedThreshold,
+      taxableAmount,
+      ihtLiability,
+    } = ihtResult;
 
     // --- Sheltered vs Exposed ---
     const shelteredPct =
@@ -120,14 +112,11 @@ export default function IHTPage() {
       (sum, c) => sum + c.isaContribution + c.giaContribution,
       0,
     );
-    // How many years until the estate exceeds the combined threshold?
-    let yearsUntilExceeded: number | null = null;
-    if (inEstate < combinedThreshold && annualSavingsInEstate > 0) {
-      const gap = combinedThreshold - inEstate;
-      yearsUntilExceeded = Math.ceil(gap / annualSavingsInEstate);
-    } else if (inEstate >= combinedThreshold) {
-      yearsUntilExceeded = 0;
-    }
+    const yearsUntilExceeded = calculateYearsUntilIHTExceeded(
+      inEstate,
+      combinedThreshold,
+      annualSavingsInEstate
+    );
 
     // Data for the sheltered vs exposed pie chart
     const shelteredVsExposedData = [

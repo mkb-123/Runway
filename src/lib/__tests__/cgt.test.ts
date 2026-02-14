@@ -6,6 +6,8 @@ import {
   calculateBedAndISA,
   getTaxYear,
   parseTaxYearDates,
+  determineCgtRate,
+  calculateBedAndISABreakEven,
 } from "../cgt";
 import type { Transaction, Account } from "@/types";
 
@@ -419,5 +421,81 @@ describe("calculateBedAndISA", () => {
     const result = calculateBedAndISA(5000, 3000, 0.2);
     // annualTaxSaved based on the unrealised gain * rate
     expect(result.annualTaxSaved).toBe(1000); // £5000 * 0.2
+  });
+});
+
+// --- New extracted function tests ---
+
+describe("determineCgtRate", () => {
+
+  it("returns basic rate for income under basic rate limit", () => {
+    expect(determineCgtRate(40000)).toBe(0.18);
+  });
+
+  it("returns higher rate for income over basic rate limit", () => {
+    expect(determineCgtRate(60000)).toBe(0.24);
+  });
+
+  it("returns basic rate for income exactly at basic rate limit", () => {
+    // £50,270 is the limit, <= means basic rate
+    expect(determineCgtRate(50270)).toBe(0.18);
+  });
+
+  it("returns higher rate for income just over basic rate limit", () => {
+    expect(determineCgtRate(50271)).toBe(0.24);
+  });
+
+  it("accounts for salary sacrifice reducing taxable income", () => {
+    // Gross: 55,000, pension: 10,000, salary sacrifice
+    // Taxable: 45,000 (under 50,270) -> basic rate
+    expect(determineCgtRate(55000, 10000, "salary_sacrifice")).toBe(0.18);
+  });
+
+  it("accounts for net pay reducing taxable income", () => {
+    // Same as salary sacrifice — net pay also reduces taxable income
+    expect(determineCgtRate(55000, 10000, "net_pay")).toBe(0.18);
+  });
+
+  it("does NOT reduce income for relief at source", () => {
+    // Relief at source doesn't reduce gross for tax purposes
+    // Gross: 55,000 > 50,270 -> higher rate
+    expect(determineCgtRate(55000, 10000, "relief_at_source")).toBe(0.24);
+  });
+
+  it("defaults to relief_at_source when no method specified", () => {
+    expect(determineCgtRate(55000, 10000)).toBe(0.24);
+  });
+
+  it("handles zero income", () => {
+    expect(determineCgtRate(0)).toBe(0.18);
+  });
+});
+
+describe("calculateBedAndISABreakEven", () => {
+
+  it("returns 0 when no CGT cost", () => {
+    expect(calculateBedAndISABreakEven(0, 50000, 0.24)).toBe(0);
+  });
+
+  it("calculates break-even period", () => {
+    // CGT cost: 1000, GIA: 50000, rate: 0.24, return: 0.07
+    // Annual saving: 50000 * 0.07 * 0.24 = 840
+    // Break-even: 1000 / 840 = 1.19, ceil to 1 decimal = 1.2
+    expect(calculateBedAndISABreakEven(1000, 50000, 0.24, 0.07)).toBe(1.2);
+  });
+
+  it("returns 0 when GIA value is 0", () => {
+    expect(calculateBedAndISABreakEven(1000, 0, 0.24, 0.07)).toBe(0);
+  });
+
+  it("returns 0 when assumed return is 0", () => {
+    expect(calculateBedAndISABreakEven(1000, 50000, 0.24, 0)).toBe(0);
+  });
+
+  it("handles large CGT costs with long break-even", () => {
+    // CGT cost: 10000, GIA: 20000, rate: 0.18, return: 0.07
+    // Annual saving: 20000 * 0.07 * 0.18 = 252
+    // Break-even: 10000 / 252 = 39.68, ceil to 1 decimal = 39.7
+    expect(calculateBedAndISABreakEven(10000, 20000, 0.18, 0.07)).toBe(39.7);
   });
 });

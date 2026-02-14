@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -28,6 +28,8 @@ import {
   calculateCoastFIRE,
   calculateRequiredSavings,
   calculatePensionBridge,
+  calculateProRataStatePension,
+  calculateAge,
 } from "@/lib/projections";
 import { RetirementProgress } from "@/components/charts/retirement-progress";
 import { RetirementDrawdownChart } from "@/components/charts/retirement-drawdown-chart";
@@ -126,12 +128,8 @@ export default function RetirementPage() {
     () => persons.find((p) => p.relationship === "self"),
     [persons]
   );
-  const [now] = useState(() => Date.now());
   const currentAge = primaryPerson
-    ? Math.floor(
-        (now - new Date(primaryPerson.dateOfBirth).getTime()) /
-          (365.25 * 24 * 60 * 60 * 1000)
-      )
+    ? calculateAge(primaryPerson.dateOfBirth)
     : 35;
   const pensionAccessAge = primaryPerson?.pensionAccessAge ?? 57;
 
@@ -184,13 +182,7 @@ export default function RetirementPage() {
   // --- Primary person pro-rata state pension ---
   const primaryStatePensionAnnual = useMemo(() => {
     if (!primaryPerson) return UK_TAX_CONSTANTS.statePension.fullNewStatePensionAnnual;
-    const qualifyingYears = primaryPerson.niQualifyingYears ?? 0;
-    const requiredYears = UK_TAX_CONSTANTS.statePension.qualifyingYearsRequired;
-    const minYears = UK_TAX_CONSTANTS.statePension.minimumQualifyingYears;
-    const fullPension = UK_TAX_CONSTANTS.statePension.fullNewStatePensionAnnual;
-    return qualifyingYears >= minYears
-      ? Math.min(1, qualifyingYears / requiredYears) * fullPension
-      : 0;
+    return calculateProRataStatePension(primaryPerson.niQualifyingYears ?? 0);
   }, [primaryPerson]);
 
   // --- Combined Retirement Income Timeline data ---
@@ -215,16 +207,9 @@ export default function RetirementPage() {
         .reduce((sum, a) => sum + a.currentValue, 0);
 
       // State pension: pro-rata based on NI qualifying years
-      const qualifyingYears = person.niQualifyingYears ?? 0;
-      const requiredYears =
-        UK_TAX_CONSTANTS.statePension.qualifyingYearsRequired;
-      const minYears = UK_TAX_CONSTANTS.statePension.minimumQualifyingYears;
-      const fullPension =
-        UK_TAX_CONSTANTS.statePension.fullNewStatePensionAnnual;
-      const statePensionAnnual =
-        qualifyingYears >= minYears
-          ? Math.min(1, qualifyingYears / requiredYears) * fullPension
-          : 0;
+      const statePensionAnnual = calculateProRataStatePension(
+        person.niQualifyingYears ?? 0
+      );
 
       return {
         name: person.name,

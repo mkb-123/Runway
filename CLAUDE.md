@@ -10,7 +10,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (145 tests)
+- **Testing:** Vitest + Testing Library (226 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
@@ -135,22 +135,9 @@ Every piece of knowledge should have a single, authoritative source in the codeb
 
 ## Test Coverage Gaps
 
-Calculations in `src/lib/` are well-tested. The following **inline page calculations** need extracting to `src/lib/` with tests:
+Most calculations are now extracted to `src/lib/` with tests. The following remain as **inline page calculations** (low risk, aggregation-only):
 
-### High Priority (Financial Correctness)
-
-| Page | Inline Calculation | Risk |
-|------|--------------------|------|
-| `iht/page.tsx` | RNRB taper: `Math.floor((estate - threshold) / 2)` | Must match HMRC formula exactly |
-| `iht/page.tsx` | 7-year gift NRB reduction | Complex gift relief taper rules |
-| `iht/page.tsx` | IHT liability: `taxableAmount * rate` | Combines multiple thresholds |
-| `tax-planning/page.tsx` | CGT rate determination (gross salary vs basic rate limit) | Ignores pension method effect on marginal rate |
-| `tax-planning/page.tsx` | Bed & ISA break-even: hardcoded 7% return | Should be configurable or documented |
-| `retirement/page.tsx` | Age calculation from DOB: `365.25 * ms` | Leap year precision over long spans |
-| `income/page.tsx` | Tax efficiency score: `taxAdvSavings / totSavings` | Excludes employer contributions |
-| `income/page.tsx` | Deferred bonus projection: compound growth to vesting | Fractional year handling |
-
-### Medium Priority (Accuracy)
+### Remaining (Medium Priority — Accuracy)
 
 | Page | Inline Calculation | Risk |
 |------|--------------------|------|
@@ -159,10 +146,13 @@ Calculations in `src/lib/` are well-tested. The following **inline page calculat
 | `retirement/page.tsx` | Mid-scenario rate selection | Array index assumption |
 | `retirement/page.tsx` | Savings rate: `contributions / grossIncome * 100` | Division by zero if no income |
 
-### Untested Recommendation Analyzers
+### Resolved (now extracted and tested)
 
-| Function | What it does |
-|----------|-------------|
-| `analyzeBedAndISA()` | GIA value + ISA remaining + unrealised gains check |
-| `analyzeExcessCash()` | Cash vs emergency target + 15% of net worth |
-| `analyzeSavingsRate()` | 15% savings rate target calculation |
+- IHT: RNRB taper, gift NRB reduction, liability calculation -> `src/lib/iht.ts` (35 tests)
+- CGT rate determination (with pension method awareness) -> `src/lib/cgt.ts:determineCgtRate`
+- Bed & ISA break-even -> `src/lib/cgt.ts:calculateBedAndISABreakEven`
+- State pension pro-rata -> `src/lib/projections.ts:calculateProRataStatePension`
+- Age calculation (calendar-based, leap year safe) -> `src/lib/projections.ts:calculateAge`
+- Tax efficiency score -> `src/lib/projections.ts:calculateTaxEfficiencyScore`
+- Deferred bonus projection -> `src/lib/projections.ts:projectDeferredBonusValue`
+- All 10 recommendation analyzers now have test coverage

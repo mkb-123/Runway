@@ -14,6 +14,10 @@ import {
   calculateStudentLoan,
   calculateTakeHomePayWithStudentLoan,
 } from "@/lib/tax";
+import {
+  calculateTaxEfficiencyScore,
+  projectDeferredBonusValue,
+} from "@/lib/projections";
 import type {
   DeferredBonusTranche,
 } from "@/types";
@@ -36,13 +40,14 @@ import { EffectiveTaxRateChart } from "@/components/charts/effective-tax-rate-ch
 import { TaxBandChart } from "@/components/charts/tax-band-chart";
 import type { TaxBandDataItem } from "@/components/charts/tax-band-chart";
 
-// --- Helper: projected value at vesting ---
+// --- Helper: projected value at vesting (delegates to lib function) ---
 function projectedValue(tranche: DeferredBonusTranche): number {
-  const grantDate = new Date(tranche.grantDate);
-  const vestingDate = new Date(tranche.vestingDate);
-  const yearsToVest =
-    (vestingDate.getTime() - grantDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-  return tranche.amount * Math.pow(1 + tranche.estimatedAnnualReturn, yearsToVest);
+  return projectDeferredBonusValue(
+    tranche.amount,
+    tranche.grantDate,
+    tranche.vestingDate,
+    tranche.estimatedAnnualReturn
+  );
 }
 
 // --- Helper: student loan plan label ---
@@ -179,18 +184,13 @@ export default function IncomePage() {
       { name: "GIA Overflow", value: giaOverflow, type: "subtotal" },
     ];
 
-    // Tax Efficiency Score
-    const totSavings = personAnalysis.reduce((sum, p) => {
-      const c = p.contributions;
-      if (!c) return sum;
-      return sum + c.isaContribution + c.pensionContribution + c.giaContribution;
-    }, 0);
-    const taxAdvSavings = personAnalysis.reduce((sum, p) => {
-      const c = p.contributions;
-      if (!c) return sum;
-      return sum + c.isaContribution + c.pensionContribution;
-    }, 0);
-    const taxEffScore = totSavings > 0 ? taxAdvSavings / totSavings : 0;
+    // Tax Efficiency Score (via lib function)
+    const totISA = personAnalysis.reduce((sum, p) => sum + (p.contributions?.isaContribution ?? 0), 0);
+    const totPension = personAnalysis.reduce((sum, p) => sum + (p.contributions?.pensionContribution ?? 0), 0);
+    const totGIA = personAnalysis.reduce((sum, p) => sum + (p.contributions?.giaContribution ?? 0), 0);
+    const totSavings = totISA + totPension + totGIA;
+    const taxAdvSavings = totISA + totPension;
+    const taxEffScore = calculateTaxEfficiencyScore(totISA, totPension, totGIA);
 
     return {
       waterfallData: wfData,
