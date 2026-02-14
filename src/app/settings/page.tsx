@@ -165,30 +165,32 @@ export default function SettingsPage() {
       <SettingsSummaryBar household={household} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full flex-wrap h-auto gap-1">
-          <TabsTrigger value="household" className="gap-1.5">
+        <TabsList className="w-full overflow-x-auto gap-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <TabsTrigger value="household" className="gap-1.5 shrink-0">
             <Users className="size-3.5" />
-            Household
+            <span className="hidden sm:inline">Household</span>
+            <span className="sm:hidden">Home</span>
           </TabsTrigger>
-          <TabsTrigger value="accounts" className="gap-1.5">
+          <TabsTrigger value="accounts" className="gap-1.5 shrink-0">
             <Landmark className="size-3.5" />
             Accounts
           </TabsTrigger>
-          <TabsTrigger value="funds" className="gap-1.5">
+          <TabsTrigger value="funds" className="gap-1.5 shrink-0">
             <BookOpen className="size-3.5" />
             Funds
           </TabsTrigger>
-          <TabsTrigger value="planning" className="gap-1.5">
+          <TabsTrigger value="planning" className="gap-1.5 shrink-0">
             <Target className="size-3.5" />
             Planning
           </TabsTrigger>
-          <TabsTrigger value="iht" className="gap-1.5">
+          <TabsTrigger value="iht" className="gap-1.5 shrink-0">
             <Shield className="size-3.5" />
             IHT
           </TabsTrigger>
-          <TabsTrigger value="transactions" className="gap-1.5">
+          <TabsTrigger value="transactions" className="gap-1.5 shrink-0">
             <ArrowRightLeft className="size-3.5" />
-            Transactions
+            <span className="hidden sm:inline">Transactions</span>
+            <span className="sm:hidden">Txns</span>
           </TabsTrigger>
         </TabsList>
 
