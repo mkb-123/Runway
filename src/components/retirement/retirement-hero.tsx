@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { ScenarioDelta } from "@/components/scenario-delta";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -14,6 +15,9 @@ interface RetirementHeroProps {
   withdrawalRate: number;
   includeStatePension: boolean;
   totalStatePensionAnnual: number;
+  /** Base (un-overridden) values for what-if comparison */
+  baseCurrentPot?: number;
+  baseProgressPercent?: number;
 }
 
 export function RetirementHero({
@@ -24,6 +28,8 @@ export function RetirementHero({
   withdrawalRate,
   includeStatePension,
   totalStatePensionAnnual,
+  baseCurrentPot,
+  baseProgressPercent,
 }: RetirementHeroProps) {
   const remaining = requiredPot - currentPot;
   const clampedPercent = Math.min(progressPercent, 100);
@@ -41,7 +47,16 @@ export function RetirementHero({
               Retirement Progress
             </p>
             <p className="text-4xl font-bold tracking-tight sm:text-5xl">
-              {progressPercent.toFixed(1)}%
+              {baseProgressPercent !== undefined ? (
+                <ScenarioDelta
+                  base={baseProgressPercent}
+                  scenario={progressPercent}
+                  format={(n) => `${n.toFixed(1)}%`}
+                  epsilon={0.05}
+                />
+              ) : (
+                `${progressPercent.toFixed(1)}%`
+              )}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
               {remaining > 0
@@ -53,7 +68,15 @@ export function RetirementHero({
             <div>
               <p className="text-muted-foreground">Current pot</p>
               <p className="text-lg font-bold font-mono">
-                {formatCurrencyCompact(currentPot)}
+                {baseCurrentPot !== undefined ? (
+                  <ScenarioDelta
+                    base={baseCurrentPot}
+                    scenario={currentPot}
+                    format={formatCurrencyCompact}
+                  />
+                ) : (
+                  formatCurrencyCompact(currentPot)
+                )}
               </p>
             </div>
             <div>

@@ -52,6 +52,7 @@ import { NetWorthTrajectoryChart } from "@/components/charts/net-worth-trajector
 import { ByPersonChart } from "@/components/charts/by-person-chart";
 import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
 import { LiquiditySplitChart } from "@/components/charts/liquidity-split-chart";
+import { ScenarioDelta } from "@/components/scenario-delta";
 
 // ============================================================
 // Hero Metric — one of 3 configurable slots above the fold
@@ -72,15 +73,28 @@ interface HeroMetricData {
   totalAnnualCommitments: number;
 }
 
+interface ResolvedMetric {
+  label: string;
+  value: string;
+  rawValue: number;
+  format: (n: number) => string;
+  subtext?: string;
+  color: string;
+  trend?: "up" | "down";
+  icon: LucideIcon;
+}
+
 function resolveMetric(
   type: HeroMetricType,
   data: HeroMetricData
-): { label: string; value: string; subtext?: string; color: string; trend?: "up" | "down"; icon: LucideIcon } {
+): ResolvedMetric {
   switch (type) {
     case "net_worth":
       return {
         label: "Net Worth",
         value: formatCurrencyCompact(data.totalNetWorth),
+        rawValue: data.totalNetWorth,
+        format: formatCurrencyCompact,
         color: "",
         icon: Wallet2,
       };
@@ -88,6 +102,8 @@ function resolveMetric(
       return {
         label: "Cash Position",
         value: formatCurrencyCompact(data.cashPosition),
+        rawValue: data.cashPosition,
+        format: formatCurrencyCompact,
         color: "",
         icon: Banknote,
       };
@@ -97,6 +113,11 @@ function resolveMetric(
       return {
         label: "Retirement",
         value: y === 0 && m === 0 ? "On track" : `${y}y ${m}m`,
+        rawValue: y * 12 + m,
+        format: (n: number) => {
+          if (n === 0) return "On track";
+          return `${Math.floor(n / 12)}y ${n % 12}m`;
+        },
         subtext: y === 0 && m === 0 ? "Target pot reached" : "to target",
         color: "",
         icon: Clock,
@@ -108,6 +129,8 @@ function resolveMetric(
       return {
         label: "Period Change",
         value: `${v >= 0 ? "+" : ""}${formatCurrencyCompact(v)}`,
+        rawValue: v,
+        format: (n: number) => `${n >= 0 ? "+" : ""}${formatCurrencyCompact(n)}`,
         subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.monthOnMonthPercent)} MoM`,
         color,
         trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
@@ -120,6 +143,8 @@ function resolveMetric(
       return {
         label: "Year-on-Year",
         value: `${v >= 0 ? "+" : ""}${formatCurrencyCompact(v)}`,
+        rawValue: v,
+        format: (n: number) => `${n >= 0 ? "+" : ""}${formatCurrencyCompact(n)}`,
         subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.yearOnYearPercent)} YoY`,
         color,
         trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
@@ -130,6 +155,8 @@ function resolveMetric(
       return {
         label: "Savings Rate",
         value: `${data.savingsRate.toFixed(1)}%`,
+        rawValue: data.savingsRate,
+        format: (n: number) => `${n.toFixed(1)}%`,
         subtext: "of gross income",
         color: "",
         icon: PiggyBank,
@@ -138,6 +165,8 @@ function resolveMetric(
       return {
         label: "FIRE Progress",
         value: `${data.fireProgress.toFixed(1)}%`,
+        rawValue: data.fireProgress,
+        format: (n: number) => `${n.toFixed(1)}%`,
         subtext: "of target pot",
         color: data.fireProgress >= 100 ? "text-emerald-600 dark:text-emerald-400" : "",
         icon: Target,
@@ -146,6 +175,8 @@ function resolveMetric(
       return {
         label: "After Commitments",
         value: formatCurrencyCompact(data.netWorthAfterCommitments),
+        rawValue: data.netWorthAfterCommitments,
+        format: formatCurrencyCompact,
         subtext: `${formatCurrencyCompact(data.totalAnnualCommitments)}/yr committed`,
         color: "",
         icon: Shield,
@@ -227,6 +258,7 @@ export default function Home() {
   const { snapshots: snapshotsData } = useData();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
+  const baseHousehold = scenarioData.baseHousehold;
   const totalNetWorth = scenarioData.getTotalNetWorth();
   const byPerson = scenarioData.getNetWorthByPerson();
   const byWrapper = scenarioData.getNetWorthByWrapper();
@@ -244,6 +276,22 @@ export default function Home() {
     [filteredAccounts]
   );
 
+  // --- Base (un-overridden) values for what-if comparison ---
+  const baseFilteredAccounts = useMemo(() => {
+    if (selectedView === "household") return baseHousehold.accounts;
+    return baseHousehold.accounts.filter((a) => a.personId === selectedView);
+  }, [baseHousehold.accounts, selectedView]);
+
+  const baseTotalNetWorth = useMemo(
+    () => baseHousehold.accounts.reduce((sum, a) => sum + a.currentValue, 0),
+    [baseHousehold.accounts]
+  );
+
+  const baseFilteredNetWorth = useMemo(
+    () => baseFilteredAccounts.reduce((sum, a) => sum + a.currentValue, 0),
+    [baseFilteredAccounts]
+  );
+
   // --- Cash position ---
   const cashPosition = useMemo(
     () =>
@@ -251,6 +299,14 @@ export default function Home() {
         .filter((a) => a.type === "cash_savings" || a.type === "cash_isa" || a.type === "premium_bonds")
         .reduce((sum, a) => sum + a.currentValue, 0),
     [filteredAccounts]
+  );
+
+  const baseCashPosition = useMemo(
+    () =>
+      baseFilteredAccounts
+        .filter((a) => a.type === "cash_savings" || a.type === "cash_isa" || a.type === "premium_bonds")
+        .reduce((sum, a) => sum + a.currentValue, 0),
+    [baseFilteredAccounts]
   );
 
   // --- Committed outgoings + lifestyle spending ---
@@ -356,6 +412,46 @@ export default function Home() {
     return req > 0 ? (totalNetWorth / req) * 100 : 0;
   }, [household.retirement, totalNetWorth, totalStatePensionAnnual]);
 
+  // --- Base metrics for what-if comparison ---
+  const baseSavingsRate = useMemo(() => {
+    const totalContrib = baseHousehold.contributions.reduce(
+      (sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0
+    );
+    const inc = baseHousehold.income.reduce((sum, i) => sum + i.grossSalary, 0);
+    return inc > 0 ? (totalContrib / inc) * 100 : 0;
+  }, [baseHousehold]);
+
+  const baseStatePensionAnnual = useMemo(
+    () => baseHousehold.persons.reduce((sum, p) => sum + calculateProRataStatePension(p.niQualifyingYears), 0),
+    [baseHousehold.persons]
+  );
+
+  const baseFireProgress = useMemo(() => {
+    const req = calculateAdjustedRequiredPot(
+      baseHousehold.retirement.targetAnnualIncome, baseHousehold.retirement.withdrawalRate,
+      baseHousehold.retirement.includeStatePension, baseStatePensionAnnual
+    );
+    return req > 0 ? (baseTotalNetWorth / req) * 100 : 0;
+  }, [baseHousehold.retirement, baseTotalNetWorth, baseStatePensionAnnual]);
+
+  const { baseRetCountdownYears, baseRetCountdownMonths } = useMemo(() => {
+    const { retirement, contributions: baseContribs } = baseHousehold;
+    const totalAnnual = baseContribs.reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+    const requiredPot = calculateAdjustedRequiredPot(
+      retirement.targetAnnualIncome, retirement.withdrawalRate,
+      retirement.includeStatePension, baseStatePensionAnnual
+    );
+    const midRate = retirement.scenarioRates[Math.floor(retirement.scenarioRates.length / 2)] ?? 0.07;
+    const cd = calculateRetirementCountdown(baseTotalNetWorth, totalAnnual, requiredPot, midRate);
+    return { baseRetCountdownYears: cd.years, baseRetCountdownMonths: cd.months };
+  }, [baseHousehold, baseTotalNetWorth, baseStatePensionAnnual]);
+
+  const baseCommitments = useMemo(() => {
+    const committed = baseHousehold.committedOutgoings.reduce((sum, o) => sum + annualiseOutgoing(o.amount, o.frequency), 0);
+    const lifestyle = baseHousehold.emergencyFund.monthlyLifestyleSpending * 12;
+    return committed + lifestyle;
+  }, [baseHousehold.committedOutgoings, baseHousehold.emergencyFund.monthlyLifestyleSpending]);
+
   // --- Hero data ---
   const heroData: HeroMetricData = useMemo(
     () => ({
@@ -377,6 +473,30 @@ export default function Home() {
       monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent,
       retirementCountdownYears, retirementCountdownMonths,
       savingsRate, fireProgress, totalAnnualCommitments,
+    ]
+  );
+
+  // Base hero data for what-if comparison (only computed when in scenario mode)
+  const baseHeroData: HeroMetricData = useMemo(
+    () => ({
+      totalNetWorth: selectedView === "household" ? baseTotalNetWorth : baseFilteredNetWorth,
+      cashPosition: baseCashPosition,
+      monthOnMonthChange,
+      monthOnMonthPercent,
+      yearOnYearChange,
+      yearOnYearPercent,
+      retirementCountdownYears: baseRetCountdownYears,
+      retirementCountdownMonths: baseRetCountdownMonths,
+      savingsRate: baseSavingsRate,
+      fireProgress: baseFireProgress,
+      netWorthAfterCommitments: baseTotalNetWorth - baseCommitments,
+      totalAnnualCommitments: baseCommitments,
+    }),
+    [
+      baseTotalNetWorth, baseFilteredNetWorth, selectedView, baseCashPosition,
+      monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent,
+      baseRetCountdownYears, baseRetCountdownMonths,
+      baseSavingsRate, baseFireProgress, baseCommitments,
     ]
   );
 
@@ -508,8 +628,10 @@ export default function Home() {
       {/* HERO — bold primary metric + supporting metrics */}
       {(() => {
         const primary = resolveMetric(heroMetrics[0], heroData);
+        const basePrimary = resolveMetric(heroMetrics[0], baseHeroData);
         const PrimaryIcon = primary.icon;
         const secondaryMetrics = heroMetrics.slice(1).map((m) => resolveMetric(m, heroData));
+        const baseSecondaryMetrics = heroMetrics.slice(1).map((m) => resolveMetric(m, baseHeroData));
         return (
           <div className="space-y-4">
             {/* Primary metric — the headline number */}
@@ -529,7 +651,7 @@ export default function Home() {
                     </div>
                     <div className="flex items-baseline gap-3">
                       <span className={`text-4xl sm:text-5xl font-bold tracking-tight tabular-nums ${primary.color}`}>
-                        {primary.value}
+                        <ScenarioDelta base={basePrimary.rawValue} scenario={primary.rawValue} format={primary.format} />
                       </span>
                       {primary.trend === "up" && <TrendingUp className="size-6 text-emerald-500" />}
                       {primary.trend === "down" && <TrendingDown className="size-6 text-red-500" />}
@@ -549,7 +671,12 @@ export default function Home() {
                         <span className="text-xs font-medium text-muted-foreground">FIRE Progress</span>
                       </div>
                       <span className="text-xs font-bold tabular-nums">
-                        {heroData.fireProgress.toFixed(1)}%
+                        <ScenarioDelta
+                          base={baseHeroData.fireProgress}
+                          scenario={heroData.fireProgress}
+                          format={(n: number) => `${n.toFixed(1)}%`}
+                          epsilon={0.05}
+                        />
                       </span>
                     </div>
                     <div className="h-2.5 w-full overflow-hidden rounded-full bg-primary/10">
@@ -576,6 +703,7 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {secondaryMetrics.map((metric, i) => {
                   const MetricIcon = metric.icon;
+                  const baseMetric = baseSecondaryMetrics[i];
                   return (
                     <Card key={i} className="border-muted-foreground/10">
                       <CardContent className="pt-4 pb-3">
@@ -589,7 +717,7 @@ export default function Home() {
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className={`text-xl sm:text-2xl font-bold tracking-tight tabular-nums ${metric.color}`}>
-                            {metric.value}
+                            <ScenarioDelta base={baseMetric.rawValue} scenario={metric.rawValue} format={metric.format} />
                           </span>
                           {metric.trend === "up" && <TrendingUp className="size-4 text-emerald-500" />}
                           {metric.trend === "down" && <TrendingDown className="size-4 text-red-500" />}

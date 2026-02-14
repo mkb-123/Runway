@@ -35,15 +35,25 @@ import {
 import { calculateTakeHomePay } from "@/lib/tax";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
+import { ScenarioDelta } from "@/components/scenario-delta";
 import type { PersonIncome } from "@/types";
-import { getPersonContributionTotals } from "@/types";
+import { getPersonContributionTotals, getAccountTaxWrapper } from "@/types";
+import type { TaxWrapper } from "@/types";
 
 export default function TaxPlanningPage() {
   const { getAccountsForPerson } = useData();
   const { selectedView } = usePersonView();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
+  const baseHousehold = scenarioData.baseHousehold;
   const getNetWorthByWrapper = scenarioData.getNetWorthByWrapper;
+
+  // Base income lookup for ScenarioDelta comparison
+  const baseIncomeLookup = useMemo(() => {
+    const map = new Map<string, PersonIncome>();
+    for (const i of baseHousehold.income) map.set(i.personId, i);
+    return map;
+  }, [baseHousehold.income]);
 
   const persons = useMemo(() => {
     if (selectedView === "household") return household.persons;
@@ -82,8 +92,12 @@ export default function TaxPlanningPage() {
         const isaUsed = personContributions.isaContribution;
         const isaRemaining = Math.max(0, isaAllowance - isaUsed);
 
-        // Pension remaining
-        const pensionUsed = personContributions.pensionContribution;
+        // Pension remaining — ALL sources count against the annual allowance:
+        // employee + employer (from income) + discretionary (from contributions array)
+        const employeePension = personIncome?.employeePensionContribution ?? 0;
+        const employerPension = personIncome?.employerPensionContribution ?? 0;
+        const discretionaryPension = personContributions.pensionContribution;
+        const pensionUsed = employeePension + employerPension + discretionaryPension;
         const pensionRemaining = Math.max(0, pensionAllowance - pensionUsed);
 
         // Unrealised gains in GIA
@@ -120,6 +134,31 @@ export default function TaxPlanningPage() {
           cgtRate
         );
 
+        // --- Base (un-overridden) values for ScenarioDelta ---
+        const baseIncome = baseIncomeLookup.get(person.id);
+        const baseContributions = getPersonContributionTotals(baseHousehold.contributions, person.id);
+        const basePersonAccounts = baseHousehold.accounts.filter((a) => a.personId === person.id);
+        const baseGiaAccounts = basePersonAccounts.filter((a) => a.type === "gia");
+
+        const baseGiaValue = baseGiaAccounts.reduce(
+          (sum, a) => sum + a.currentValue,
+          0
+        );
+        const baseIsaUsed = baseContributions.isaContribution;
+        const baseIsaRemaining = Math.max(0, isaAllowance - baseIsaUsed);
+
+        const baseEmployeePension = baseIncome?.employeePensionContribution ?? 0;
+        const baseEmployerPension = baseIncome?.employerPensionContribution ?? 0;
+        const baseDiscretionaryPension = baseContributions.pensionContribution;
+        const basePensionUsed = baseEmployeePension + baseEmployerPension + baseDiscretionaryPension;
+        const basePensionRemaining = Math.max(0, pensionAllowance - basePensionUsed);
+
+        const baseUnrealisedGains = getUnrealisedGains(baseGiaAccounts);
+        const baseTotalUnrealisedGain = baseUnrealisedGains.reduce(
+          (sum, ug) => sum + ug.unrealisedGain,
+          0
+        );
+
         return {
           person,
           personIncome,
@@ -136,9 +175,16 @@ export default function TaxPlanningPage() {
           bedAndISA,
           breakEvenYears,
           isHigherRate,
+          // Base values for ScenarioDelta
+          baseGiaValue,
+          baseIsaUsed,
+          baseIsaRemaining,
+          basePensionUsed,
+          basePensionRemaining,
+          baseTotalUnrealisedGain,
         };
       }),
-    [persons, income, contributions, getAccountsForPerson, isaAllowance, pensionAllowance, cgtAnnualExempt]
+    [persons, income, contributions, getAccountsForPerson, isaAllowance, pensionAllowance, cgtAnnualExempt, baseIncomeLookup, baseHousehold.contributions, baseHousehold.accounts]
   );
 
   // Pension modelling scenarios
@@ -203,6 +249,16 @@ export default function TaxPlanningPage() {
     [personData]
   );
 
+  // Base wrapper data for ScenarioDelta comparison
+  const baseWrapperData = useMemo(() => {
+    const totals = new Map<TaxWrapper, number>();
+    for (const account of baseHousehold.accounts) {
+      const wrapper = getAccountTaxWrapper(account.type);
+      totals.set(wrapper, (totals.get(wrapper) ?? 0) + account.currentValue);
+    }
+    return totals;
+  }, [baseHousehold.accounts]);
+
   // Wrapper efficiency: compute percentages
   const wrapperPercentages = useMemo(
     () =>
@@ -251,6 +307,9 @@ export default function TaxPlanningPage() {
                   bedAndISA,
                   breakEvenYears,
                   isHigherRate,
+                  baseGiaValue,
+                  baseIsaRemaining,
+                  baseTotalUnrealisedGain,
                 }) => (
                   <Card key={person.id} className="border-dashed">
                     <CardHeader>
@@ -264,7 +323,7 @@ export default function TaxPlanningPage() {
                               GIA Value
                             </p>
                             <p className="text-lg font-semibold">
-                              {formatCurrency(giaValue)}
+                              <ScenarioDelta base={baseGiaValue} scenario={giaValue} format={formatCurrency} />
                             </p>
                           </div>
                           <div>
@@ -272,7 +331,7 @@ export default function TaxPlanningPage() {
                               ISA Allowance Remaining
                             </p>
                             <p className="text-lg font-semibold">
-                              {formatCurrency(isaRemaining)}
+                              <ScenarioDelta base={baseIsaRemaining} scenario={isaRemaining} format={formatCurrency} />
                             </p>
                           </div>
                           <div>
@@ -286,7 +345,7 @@ export default function TaxPlanningPage() {
                                   : "text-red-600"
                               }`}
                             >
-                              {formatCurrency(totalUnrealisedGain)}
+                              <ScenarioDelta base={baseTotalUnrealisedGain} scenario={totalUnrealisedGain} format={formatCurrency} />
                             </p>
                           </div>
                           <div>
@@ -556,6 +615,7 @@ export default function TaxPlanningPage() {
                     cash: "Cash",
                     premium_bonds: "Premium Bonds",
                   };
+                  const baseValue = baseWrapperData.get(w.wrapper) ?? 0;
                   return (
                     <div
                       key={w.wrapper}
@@ -573,7 +633,7 @@ export default function TaxPlanningPage() {
                       </div>
                       <div className="text-right">
                         <span className="font-semibold">
-                          {formatCurrency(w.value)}
+                          <ScenarioDelta base={baseValue} scenario={w.value} format={formatCurrency} />
                         </span>
                         <span className="text-muted-foreground ml-2 text-sm">
                           ({formatPercent(w.percentage)})
@@ -620,6 +680,10 @@ export default function TaxPlanningPage() {
                   isaRemaining,
                   pensionUsed,
                   pensionRemaining,
+                  baseIsaUsed,
+                  baseIsaRemaining,
+                  basePensionUsed,
+                  basePensionRemaining,
                 }) => (
                   <Card key={person.id} className="border-dashed">
                     <CardHeader>
@@ -632,7 +696,7 @@ export default function TaxPlanningPage() {
                           <div className="flex items-center justify-between">
                             <p className="text-sm font-medium">ISA Allowance</p>
                             <p className="text-muted-foreground text-sm">
-                              {formatCurrency(isaUsed)} /{" "}
+                              <ScenarioDelta base={baseIsaUsed} scenario={isaUsed} format={formatCurrency} showPercent={false} /> /{" "}
                               {formatCurrency(isaAllowance)}
                             </p>
                           </div>
@@ -647,7 +711,7 @@ export default function TaxPlanningPage() {
                               {formatPercent(isaUsed / isaAllowance)} used
                             </span>
                             <span className="text-xs font-medium">
-                              {formatCurrency(isaRemaining)} remaining
+                              <ScenarioDelta base={baseIsaRemaining} scenario={isaRemaining} format={formatCurrency} /> remaining
                             </span>
                           </div>
                           {isaRemaining === 0 && (
@@ -662,7 +726,7 @@ export default function TaxPlanningPage() {
                               Pension Annual Allowance
                             </p>
                             <p className="text-muted-foreground text-sm">
-                              {formatCurrency(pensionUsed)} /{" "}
+                              <ScenarioDelta base={basePensionUsed} scenario={pensionUsed} format={formatCurrency} showPercent={false} /> /{" "}
                               {formatCurrency(pensionAllowance)}
                             </p>
                           </div>
@@ -678,7 +742,7 @@ export default function TaxPlanningPage() {
                               used
                             </span>
                             <span className="text-xs font-medium">
-                              {formatCurrency(pensionRemaining)} remaining
+                              <ScenarioDelta base={basePensionRemaining} scenario={pensionRemaining} format={formatCurrency} /> remaining
                             </span>
                           </div>
                           {pensionRemaining === 0 ? (

@@ -19,9 +19,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
+import { ScenarioDelta } from "@/components/scenario-delta";
 
 export default function AccountsPage() {
-  const { household } = useScenarioData();
+  const { household, baseHousehold } = useScenarioData();
   const { persons, accounts } = household;
   const { selectedView } = usePersonView();
 
@@ -29,6 +30,15 @@ export default function AccountsPage() {
     if (selectedView === "household") return accounts;
     return accounts.filter((a) => a.personId === selectedView);
   }, [accounts, selectedView]);
+
+  // Base account value lookup by ID
+  const baseAccountValues = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of baseHousehold.accounts) {
+      map.set(a.id, a.currentValue);
+    }
+    return map;
+  }, [baseHousehold.accounts]);
 
   // Group accounts by person
   const accountsByPerson = useMemo(
@@ -40,15 +50,24 @@ export default function AccountsPage() {
             (sum, a) => sum + a.currentValue,
             0
           );
-          return { person, accounts: personAccounts, totalValue };
+          const baseTotalValue = personAccounts.reduce(
+            (sum, a) => sum + (baseAccountValues.get(a.id) ?? a.currentValue),
+            0
+          );
+          return { person, accounts: personAccounts, totalValue, baseTotalValue };
         })
         .filter((g) => g.accounts.length > 0),
-    [persons, filteredAccounts]
+    [persons, filteredAccounts, baseAccountValues]
   );
 
   const grandTotal = useMemo(
     () => filteredAccounts.reduce((sum, a) => sum + a.currentValue, 0),
     [filteredAccounts]
+  );
+
+  const baseGrandTotal = useMemo(
+    () => filteredAccounts.reduce((sum, a) => sum + (baseAccountValues.get(a.id) ?? a.currentValue), 0),
+    [filteredAccounts, baseAccountValues]
   );
 
   return (
@@ -61,12 +80,12 @@ export default function AccountsPage() {
         <EmptyState message="No accounts yet. Add your ISAs, pensions, and savings accounts to get started." settingsTab="accounts" />
       )}
 
-      {accountsByPerson.map(({ person, accounts: personAccounts, totalValue }) => (
+      {accountsByPerson.map(({ person, accounts: personAccounts, totalValue, baseTotalValue }) => (
         <section key={person.id} className="space-y-4">
           <div className="flex items-baseline justify-between">
             <h2 className="text-xl font-semibold">{person.name}</h2>
             <span className="text-lg font-medium text-muted-foreground">
-              Total: {formatCurrency(totalValue)}
+              Total: <ScenarioDelta base={baseTotalValue} scenario={totalValue} format={formatCurrency} />
             </span>
           </div>
 
@@ -95,7 +114,11 @@ export default function AccountsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(account.currentValue)}
+                        <ScenarioDelta
+                          base={baseAccountValues.get(account.id) ?? account.currentValue}
+                          scenario={account.currentValue}
+                          format={formatCurrency}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -106,7 +129,7 @@ export default function AccountsPage() {
                       Subtotal
                     </TableCell>
                     <TableCell className="text-right font-semibold">
-                      {formatCurrency(totalValue)}
+                      <ScenarioDelta base={baseTotalValue} scenario={totalValue} format={formatCurrency} />
                     </TableCell>
                   </TableRow>
                 </TableFooter>
@@ -139,7 +162,11 @@ export default function AccountsPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Value</span>
                     <span className="text-base font-semibold">
-                      {formatCurrency(account.currentValue)}
+                      <ScenarioDelta
+                        base={baseAccountValues.get(account.id) ?? account.currentValue}
+                        scenario={account.currentValue}
+                        format={formatCurrency}
+                      />
                     </span>
                   </div>
                 </CardContent>
@@ -154,7 +181,7 @@ export default function AccountsPage() {
         <div className="flex items-center justify-between">
           <span className="text-lg font-semibold">Grand Total</span>
           <span className="text-2xl font-bold">
-            {formatCurrency(grandTotal)}
+            <ScenarioDelta base={baseGrandTotal} scenario={grandTotal} format={formatCurrency} />
           </span>
         </div>
       </div>

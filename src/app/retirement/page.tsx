@@ -40,6 +40,7 @@ export default function RetirementPage() {
   const scenarioData = useScenarioData();
   const { selectedView } = usePersonView();
   const household = scenarioData.household;
+  const baseHousehold = scenarioData.baseHousehold;
 
   const accounts = useMemo(() => {
     if (selectedView === "household") return household.accounts;
@@ -120,6 +121,97 @@ export default function RetirementPage() {
     totalGrossIncome > 0
       ? (totalAnnualContributions / totalGrossIncome) * 100
       : 0;
+
+  // --- Base (un-overridden) values for what-if comparison ---
+  const baseAccounts = useMemo(() => {
+    if (selectedView === "household") return baseHousehold.accounts;
+    return baseHousehold.accounts.filter((a) => a.personId === selectedView);
+  }, [baseHousehold.accounts, selectedView]);
+
+  const basePersons = useMemo(() => {
+    if (selectedView === "household") return baseHousehold.persons;
+    return baseHousehold.persons.filter((p) => p.id === selectedView);
+  }, [baseHousehold.persons, selectedView]);
+
+  const baseIncome = useMemo(() => {
+    if (selectedView === "household") return baseHousehold.income;
+    return baseHousehold.income.filter((i) => i.personId === selectedView);
+  }, [baseHousehold.income, selectedView]);
+
+  const baseFilteredContributions = useMemo(() => {
+    if (selectedView === "household") return baseHousehold.contributions;
+    return baseHousehold.contributions.filter((c) => c.personId === selectedView);
+  }, [baseHousehold.contributions, selectedView]);
+
+  const baseCurrentPot = useMemo(
+    () => baseAccounts.reduce((sum, a) => sum + a.currentValue, 0),
+    [baseAccounts]
+  );
+
+  const baseTotalStatePensionAnnual = useMemo(
+    () =>
+      basePersons.reduce(
+        (sum, p) =>
+          sum + calculateProRataStatePension(p.niQualifyingYears ?? 0),
+        0
+      ),
+    [basePersons]
+  );
+
+  const baseRequiredPot = useMemo(
+    () =>
+      calculateAdjustedRequiredPot(
+        baseHousehold.retirement.targetAnnualIncome,
+        baseHousehold.retirement.withdrawalRate,
+        baseHousehold.retirement.includeStatePension,
+        baseTotalStatePensionAnnual
+      ),
+    [baseHousehold.retirement, baseTotalStatePensionAnnual]
+  );
+
+  const baseProgressPercent =
+    baseRequiredPot > 0 ? (baseCurrentPot / baseRequiredPot) * 100 : 0;
+
+  const baseTotalAnnualContributions = useMemo(
+    () =>
+      baseFilteredContributions.reduce(
+        (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
+        0
+      ),
+    [baseFilteredContributions]
+  );
+
+  const baseTotalGrossIncome = useMemo(
+    () => baseIncome.reduce((sum, i) => sum + i.grossSalary, 0),
+    [baseIncome]
+  );
+
+  const baseSavingsRate =
+    baseTotalGrossIncome > 0
+      ? (baseTotalAnnualContributions / baseTotalGrossIncome) * 100
+      : 0;
+
+  const { baseAccessibleWealth, baseLockedWealth } = useMemo(() => {
+    const accessibleWrappers = new Set([
+      "isa",
+      "gia",
+      "cash",
+      "premium_bonds",
+    ]);
+    let accessible = 0;
+    let locked = 0;
+
+    for (const account of baseAccounts) {
+      const wrapper = getAccountTaxWrapper(account.type);
+      if (accessibleWrappers.has(wrapper)) {
+        accessible += account.currentValue;
+      } else {
+        locked += account.currentValue;
+      }
+    }
+
+    return { baseAccessibleWealth: accessible, baseLockedWealth: locked };
+  }, [baseAccounts]);
 
   // Calculate accessible vs locked wealth
   const { accessibleWealth, lockedWealth } = useMemo(() => {
@@ -279,6 +371,8 @@ export default function RetirementPage() {
         withdrawalRate={retirement.withdrawalRate}
         includeStatePension={retirement.includeStatePension}
         totalStatePensionAnnual={totalStatePensionAnnual}
+        baseCurrentPot={baseCurrentPot}
+        baseProgressPercent={baseProgressPercent}
       />
 
       {/* 2. Scenario Controls (shared across sections) */}
@@ -311,6 +405,8 @@ export default function RetirementPage() {
           targetAnnualIncome={retirement.targetAnnualIncome}
           accessibleWealth={accessibleWealth}
           lockedWealth={lockedWealth}
+          baseAccessibleWealth={baseAccessibleWealth}
+          baseLockedWealth={baseLockedWealth}
         />
       </CollapsibleSection>
 
@@ -447,6 +543,7 @@ export default function RetirementPage() {
           pensionAccessAge={pensionAccessAge}
           midRate={midRate}
           requiredMonthlySavings={requiredMonthlySavings}
+          baseSavingsRate={baseSavingsRate}
         />
       </CollapsibleSection>
 

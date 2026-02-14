@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ScenarioDelta } from "@/components/scenario-delta";
 import {
   Table,
   TableBody,
@@ -25,6 +26,8 @@ interface FireMetricsCardProps {
   pensionAccessAge: number;
   midRate: number;
   requiredMonthlySavings: { years: number; monthly: number }[];
+  /** Base (un-overridden) values for what-if comparison */
+  baseSavingsRate?: number;
 }
 
 export function FireMetricsCard({
@@ -36,6 +39,7 @@ export function FireMetricsCard({
   pensionAccessAge,
   midRate,
   requiredMonthlySavings,
+  baseSavingsRate,
 }: FireMetricsCardProps) {
   return (
     <Card>
@@ -51,7 +55,16 @@ export function FireMetricsCard({
               Savings Rate
             </p>
             <p className="text-2xl font-bold mt-1">
-              {savingsRate.toFixed(1)}%
+              {baseSavingsRate !== undefined ? (
+                <ScenarioDelta
+                  base={baseSavingsRate}
+                  scenario={savingsRate}
+                  format={(n) => `${n.toFixed(1)}%`}
+                  epsilon={0.05}
+                />
+              ) : (
+                `${savingsRate.toFixed(1)}%`
+              )}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               {formatCurrency(totalAnnualContributions)} /{" "}

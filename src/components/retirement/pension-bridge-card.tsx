@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ScenarioDelta } from "@/components/scenario-delta";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/format";
 import type { PensionBridgeResult } from "@/lib/projections";
 
@@ -12,6 +13,9 @@ interface PensionBridgeCardProps {
   targetAnnualIncome: number;
   accessibleWealth: number;
   lockedWealth: number;
+  /** Base (un-overridden) values for what-if comparison */
+  baseAccessibleWealth?: number;
+  baseLockedWealth?: number;
 }
 
 export function PensionBridgeCard({
@@ -21,6 +25,8 @@ export function PensionBridgeCard({
   targetAnnualIncome,
   accessibleWealth,
   lockedWealth,
+  baseAccessibleWealth,
+  baseLockedWealth,
 }: PensionBridgeCardProps) {
   const totalWealth = accessibleWealth + lockedWealth;
   const accessiblePercent =
@@ -96,7 +102,15 @@ export function PensionBridgeCard({
                 Accessible wealth
               </p>
               <p className="text-lg font-bold font-mono">
-                {formatCurrencyCompact(accessibleWealth)}
+                {baseAccessibleWealth !== undefined ? (
+                  <ScenarioDelta
+                    base={baseAccessibleWealth}
+                    scenario={accessibleWealth}
+                    format={formatCurrencyCompact}
+                  />
+                ) : (
+                  formatCurrencyCompact(accessibleWealth)
+                )}
               </p>
             </div>
             <div>
@@ -142,15 +156,33 @@ export function PensionBridgeCard({
             <div className="flex items-center gap-1.5">
               <div className="size-2.5 rounded-sm bg-blue-500" />
               <span>
-                Accessible {formatCurrencyCompact(accessibleWealth)} (
-                {accessiblePercent.toFixed(0)}%)
+                Accessible{" "}
+                {baseAccessibleWealth !== undefined ? (
+                  <ScenarioDelta
+                    base={baseAccessibleWealth}
+                    scenario={accessibleWealth}
+                    format={formatCurrencyCompact}
+                  />
+                ) : (
+                  formatCurrencyCompact(accessibleWealth)
+                )}{" "}
+                ({accessiblePercent.toFixed(0)}%)
               </span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="size-2.5 rounded-sm bg-amber-500" />
               <span>
-                Locked {formatCurrencyCompact(lockedWealth)} (
-                {lockedPercent.toFixed(0)}%)
+                Locked{" "}
+                {baseLockedWealth !== undefined ? (
+                  <ScenarioDelta
+                    base={baseLockedWealth}
+                    scenario={lockedWealth}
+                    format={formatCurrencyCompact}
+                  />
+                ) : (
+                  formatCurrencyCompact(lockedWealth)
+                )}{" "}
+                ({lockedPercent.toFixed(0)}%)
               </span>
             </div>
           </div>
