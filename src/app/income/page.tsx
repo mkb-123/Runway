@@ -191,8 +191,14 @@ export default function IncomePage() {
     ];
 
     // Tax Efficiency Score (via lib function)
+    // Include ALL pension contributions: salary sacrifice/net pay from income + discretionary
     const totISA = personAnalysis.reduce((sum, p) => sum + p.contributions.isaContribution, 0);
-    const totPension = personAnalysis.reduce((sum, p) => sum + p.contributions.pensionContribution, 0);
+    const discretionaryPension = personAnalysis.reduce((sum, p) => sum + p.contributions.pensionContribution, 0);
+    const employmentPension = income.reduce(
+      (sum, i) => sum + i.employeePensionContribution + i.employerPensionContribution,
+      0
+    );
+    const totPension = discretionaryPension + employmentPension;
     const totGIA = personAnalysis.reduce((sum, p) => sum + p.contributions.giaContribution, 0);
     const totSavings = totISA + totPension + totGIA;
     const taxAdvSavings = totISA + totPension;
@@ -204,7 +210,7 @@ export default function IncomePage() {
       taxAdvantagedSavings: taxAdvSavings,
       taxEfficiencyScore: taxEffScore,
     };
-  }, [personAnalysis, committedOutgoings, emergencyFund.monthlyLifestyleSpending]);
+  }, [personAnalysis, committedOutgoings, emergencyFund.monthlyLifestyleSpending, income]);
 
   return (
     <div className="space-y-8 p-4 md:p-8">

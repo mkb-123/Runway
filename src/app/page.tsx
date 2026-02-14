@@ -49,9 +49,9 @@ import { TAX_WRAPPER_LABELS } from "@/types";
 import type { TaxWrapper, HeroMetricType } from "@/types";
 
 import { NetWorthTrajectoryChart } from "@/components/charts/net-worth-trajectory";
-import { NetWorthHistoryChart } from "@/components/charts/net-worth-history";
 import { ByPersonChart } from "@/components/charts/by-person-chart";
 import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
+import { LiquiditySplitChart } from "@/components/charts/liquidity-split-chart";
 
 // ============================================================
 // Hero Metric — one of 3 configurable slots above the fold
@@ -656,10 +656,10 @@ export default function Home() {
       </div>
 
       {/* SECONDARY SECTIONS — collapsible */}
-      <CollapsibleSection title="Net Worth History" summary="By tax wrapper over time" storageKey="history">
+      <CollapsibleSection title="Liquid vs Illiquid" summary="Accessible wealth vs locked pensions" storageKey="liquidity">
         <Card>
           <CardContent className="pt-6">
-            <NetWorthHistoryChart snapshots={snapshots} />
+            <LiquiditySplitChart accounts={filteredAccounts} />
           </CardContent>
         </Card>
       </CollapsibleSection>
