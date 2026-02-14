@@ -7,7 +7,7 @@ import {
   ASSET_CLASS_LABELS,
   REGION_LABELS,
 } from "@/types";
-import type { Fund, Account, Holding } from "@/types";
+import type { Fund } from "@/types";
 import {
   Table,
   TableHeader,

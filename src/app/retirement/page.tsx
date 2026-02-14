@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -12,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { getAccountTaxWrapper } from "@/types";
 import {
@@ -100,9 +99,10 @@ export default function RetirementPage() {
     () => persons.find((p) => p.relationship === "self"),
     [persons]
   );
+  const [now] = useState(() => Date.now());
   const currentAge = primaryPerson
     ? Math.floor(
-        (Date.now() - new Date(primaryPerson.dateOfBirth).getTime()) /
+        (now - new Date(primaryPerson.dateOfBirth).getTime()) /
           (365.25 * 24 * 60 * 60 * 1000)
       )
     : 35;
@@ -126,15 +126,13 @@ export default function RetirementPage() {
   );
 
   // Required monthly savings for different time horizons
-  const savingsTimeframes = [10, 15, 20];
-  const requiredMonthlySavings = useMemo(
-    () =>
-      savingsTimeframes.map((years) => ({
-        years,
-        monthly: calculateRequiredSavings(requiredPot, currentPot, years, midRate),
-      })),
-    [requiredPot, currentPot, midRate]
-  );
+  const requiredMonthlySavings = useMemo(() => {
+    const timeframes = [10, 15, 20];
+    return timeframes.map((years) => ({
+      years,
+      monthly: calculateRequiredSavings(requiredPot, currentPot, years, midRate),
+    }));
+  }, [requiredPot, currentPot, midRate]);
 
   // Pension Bridge Analysis
   const earlyRetirementAge = currentAge + 10;

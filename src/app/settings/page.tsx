@@ -55,6 +55,7 @@ function clone<T>(obj: T): T {
 /** Type-safe field setter that avoids TS2352 with a double assertion. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function setField<T>(obj: T, field: keyof T, value: any): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (obj as any)[field] = value;
 }
 
@@ -874,7 +875,7 @@ export default function SettingsPage() {
         {/* TAB 3: INCOME                                          */}
         {/* ====================================================== */}
         <TabsContent value="income" className="space-y-4 mt-4">
-          {household.persons.map((person, pIdx) => {
+          {household.persons.map((person) => {
             const incomeIdx = household.income.findIndex(
               (i) => i.personId === person.id
             );

@@ -74,7 +74,7 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
     (household: HouseholdData): HouseholdData => {
       if (!isScenarioMode) return household;
 
-      let result = { ...household };
+      const result = { ...household };
 
       // Override income
       if (overrides.income && overrides.income.length > 0) {

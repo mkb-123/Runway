@@ -30,7 +30,7 @@ function yearsSince(dateStr: string): number {
 }
 
 export default function IHTPage() {
-  const { household, getTotalNetWorth, getNetWorthByWrapper } = useData();
+  const { household, getTotalNetWorth } = useData();
 
   const ihtData = useMemo(() => {
     const ihtConfig = household.iht;
@@ -150,7 +150,7 @@ export default function IHTPage() {
       estateBreakdown,
       numberOfPersons,
     };
-  }, [household, getTotalNetWorth, getNetWorthByWrapper]);
+  }, [household, getTotalNetWorth]);
 
   const {
     ihtConfig,

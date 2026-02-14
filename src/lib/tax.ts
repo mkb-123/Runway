@@ -295,19 +295,8 @@ export function calculateTakeHomePay(income: PersonIncome): TakeHomeResult {
     pensionContributionMethod
   );
 
-  // Student loan is typically calculated on gross salary (before pension deductions)
-  // unless salary sacrifice reduces the contractual salary
-  const studentLoanGross =
-    pensionContributionMethod === "salary_sacrifice"
-      ? grossSalary - employeePensionContribution
-      : grossSalary;
-
-  // We need the person's student loan plan - this is passed via the income object indirectly
-  // For this function, we need to look it up. Since PersonIncome doesn't include it directly,
-  // the caller should use calculateStudentLoan separately, or we calculate with "none" as default.
-  // However, to make this self-contained, we'll omit student loan here and let callers add it.
-  // Actually, let's accept it as zero and have a variant that includes it.
-  const studentLoan = 0; // Caller should use calculateStudentLoan with the person's plan
+  // Student loan is omitted here — callers should use calculateStudentLoan with the person's plan
+  const studentLoan = 0;
 
   // Calculate actual deduction from pay packet
   let pensionDeduction: number;
