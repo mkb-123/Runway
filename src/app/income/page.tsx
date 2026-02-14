@@ -17,6 +17,7 @@ import {
 import {
   calculateTaxEfficiencyScore,
   projectDeferredBonusValue,
+  projectSalaryTrajectory,
 } from "@/lib/projections";
 import type { DeferredBonusTranche } from "@/types";
 import { getPersonContributionTotals, annualiseOutgoing } from "@/types";
@@ -595,6 +596,77 @@ export default function IncomePage() {
         </div>
       </section>
       </CollapsibleSection>
+
+      {/* Salary Trajectory — only shown when growth rates are configured */}
+      {personAnalysis.some(({ personIncome }) => (personIncome.salaryGrowthRate ?? 0) > 0 || (personIncome.bonusGrowthRate ?? 0) > 0) && (
+        <CollapsibleSection title="Income Trajectory" summary="Projected salary and bonus growth over time" storageKey="income-trajectory">
+          <section className="space-y-4">
+            <p className="text-muted-foreground">
+              How salary and total compensation evolve based on configured annual growth rates.
+              These projections feed into the portfolio growth model on the Projections page.
+            </p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {personAnalysis
+                .filter(({ personIncome }) => (personIncome.salaryGrowthRate ?? 0) > 0 || (personIncome.bonusGrowthRate ?? 0) > 0)
+                .map(({ person, personIncome, bonus }) => {
+                  const salaryGrowth = personIncome.salaryGrowthRate ?? 0;
+                  const bonusGrowth = personIncome.bonusGrowthRate ?? 0;
+                  const trajectory = projectSalaryTrajectory(personIncome.grossSalary, salaryGrowth, 10);
+                  const cashBonus = bonus?.cashBonusAnnual ?? 0;
+
+                  return (
+                    <Card key={person.id}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          {person.name} — Income Trajectory
+                          <Badge variant="secondary">
+                            {salaryGrowth > 0 && `Salary +${formatPercent(salaryGrowth)}/yr`}
+                            {salaryGrowth > 0 && bonusGrowth > 0 && " · "}
+                            {bonusGrowth > 0 && `Bonus +${formatPercent(bonusGrowth)}/yr`}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Year</TableHead>
+                                <TableHead className="text-right">Salary</TableHead>
+                                {cashBonus > 0 && <TableHead className="text-right">Cash Bonus</TableHead>}
+                                <TableHead className="text-right">Total Comp</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {trajectory.filter((_, i) => i % 2 === 0 || i === trajectory.length - 1).map((point) => {
+                                const yearBonus = cashBonus * Math.pow(1 + bonusGrowth, point.year);
+                                const employerPension = personIncome.employerPensionContribution * Math.pow(1 + salaryGrowth, point.year);
+                                return (
+                                  <TableRow key={point.year}>
+                                    <TableCell className="font-medium">
+                                      {point.year === 0 ? "Now" : `+${point.year}yr`}
+                                    </TableCell>
+                                    <TableCell className="text-right">{formatCurrency(point.salary)}</TableCell>
+                                    {cashBonus > 0 && (
+                                      <TableCell className="text-right">{formatCurrency(yearBonus)}</TableCell>
+                                    )}
+                                    <TableCell className="text-right font-semibold">
+                                      {formatCurrency(point.salary + yearBonus + employerPension)}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+            </div>
+          </section>
+        </CollapsibleSection>
+      )}
 
       {/* Cash Flow Waterfall */}
       <CollapsibleSection title="Cash Flow Waterfall" summary="Gross income through deductions to savings" defaultOpen storageKey="income-waterfall">

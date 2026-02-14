@@ -82,6 +82,100 @@ export function projectScenarios(
   }));
 }
 
+// --- Growing Contribution Projections ---
+
+export interface GrowingProjectionParams {
+  currentValue: number;
+  /** Year-1 annual contribution (salary-driven, will grow YoY) */
+  annualContribution: number;
+  /** Annual growth rate of contributions (e.g. 0.03 for 3% salary growth) */
+  contributionGrowthRate: number;
+  /** Annual investment return rate (e.g. 0.07 for 7%) */
+  investmentReturnRate: number;
+  /** Number of years to project */
+  years: number;
+}
+
+/**
+ * Project compound growth with annually-growing contributions.
+ *
+ * Models the real-world pattern where salary (and thus savings) increase
+ * year-on-year. Each year:
+ *   1. The pot grows by the investment return rate
+ *   2. The year's contribution (growing each year) is added at year-end
+ *
+ * @returns Array of year-end values
+ */
+export function projectCompoundGrowthWithGrowingContributions(
+  params: GrowingProjectionParams
+): YearlyProjection[] {
+  const {
+    currentValue,
+    annualContribution,
+    contributionGrowthRate,
+    investmentReturnRate,
+    years,
+  } = params;
+
+  const projections: YearlyProjection[] = [];
+  let value = currentValue;
+  let contribution = annualContribution;
+
+  for (let year = 1; year <= years; year++) {
+    // Pot grows through the year
+    value = value * (1 + investmentReturnRate);
+    // Contribution made at year-end (simplified from monthly for clarity)
+    value += contribution;
+    projections.push({ year, value: roundPence(value) });
+    // Contribution grows for next year
+    contribution *= 1 + contributionGrowthRate;
+  }
+
+  return projections;
+}
+
+/**
+ * Project multiple growth scenarios with growing contributions.
+ */
+export function projectScenariosWithGrowth(
+  currentValue: number,
+  annualContribution: number,
+  contributionGrowthRate: number,
+  rates: number[],
+  years: number
+): ScenarioProjection[] {
+  return rates.map((rate) => ({
+    rate,
+    projections: projectCompoundGrowthWithGrowingContributions({
+      currentValue,
+      annualContribution,
+      contributionGrowthRate,
+      investmentReturnRate: rate,
+      years,
+    }),
+  }));
+}
+
+/**
+ * Project salary trajectory over N years with compound growth.
+ *
+ * Returns an array of {year, salary} showing expected salary at each year.
+ * Useful for income trajectory visualization.
+ */
+export function projectSalaryTrajectory(
+  currentSalary: number,
+  growthRate: number,
+  years: number
+): { year: number; salary: number }[] {
+  const trajectory: { year: number; salary: number }[] = [];
+  let salary = currentSalary;
+  for (let year = 0; year <= years; year++) {
+    trajectory.push({ year, salary: roundPence(salary) });
+    salary *= 1 + growthRate;
+  }
+  return trajectory;
+}
+
 // --- Retirement Countdown ---
 
 /**

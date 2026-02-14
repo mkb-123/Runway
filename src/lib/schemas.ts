@@ -92,6 +92,8 @@ export const PersonIncomeSchema = z.object({
   employerPensionContribution: z.number().min(0),
   employeePensionContribution: z.number().min(0),
   pensionContributionMethod: PensionContributionMethodSchema,
+  salaryGrowthRate: z.number().min(-0.5).max(0.5).optional(),
+  bonusGrowthRate: z.number().min(-0.5).max(0.5).optional(),
 });
 
 // --- Contributions & Planning ---

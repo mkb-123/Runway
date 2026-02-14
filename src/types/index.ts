@@ -68,6 +68,10 @@ export interface PersonIncome {
   employerPensionContribution: number; // annual amount
   employeePensionContribution: number; // annual amount (salary sacrifice or net pay)
   pensionContributionMethod: "salary_sacrifice" | "net_pay" | "relief_at_source";
+  /** Expected annual salary growth rate as a decimal (e.g. 0.03 for 3%). Defaults to 0. */
+  salaryGrowthRate?: number;
+  /** Expected annual bonus growth rate as a decimal (e.g. 0.05 for 5%). Defaults to 0. */
+  bonusGrowthRate?: number;
 }
 
 // --- Contributions & Planning ---
