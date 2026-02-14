@@ -38,8 +38,8 @@ export function generateCashFlowTimeline(household: HouseholdData): CashFlowMont
     const year = startYear + Math.floor((startMonth + i) / 12);
     const label = `${MONTHS[monthIdx]} ${year}`;
 
-    const salary = calculateMonthlySalary(household);
-    const bonus = calculateBonusForMonth(household, monthIdx);
+    const salary = calculateMonthlySalaryForMonth(household, i);
+    const bonus = calculateBonusForMonth(household, monthIdx, i);
     const deferredVesting = calculateDeferredVestingForMonth(household, year, monthIdx);
     const { committed, lifestyle } = calculateOutgoingsForMonth(household, monthIdx);
 
@@ -61,17 +61,31 @@ export function generateCashFlowTimeline(household: HouseholdData): CashFlowMont
   return months;
 }
 
-function calculateMonthlySalary(household: HouseholdData): number {
-  return household.income.reduce((sum, inc) => sum + inc.grossSalary / 12, 0);
+/**
+ * Calculate monthly salary for a given month offset from now.
+ * Applies salary growth rate compound by year.
+ */
+function calculateMonthlySalaryForMonth(household: HouseholdData, monthOffset: number): number {
+  const yearsElapsed = monthOffset / 12;
+  return household.income.reduce((sum, inc) => {
+    const growthRate = inc.salaryGrowthRate ?? 0;
+    const grownSalary = inc.grossSalary * Math.pow(1 + growthRate, yearsElapsed);
+    return sum + grownSalary / 12;
+  }, 0);
 }
 
 /**
  * Cash bonuses are typically paid in March (end of tax year).
- * Month index 2 = March.
+ * Month index 2 = March. Applies bonus growth rate.
  */
-function calculateBonusForMonth(household: HouseholdData, monthIdx: number): number {
+function calculateBonusForMonth(household: HouseholdData, monthIdx: number, monthOffset: number): number {
   if (monthIdx !== 2) return 0; // March
-  return household.bonusStructures.reduce((sum, b) => sum + b.cashBonusAnnual, 0);
+  const yearsElapsed = monthOffset / 12;
+  return household.bonusStructures.reduce((sum, b) => {
+    const personIncome = household.income.find((i) => i.personId === b.personId);
+    const growthRate = personIncome?.bonusGrowthRate ?? 0;
+    return sum + b.cashBonusAnnual * Math.pow(1 + growthRate, yearsElapsed);
+  }, 0);
 }
 
 /**

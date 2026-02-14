@@ -18,7 +18,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/format";
 import { annualiseContribution } from "@/types";
-import { projectScenarios, calculateRequiredPot } from "@/lib/projections";
+import { projectScenarios, projectScenariosWithGrowth, calculateRequiredPot } from "@/lib/projections";
 import { ProjectionChart } from "@/components/charts/projection-chart";
 
 const PROJECTION_YEARS = 30;
@@ -59,6 +59,18 @@ export default function ProjectionsPage() {
   // Monthly contributions
   const monthlyContributions = totalAnnualContributions / 12;
 
+  // Weighted average salary growth rate across household members
+  const weightedContributionGrowthRate = useMemo(() => {
+    const totalGross = household.income.reduce((s, i) => s + i.grossSalary, 0);
+    if (totalGross <= 0) return 0;
+    return household.income.reduce(
+      (s, i) => s + (i.salaryGrowthRate ?? 0) * (i.grossSalary / totalGross),
+      0
+    );
+  }, [household.income]);
+
+  const hasGrowthRate = weightedContributionGrowthRate > 0;
+
   // Required pot from retirement config
   const requiredPot = useMemo(
     () =>
@@ -69,16 +81,24 @@ export default function ProjectionsPage() {
     [retirement.targetAnnualIncome, retirement.withdrawalRate]
   );
 
-  // Run projections for configured scenario rates
+  // Run projections — use growth-aware version if salary growth is configured
   const scenarios = useMemo(
     () =>
-      projectScenarios(
-        currentPot,
-        monthlyContributions,
-        retirement.scenarioRates,
-        PROJECTION_YEARS
-      ),
-    [currentPot, monthlyContributions, retirement.scenarioRates]
+      hasGrowthRate
+        ? projectScenariosWithGrowth(
+            currentPot,
+            totalAnnualContributions,
+            weightedContributionGrowthRate,
+            retirement.scenarioRates,
+            PROJECTION_YEARS
+          )
+        : projectScenarios(
+            currentPot,
+            monthlyContributions,
+            retirement.scenarioRates,
+            PROJECTION_YEARS
+          ),
+    [currentPot, totalAnnualContributions, monthlyContributions, weightedContributionGrowthRate, hasGrowthRate, retirement.scenarioRates]
   );
 
   return (
@@ -206,6 +226,9 @@ export default function ProjectionsPage() {
           <p className="text-xs text-muted-foreground mt-4">
             Values highlighted in green indicate the projected pot exceeds the required pot of{" "}
             {formatCurrencyCompact(requiredPot)}.
+            {hasGrowthRate && (
+              <> Projections assume contributions grow at {formatPercent(weightedContributionGrowthRate)}/yr (weighted salary growth).</>
+            )}
           </p>
         </CardContent>
       </Card>

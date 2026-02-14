@@ -500,6 +500,48 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                         </Select>,
                         "Salary sacrifice is usually most tax-efficient"
                       )}
+                      {renderField(
+                        "Salary Growth Rate (%)",
+                        <>
+                          <Input
+                            type="number"
+                            step="0.5"
+                            value={((income.salaryGrowthRate ?? 0) * 100).toFixed(1)}
+                            onChange={(e) =>
+                              updateIncome(incomeIdx, "salaryGrowthRate", Number(e.target.value) / 100)
+                            }
+                            placeholder="0.0"
+                          />
+                          <FieldWarning
+                            value={(income.salaryGrowthRate ?? 0) * 100}
+                            min={0}
+                            max={20}
+                            label="salary growth rate"
+                          />
+                        </>,
+                        "Expected annual salary increase (e.g. 3 for 3%/yr). Used in projections."
+                      )}
+                      {renderField(
+                        "Bonus Growth Rate (%)",
+                        <>
+                          <Input
+                            type="number"
+                            step="0.5"
+                            value={((income.bonusGrowthRate ?? 0) * 100).toFixed(1)}
+                            onChange={(e) =>
+                              updateIncome(incomeIdx, "bonusGrowthRate", Number(e.target.value) / 100)
+                            }
+                            placeholder="0.0"
+                          />
+                          <FieldWarning
+                            value={(income.bonusGrowthRate ?? 0) * 100}
+                            min={0}
+                            max={30}
+                            label="bonus growth rate"
+                          />
+                        </>,
+                        "Expected annual bonus growth (e.g. 5 for 5%/yr). Used in cash flow projections."
+                      )}
                     </div>
                   </CollapsibleContent>
                 </Collapsible>

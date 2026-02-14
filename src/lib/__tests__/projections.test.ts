@@ -12,6 +12,10 @@ import {
   calculateAge,
   calculateTaxEfficiencyScore,
   projectDeferredBonusValue,
+  calculateTaperedAnnualAllowance,
+  projectCompoundGrowthWithGrowingContributions,
+  projectScenariosWithGrowth,
+  projectSalaryTrajectory,
 } from "../projections";
 
 describe("projectCompoundGrowth", () => {
@@ -383,5 +387,170 @@ describe("projectDeferredBonusValue", () => {
       0
     );
     expect(result).toBe(10000);
+  });
+});
+
+describe("calculateTaperedAnnualAllowance", () => {
+  it("returns full allowance when threshold income <= £200k", () => {
+    expect(calculateTaperedAnnualAllowance(200000, 270000)).toBe(60000);
+  });
+
+  it("returns full allowance when adjusted income <= £260k", () => {
+    expect(calculateTaperedAnnualAllowance(250000, 260000)).toBe(60000);
+  });
+
+  it("tapers by £1 for every £2 over £260k adjusted income", () => {
+    // Threshold income: £250k (> £200k), adjusted income: £280k
+    // Excess: £280k - £260k = £20k, reduction: £10k
+    // Tapered: £60k - £10k = £50k
+    expect(calculateTaperedAnnualAllowance(250000, 280000)).toBe(50000);
+  });
+
+  it("floors at £10k minimum tapered allowance", () => {
+    // Adjusted income: £360k, excess: £100k, reduction: £50k
+    // Tapered: £60k - £50k = £10k (at minimum)
+    expect(calculateTaperedAnnualAllowance(300000, 360000)).toBe(10000);
+  });
+
+  it("does not go below £10k even with extreme income", () => {
+    expect(calculateTaperedAnnualAllowance(500000, 500000)).toBe(10000);
+  });
+
+  it("returns full allowance for typical higher-rate earner", () => {
+    // £80k salary, £3k employer pension = £83k adjusted
+    expect(calculateTaperedAnnualAllowance(80000, 83000)).toBe(60000);
+  });
+
+  it("correctly handles boundary at exactly £260k adjusted income", () => {
+    expect(calculateTaperedAnnualAllowance(250000, 260000)).toBe(60000);
+  });
+
+  it("tapers by £500 when £1k over threshold", () => {
+    // Adjusted income: £261k, excess: £1k, reduction: £500
+    expect(calculateTaperedAnnualAllowance(250000, 261000)).toBe(59500);
+  });
+});
+
+describe("projectCompoundGrowthWithGrowingContributions", () => {
+  it("returns correct number of years", () => {
+    const result = projectCompoundGrowthWithGrowingContributions({
+      currentValue: 100000,
+      annualContribution: 10000,
+      contributionGrowthRate: 0.03,
+      investmentReturnRate: 0.07,
+      years: 10,
+    });
+    expect(result).toHaveLength(10);
+  });
+
+  it("first year matches simple growth + first contribution", () => {
+    const result = projectCompoundGrowthWithGrowingContributions({
+      currentValue: 100000,
+      annualContribution: 10000,
+      contributionGrowthRate: 0,
+      investmentReturnRate: 0.07,
+      years: 1,
+    });
+    // 100000 * 1.07 + 10000 = 117000
+    expect(result[0].value).toBe(117000);
+  });
+
+  it("growing contributions produce higher values than flat contributions", () => {
+    const flat = projectCompoundGrowthWithGrowingContributions({
+      currentValue: 100000,
+      annualContribution: 10000,
+      contributionGrowthRate: 0,
+      investmentReturnRate: 0.07,
+      years: 20,
+    });
+    const growing = projectCompoundGrowthWithGrowingContributions({
+      currentValue: 100000,
+      annualContribution: 10000,
+      contributionGrowthRate: 0.03,
+      investmentReturnRate: 0.07,
+      years: 20,
+    });
+    // With 3% contribution growth, final value should be higher
+    expect(growing[19].value).toBeGreaterThan(flat[19].value);
+  });
+
+  it("zero growth rate matches flat contribution behavior", () => {
+    const flat = projectCompoundGrowthWithGrowingContributions({
+      currentValue: 100000,
+      annualContribution: 10000,
+      contributionGrowthRate: 0,
+      investmentReturnRate: 0.07,
+      years: 5,
+    });
+    // Manual verification for year 1: 100000*1.07 + 10000 = 117000
+    // Year 2: 117000*1.07 + 10000 = 135190
+    expect(flat[0].value).toBe(117000);
+    expect(flat[1].value).toBeCloseTo(135190, 0);
+  });
+
+  it("handles zero initial value", () => {
+    const result = projectCompoundGrowthWithGrowingContributions({
+      currentValue: 0,
+      annualContribution: 12000,
+      contributionGrowthRate: 0.05,
+      investmentReturnRate: 0.07,
+      years: 5,
+    });
+    expect(result[0].value).toBe(12000);
+    // Year 2: 12000*1.07 + 12600 = 25440
+    expect(result[1].value).toBeCloseTo(25440, 0);
+  });
+
+  it("handles zero contribution", () => {
+    const result = projectCompoundGrowthWithGrowingContributions({
+      currentValue: 100000,
+      annualContribution: 0,
+      contributionGrowthRate: 0.03,
+      investmentReturnRate: 0.07,
+      years: 3,
+    });
+    // Pure compound growth
+    expect(result[0].value).toBe(107000);
+    expect(result[1].value).toBeCloseTo(114490, 0);
+  });
+});
+
+describe("projectScenariosWithGrowth", () => {
+  it("returns one scenario per rate", () => {
+    const result = projectScenariosWithGrowth(100000, 10000, 0.03, [0.05, 0.07, 0.09], 10);
+    expect(result).toHaveLength(3);
+    expect(result[0].rate).toBe(0.05);
+    expect(result[2].rate).toBe(0.09);
+  });
+
+  it("higher return rate produces higher values", () => {
+    const result = projectScenariosWithGrowth(100000, 10000, 0.03, [0.05, 0.09], 10);
+    expect(result[1].projections[9].value).toBeGreaterThan(result[0].projections[9].value);
+  });
+});
+
+describe("projectSalaryTrajectory", () => {
+  it("returns year 0 as current salary", () => {
+    const result = projectSalaryTrajectory(100000, 0.03, 5);
+    expect(result[0]).toEqual({ year: 0, salary: 100000 });
+  });
+
+  it("grows salary by growth rate each year", () => {
+    const result = projectSalaryTrajectory(100000, 0.05, 3);
+    expect(result[1].salary).toBe(105000);
+    expect(result[2].salary).toBeCloseTo(110250, 0);
+    expect(result[3].salary).toBeCloseTo(115762.50, 0);
+  });
+
+  it("returns n+1 entries for n years", () => {
+    const result = projectSalaryTrajectory(50000, 0.03, 10);
+    expect(result).toHaveLength(11);
+  });
+
+  it("handles zero growth rate", () => {
+    const result = projectSalaryTrajectory(80000, 0, 5);
+    for (const point of result) {
+      expect(point.salary).toBe(80000);
+    }
   });
 });

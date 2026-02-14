@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -40,6 +40,7 @@ import {
   type PersonRetirementInput,
 } from "@/components/charts/retirement-income-timeline";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
+import { Button } from "@/components/ui/button";
 
 export default function RetirementPage() {
   // Scenario-aware data
@@ -111,8 +112,8 @@ export default function RetirementPage() {
     [income]
   );
 
-  // Savings rate
-  const savingsRate = (totalAnnualContributions / totalGrossIncome) * 100;
+  // Savings rate (guard against division by zero)
+  const savingsRate = totalGrossIncome > 0 ? (totalAnnualContributions / totalGrossIncome) * 100 : 0;
 
   // Calculate accessible vs locked wealth
   const { accessibleWealth, lockedWealth } = useMemo(() => {
@@ -143,11 +144,17 @@ export default function RetirementPage() {
   const plannedRetirementAge = primaryPerson?.plannedRetirementAge ?? 60;
   const pensionAccessAge = primaryPerson?.pensionAccessAge ?? 57;
 
-  // Coast FIRE: use the middle scenario rate
-  const midRate =
-    retirement.scenarioRates[
-      Math.floor(retirement.scenarioRates.length / 2)
-    ] ?? 0.07;
+  // FEAT-003: Interactive retirement age override
+  const [retirementAgeOverride, setRetirementAgeOverride] = useState<number | null>(null);
+  const effectiveRetirementAge = retirementAgeOverride ?? plannedRetirementAge;
+
+  // FEAT-004: Growth rate toggle (index into scenarioRates)
+  const [selectedRateIndex, setSelectedRateIndex] = useState<number>(
+    Math.floor((retirement.scenarioRates.length || 1) / 2)
+  );
+
+  // Coast FIRE: use the selected scenario rate
+  const midRate = retirement.scenarioRates[selectedRateIndex] ?? 0.07;
   const coastFIRE = useMemo(
     () =>
       calculateCoastFIRE(
@@ -173,12 +180,12 @@ export default function RetirementPage() {
   const bridgeResult = useMemo(
     () =>
       calculatePensionBridge(
-        plannedRetirementAge,
+        effectiveRetirementAge,
         pensionAccessAge,
         retirement.targetAnnualIncome,
         accessibleWealth
       ),
-    [plannedRetirementAge, pensionAccessAge, retirement.targetAnnualIncome, accessibleWealth]
+    [effectiveRetirementAge, pensionAccessAge, retirement.targetAnnualIncome, accessibleWealth]
   );
 
   // Max bar width calculation for stacked bar
@@ -376,10 +383,59 @@ export default function RetirementPage() {
               the {formatCurrency(retirement.targetAnnualIncome)}/yr target at{" "}
               {formatPercent(midRate)} growth.
             </p>
+
+            {/* FEAT-003: Retirement age slider */}
+            <div className="mb-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="retirement-age-slider" className="text-sm font-medium">
+                  Retirement Age: {effectiveRetirementAge}
+                </label>
+                {retirementAgeOverride !== null && (
+                  <button
+                    onClick={() => setRetirementAgeOverride(null)}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Reset to {plannedRetirementAge}
+                  </button>
+                )}
+              </div>
+              <input
+                id="retirement-age-slider"
+                type="range"
+                min={50}
+                max={75}
+                step={1}
+                value={effectiveRetirementAge}
+                onChange={(e) => setRetirementAgeOverride(parseInt(e.target.value))}
+                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>50</span>
+                <span>75</span>
+              </div>
+            </div>
+
+            {/* FEAT-004: Growth rate toggle */}
+            <div className="mb-4 flex items-center gap-2">
+              <span className="text-sm font-medium">Growth rate:</span>
+              <div className="flex gap-1">
+                {retirement.scenarioRates.map((rate, idx) => (
+                  <Button
+                    key={rate}
+                    variant={idx === selectedRateIndex ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedRateIndex(idx)}
+                  >
+                    {formatPercent(rate)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             <RetirementIncomeTimeline
               persons={personRetirementInputs}
               targetAnnualIncome={retirement.targetAnnualIncome}
-              retirementAge={plannedRetirementAge}
+              retirementAge={effectiveRetirementAge}
               growthRate={midRate}
             />
             <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -431,14 +487,14 @@ export default function RetirementPage() {
           </CardHeader>
           <CardContent>
             <p className="mb-4 text-sm text-muted-foreground">
-              How your pot depletes during retirement at {formatCurrency(retirement.targetAnnualIncome)}/yr
+              How your current pot ({formatCurrency(currentPot)}) depletes during retirement at {formatCurrency(retirement.targetAnnualIncome)}/yr
               spending, with state pension income reducing withdrawals from age{" "}
-              {primaryPerson?.stateRetirementAge ?? 67}. Capital at risk — projections are illustrative only.
+              {primaryPerson?.stateRetirementAge ?? 67}.
             </p>
             <RetirementDrawdownChart
-              startingPot={requiredPot}
+              startingPot={currentPot}
               annualSpend={retirement.targetAnnualIncome}
-              retirementAge={plannedRetirementAge}
+              retirementAge={effectiveRetirementAge}
               scenarioRates={retirement.scenarioRates}
               statePensionAge={primaryPerson?.stateRetirementAge ?? 67}
               statePensionAnnual={primaryStatePensionAnnual}
@@ -522,6 +578,12 @@ export default function RetirementPage() {
         </Card>
       </CollapsibleSection>
 
+      {/* Disclaimer */}
+      <p className="text-xs text-muted-foreground italic">
+        Capital at risk — projections are illustrative only and do not constitute financial advice.
+        Figures are shown in today&apos;s money with no inflation adjustment. Past performance does not predict future returns.
+      </p>
+
       {/* Pension Bridge Analysis */}
       <CollapsibleSection title="Pension Bridge Analysis" summary="Can accessible wealth bridge the gap to pension access?" storageKey="retirement-bridge">
         <Card>
@@ -530,7 +592,7 @@ export default function RetirementPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <p className="text-sm text-muted-foreground">
-              If you retire at age {plannedRetirementAge}, can your accessible
+              If you retire at age {effectiveRetirementAge}, can your accessible
               (non-pension) wealth bridge the gap until pension access at age{" "}
               {pensionAccessAge}?
             </p>
@@ -586,7 +648,7 @@ export default function RetirementPage() {
                     {formatCurrency(bridgeResult.bridgePotRequired)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {pensionAccessAge - plannedRetirementAge} years x{" "}
+                    {pensionAccessAge - effectiveRetirementAge} years x{" "}
                     {formatCurrencyCompact(retirement.targetAnnualIncome)}/yr
                   </p>
                 </CardContent>

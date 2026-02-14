@@ -45,6 +45,10 @@ export const UK_TAX_CONSTANTS = {
 
   // --- Pension ---
   pensionAnnualAllowance: 60_000,
+  pensionTaperThresholdIncome: 200_000,    // threshold income for taper
+  pensionTaperAdjustedIncomeThreshold: 260_000, // adjusted income where taper starts
+  pensionTaperRate: 0.5,                   // lose £1 of allowance for every £2 over threshold
+  pensionMinimumTaperedAllowance: 10_000,  // floor for tapered allowance
   pensionTaxFreeLumpSum: 268_275, // max tax-free lump sum (25% of LTA equivalent)
 
   // --- Dividends ---
