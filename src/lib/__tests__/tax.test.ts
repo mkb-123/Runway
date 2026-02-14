@@ -295,6 +295,42 @@ describe("calculateTakeHomePayWithStudentLoan", () => {
     );
   });
 
+  it("calculates take-home correctly when gross includes cash bonus", () => {
+    // Simulates how the income page adds cash bonus to gross salary
+    // Base salary £80,000 + £20,000 bonus = £100,000 total gross
+    const incomeWithBonus: PersonIncome = {
+      personId: "test",
+      grossSalary: 100000, // salary + bonus combined
+      employerPensionContribution: 0,
+      employeePensionContribution: 5000,
+      pensionContributionMethod: "salary_sacrifice",
+    };
+
+    const result = calculateTakeHomePayWithStudentLoan(incomeWithBonus, "none");
+
+    // Adjusted gross for tax: 100000 - 5000 = 95000 (salary sacrifice)
+    // This should be below the 100k taper threshold
+    expect(result.adjustedGross).toBe(95000);
+    expect(result.incomeTax).toBeGreaterThan(0);
+    expect(result.takeHome).toBeLessThan(100000);
+    expect(result.takeHome).toBeGreaterThan(0);
+    // Monthly should be annual / 12
+    expect(result.monthlyTakeHome).toBe(roundPence(result.takeHome / 12));
+  });
+
+  it("bonus pushing gross over 100k triggers personal allowance taper", () => {
+    // £90k salary alone — below taper
+    const withoutBonus = calculateIncomeTax(90000);
+    // £90k + £20k bonus = £110k — into taper territory
+    const withBonus = calculateIncomeTax(110000);
+
+    // The effective rate should be higher when PA is tapered
+    expect(withBonus.effectiveRate).toBeGreaterThan(withoutBonus.effectiveRate);
+    // Tax should be more than proportionally higher due to PA taper
+    const proportionalTax = withoutBonus.tax * (110000 / 90000);
+    expect(withBonus.tax).toBeGreaterThan(proportionalTax);
+  });
+
   it("returns zero student loan for none plan", () => {
     const income: PersonIncome = {
       personId: "test",

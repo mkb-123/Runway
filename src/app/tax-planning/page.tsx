@@ -22,11 +22,14 @@ import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
+import { EmptyState } from "@/components/empty-state";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import {
   getUnrealisedGains,
   calculateBedAndISA,
   calculateGainsForTaxYear,
+  determineCgtRate,
+  calculateBedAndISABreakEven,
 } from "@/lib/cgt";
 import { calculateTakeHomePay } from "@/lib/tax";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
@@ -106,12 +109,15 @@ export default function TaxPlanningPage() {
         const usedAllowance = Math.max(0, personTaxYearGains.netGain);
         const remainingCgtAllowance = Math.max(0, cgtAnnualExempt - usedAllowance);
 
-        // Determine CGT rate based on income
-        const isHigherRate =
-          personIncome && personIncome.grossSalary > UK_TAX_CONSTANTS.incomeTax.basicRateUpperLimit;
-        const cgtRate = isHigherRate
-          ? UK_TAX_CONSTANTS.cgt.higherRate
+        // Determine CGT rate based on income (accounting for pension method)
+        const cgtRate = personIncome
+          ? determineCgtRate(
+              personIncome.grossSalary,
+              personIncome.employeePensionContribution,
+              personIncome.pensionContributionMethod
+            )
           : UK_TAX_CONSTANTS.cgt.basicRate;
+        const isHigherRate = cgtRate === UK_TAX_CONSTANTS.cgt.higherRate;
 
         // Bed & ISA calculation
         const bedAndISA = calculateBedAndISA(
@@ -121,14 +127,11 @@ export default function TaxPlanningPage() {
         );
 
         // Break-even analysis: how many years until the CGT cost is recouped
-        // by ISA tax savings on future gains
-        // Assume 7% average annual return in the ISA
-        const assumedReturn = 0.07;
-        const annualFutureTaxSaved = giaValue * assumedReturn * cgtRate;
-        const breakEvenYears =
-          annualFutureTaxSaved > 0
-            ? Math.ceil((bedAndISA.cgtCost / annualFutureTaxSaved) * 10) / 10
-            : 0;
+        const breakEvenYears = calculateBedAndISABreakEven(
+          bedAndISA.cgtCost,
+          giaValue,
+          cgtRate
+        );
 
         return {
           person,
@@ -230,7 +233,7 @@ export default function TaxPlanningPage() {
   );
 
   return (
-    <div className="space-y-8 p-6">
+    <div className="space-y-8 p-4 md:p-8">
       {/* Page Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -243,6 +246,10 @@ export default function TaxPlanningPage() {
         </div>
         <PersonToggle />
       </div>
+
+      {persons.length === 0 && (
+        <EmptyState message="No household data yet. Add people and accounts to see tax planning strategies." settingsTab="household" />
+      )}
 
       {/* Bed & ISA Planner */}
       <Card>

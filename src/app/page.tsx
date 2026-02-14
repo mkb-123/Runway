@@ -11,8 +11,6 @@ import {
   Lightbulb,
   Printer,
   ArrowRight,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +24,8 @@ import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
+import { CollapsibleSection } from "@/components/collapsible-section";
+import { EmptyState } from "@/components/empty-state";
 import { projectScenarios } from "@/lib/projections";
 import {
   calculateRetirementCountdown,
@@ -152,65 +152,7 @@ function HeroMetric({ type, data }: { type: HeroMetricType; data: HeroMetricData
 // Collapsible Dashboard Section — progressive disclosure
 // ============================================================
 
-function DashboardSection({
-  title,
-  summary,
-  defaultOpen = false,
-  children,
-  storageKey,
-}: {
-  title: string;
-  summary: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-  storageKey: string;
-}) {
-  const [isOpen, setIsOpen] = useState(() => {
-    if (typeof window === "undefined") return defaultOpen;
-    try {
-      const stored = localStorage.getItem(`nw-section-${storageKey}`);
-      return stored !== null ? stored === "true" : defaultOpen;
-    } catch {
-      return defaultOpen;
-    }
-  });
-
-  const toggle = useCallback(() => {
-    setIsOpen((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(`nw-section-${storageKey}`, String(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  }, [storageKey]);
-
-  return (
-    <div className="mb-4">
-      <button
-        onClick={toggle}
-        className="flex w-full items-center justify-between rounded-lg border bg-card px-4 py-3 text-left transition-colors hover:bg-accent/50"
-      >
-        <div className="flex items-center gap-2">
-          {isOpen ? (
-            <ChevronDown className="size-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="size-4 text-muted-foreground" />
-          )}
-          <span className="font-semibold text-sm">{title}</span>
-        </div>
-        {!isOpen && (
-          <span className="text-xs text-muted-foreground truncate ml-4 max-w-[60%] text-right">
-            {summary}
-          </span>
-        )}
-      </button>
-      {isOpen && <div className="mt-3">{children}</div>}
-    </div>
-  );
-}
+// CollapsibleSection is now the shared CollapsibleSection component
 
 // ============================================================
 // Recommendation Card
@@ -331,7 +273,7 @@ export default function Home() {
     );
   }, [recommendations, selectedView, household.persons]);
 
-  const [showAllRecs, setShowAllRecs] = useState(false);
+  // showAllRecs removed — recommendations now in CollapsibleSection
 
   // --- Snapshot changes ---
   const { monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent, latestSnapshot } =
@@ -498,7 +440,7 @@ export default function Home() {
         </div>
 
         {/* Getting Started */}
-        {!bannerDismissed && (
+        {(!bannerDismissed || household.persons.length === 0) && (
           <div className="relative mb-6 rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
             <button
               onClick={dismissBanner}
@@ -557,40 +499,34 @@ export default function Home() {
           ))}
         </div>
 
-        {/* TOP RECOMMENDATION — one card, expand for more */}
+        {/* RECOMMENDATIONS — collapsible */}
         {filteredRecommendations.length > 0 && (
           <div className="mb-6">
-            <RecommendationCard rec={filteredRecommendations[0]} />
-            {filteredRecommendations.length > 1 && (
-              <>
-                {showAllRecs && (
-                  <div className="mt-3 grid gap-3">
-                    {filteredRecommendations.slice(1).map((rec) => (
-                      <RecommendationCard key={rec.id} rec={rec} />
-                    ))}
-                  </div>
-                )}
-                <button
-                  onClick={() => setShowAllRecs(!showAllRecs)}
-                  className="mt-2 text-sm font-medium text-primary hover:underline"
-                >
-                  {showAllRecs ? "Show fewer" : `+${filteredRecommendations.length - 1} more recommendations`}
-                </button>
-              </>
-            )}
+            <CollapsibleSection
+              title="Recommendations"
+              summary={`${filteredRecommendations.length} suggestion${filteredRecommendations.length !== 1 ? "s" : ""}`}
+              defaultOpen
+              storageKey="recommendations"
+            >
+              <div className="grid gap-3">
+                {filteredRecommendations.map((rec) => (
+                  <RecommendationCard key={rec.id} rec={rec} />
+                ))}
+              </div>
+            </CollapsibleSection>
           </div>
         )}
 
         {/* COLLAPSIBLE SECTIONS — progressive disclosure */}
-        <DashboardSection title="Net Worth by Wrapper" summary={wrapperSummary} storageKey="wrappers">
+        <CollapsibleSection title="Net Worth by Wrapper" summary={wrapperSummary} storageKey="wrappers">
           <Card>
             <CardContent className="pt-6">
               <WrapperSplitChart data={byWrapper} />
             </CardContent>
           </Card>
-        </DashboardSection>
+        </CollapsibleSection>
 
-        <DashboardSection
+        <CollapsibleSection
           title="Net Worth Trajectory"
           summary={`${scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over ${projectionYears}yr`}
           storageKey="trajectory"
@@ -600,18 +536,18 @@ export default function Home() {
               <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} />
             </CardContent>
           </Card>
-        </DashboardSection>
+        </CollapsibleSection>
 
-        <DashboardSection title="Net Worth History" summary="By tax wrapper over time" storageKey="history">
+        <CollapsibleSection title="Net Worth History" summary="By tax wrapper over time" storageKey="history">
           <Card>
             <CardContent className="pt-6">
               <NetWorthHistoryChart snapshots={snapshots} />
             </CardContent>
           </Card>
-        </DashboardSection>
+        </CollapsibleSection>
 
         {selectedView === "household" && (
-          <DashboardSection
+          <CollapsibleSection
             title="Net Worth by Person"
             summary={byPerson.map((p) => `${p.name}: ${formatCurrencyCompact(p.value)}`).join(", ")}
             storageKey="by-person"
@@ -621,11 +557,11 @@ export default function Home() {
                 <ByPersonChart data={personChartData} />
               </CardContent>
             </Card>
-          </DashboardSection>
+          </CollapsibleSection>
         )}
 
         {household.committedOutgoings.length > 0 && (
-          <DashboardSection
+          <CollapsibleSection
             title="Committed Outgoings"
             summary={`${formatCurrencyCompact(totalAnnualCommitments)}/yr across ${household.committedOutgoings.length} items`}
             storageKey="commitments"
@@ -648,7 +584,7 @@ export default function Home() {
                 </Card>
               ))}
             </div>
-          </DashboardSection>
+          </CollapsibleSection>
         )}
       </div>
     </div>

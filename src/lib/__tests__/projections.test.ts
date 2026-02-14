@@ -8,6 +8,10 @@ import {
   calculatePensionBridge,
   calculateSWR,
   calculateRequiredPot,
+  calculateProRataStatePension,
+  calculateAge,
+  calculateTaxEfficiencyScore,
+  projectDeferredBonusValue,
 } from "../projections";
 
 describe("projectCompoundGrowth", () => {
@@ -225,5 +229,159 @@ describe("calculateRequiredPot", () => {
 
   it("handles zero rate", () => {
     expect(calculateRequiredPot(40000, 0)).toBe(Infinity);
+  });
+});
+
+// --- New extracted function tests ---
+
+describe("calculateProRataStatePension", () => {
+
+  it("returns full pension for 35 qualifying years", () => {
+    expect(calculateProRataStatePension(35)).toBe(11502.4);
+  });
+
+  it("returns full pension for years exceeding 35 (capped)", () => {
+    expect(calculateProRataStatePension(40)).toBe(11502.4);
+  });
+
+  it("returns zero for fewer than 10 qualifying years", () => {
+    expect(calculateProRataStatePension(0)).toBe(0);
+    expect(calculateProRataStatePension(5)).toBe(0);
+    expect(calculateProRataStatePension(9)).toBe(0);
+  });
+
+  it("returns proportional pension for 10 qualifying years (minimum)", () => {
+    const result = calculateProRataStatePension(10);
+    // 10/35 * 11502.40 = 3286.40
+    expect(result).toBeCloseTo(3286.4, 2);
+  });
+
+  it("returns proportional pension for 25 qualifying years", () => {
+    const result = calculateProRataStatePension(25);
+    // 25/35 * 11502.40 = 8216.00
+    expect(result).toBeCloseTo(8216.0, 2);
+  });
+
+  it("returns proportional pension for 20 qualifying years", () => {
+    const result = calculateProRataStatePension(20);
+    // 20/35 * 11502.40 = 6572.80
+    expect(result).toBeCloseTo(6572.8, 2);
+  });
+});
+
+describe("calculateAge", () => {
+
+  it("calculates age correctly for a straightforward case", () => {
+    const now = new Date("2024-06-15");
+    expect(calculateAge("1990-01-01", now)).toBe(34);
+  });
+
+  it("handles birthday not yet reached this year", () => {
+    const now = new Date("2024-03-01");
+    expect(calculateAge("1990-06-15", now)).toBe(33);
+  });
+
+  it("handles birthday already passed this year", () => {
+    const now = new Date("2024-09-01");
+    expect(calculateAge("1990-06-15", now)).toBe(34);
+  });
+
+  it("handles exact birthday", () => {
+    const now = new Date("2024-06-15");
+    expect(calculateAge("1990-06-15", now)).toBe(34);
+  });
+
+  it("handles leap year birthday (Feb 29)", () => {
+    // Born Feb 29, 1992. On March 1 2024: 32 years old (2024 - 1992 = 32, birthday passed)
+    const now = new Date("2024-03-01");
+    expect(calculateAge("1992-02-29", now)).toBe(32);
+  });
+
+  it("handles leap year birthday on Feb 28 of non-leap year", () => {
+    // Born Feb 29, 1992. On Feb 28, 2025: still 32
+    const now = new Date("2025-02-28");
+    expect(calculateAge("1992-02-29", now)).toBe(32);
+  });
+});
+
+describe("calculateTaxEfficiencyScore", () => {
+
+  it("returns 1 when all savings are tax-advantaged", () => {
+    expect(calculateTaxEfficiencyScore(10000, 5000, 0)).toBe(1);
+  });
+
+  it("returns 0 when all savings are GIA", () => {
+    expect(calculateTaxEfficiencyScore(0, 0, 10000)).toBe(0);
+  });
+
+  it("returns correct ratio for mixed savings", () => {
+    // ISA: 10k, Pension: 10k, GIA: 5k = 20k/25k = 0.8
+    expect(calculateTaxEfficiencyScore(10000, 10000, 5000)).toBeCloseTo(0.8);
+  });
+
+  it("returns 0 when no savings", () => {
+    expect(calculateTaxEfficiencyScore(0, 0, 0)).toBe(0);
+  });
+
+  it("handles decimal precision", () => {
+    // 6000 + 4000 = 10000 / 15000 = 0.6667
+    expect(calculateTaxEfficiencyScore(6000, 4000, 5000)).toBeCloseTo(0.6667, 3);
+  });
+});
+
+describe("projectDeferredBonusValue", () => {
+
+  it("projects value with compound growth", () => {
+    // £10,000 at 5% for ~1 year
+    const result = projectDeferredBonusValue(
+      10000,
+      "2023-01-01",
+      "2024-01-01",
+      0.05
+    );
+    expect(result).toBeCloseTo(10500, -1); // ~10,500
+  });
+
+  it("returns original amount when vesting date equals grant date", () => {
+    const result = projectDeferredBonusValue(
+      10000,
+      "2024-01-01",
+      "2024-01-01",
+      0.05
+    );
+    expect(result).toBe(10000);
+  });
+
+  it("returns original amount when vesting is before grant", () => {
+    const result = projectDeferredBonusValue(
+      10000,
+      "2024-01-01",
+      "2023-01-01",
+      0.05
+    );
+    expect(result).toBe(10000);
+  });
+
+  it("handles multi-year growth correctly", () => {
+    // £50,000 at 8% for ~3 years (365.25 day year means ~2.9993 years)
+    const result = projectDeferredBonusValue(
+      50000,
+      "2022-01-01",
+      "2025-01-01",
+      0.08
+    );
+    // ~50000 * 1.08^3 ≈ 62,985–62,989 depending on exact day count
+    expect(result).toBeGreaterThan(62980);
+    expect(result).toBeLessThan(63000);
+  });
+
+  it("handles zero return rate", () => {
+    const result = projectDeferredBonusValue(
+      10000,
+      "2023-01-01",
+      "2025-01-01",
+      0
+    );
+    expect(result).toBe(10000);
   });
 });

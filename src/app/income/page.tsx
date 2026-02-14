@@ -5,6 +5,8 @@ import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
+import { EmptyState } from "@/components/empty-state";
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import {
   calculateIncomeTax,
@@ -12,6 +14,10 @@ import {
   calculateStudentLoan,
   calculateTakeHomePayWithStudentLoan,
 } from "@/lib/tax";
+import {
+  calculateTaxEfficiencyScore,
+  projectDeferredBonusValue,
+} from "@/lib/projections";
 import type {
   DeferredBonusTranche,
 } from "@/types";
@@ -34,13 +40,14 @@ import { EffectiveTaxRateChart } from "@/components/charts/effective-tax-rate-ch
 import { TaxBandChart } from "@/components/charts/tax-band-chart";
 import type { TaxBandDataItem } from "@/components/charts/tax-band-chart";
 
-// --- Helper: projected value at vesting ---
+// --- Helper: projected value at vesting (delegates to lib function) ---
 function projectedValue(tranche: DeferredBonusTranche): number {
-  const grantDate = new Date(tranche.grantDate);
-  const vestingDate = new Date(tranche.vestingDate);
-  const yearsToVest =
-    (vestingDate.getTime() - grantDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-  return tranche.amount * Math.pow(1 + tranche.estimatedAnnualReturn, yearsToVest);
+  return projectDeferredBonusValue(
+    tranche.amount,
+    tranche.grantDate,
+    tranche.vestingDate,
+    tranche.estimatedAnnualReturn
+  );
 }
 
 // --- Helper: student loan plan label ---
@@ -177,18 +184,13 @@ export default function IncomePage() {
       { name: "GIA Overflow", value: giaOverflow, type: "subtotal" },
     ];
 
-    // Tax Efficiency Score
-    const totSavings = personAnalysis.reduce((sum, p) => {
-      const c = p.contributions;
-      if (!c) return sum;
-      return sum + c.isaContribution + c.pensionContribution + c.giaContribution;
-    }, 0);
-    const taxAdvSavings = personAnalysis.reduce((sum, p) => {
-      const c = p.contributions;
-      if (!c) return sum;
-      return sum + c.isaContribution + c.pensionContribution;
-    }, 0);
-    const taxEffScore = totSavings > 0 ? taxAdvSavings / totSavings : 0;
+    // Tax Efficiency Score (via lib function)
+    const totISA = personAnalysis.reduce((sum, p) => sum + (p.contributions?.isaContribution ?? 0), 0);
+    const totPension = personAnalysis.reduce((sum, p) => sum + (p.contributions?.pensionContribution ?? 0), 0);
+    const totGIA = personAnalysis.reduce((sum, p) => sum + (p.contributions?.giaContribution ?? 0), 0);
+    const totSavings = totISA + totPension + totGIA;
+    const taxAdvSavings = totISA + totPension;
+    const taxEffScore = calculateTaxEfficiencyScore(totISA, totPension, totGIA);
 
     return {
       waterfallData: wfData,
@@ -210,6 +212,10 @@ export default function IncomePage() {
         </div>
         <PersonToggle />
       </div>
+
+      {personAnalysis.length === 0 && (
+        <EmptyState message="No income data yet. Add household members and their salary details in Settings." settingsTab="household" />
+      )}
 
       {/* Per-Person Income Breakdown */}
       {personAnalysis.map(
@@ -551,8 +557,8 @@ export default function IncomePage() {
       )}
 
       {/* Total Compensation Overview */}
+      <CollapsibleSection title="Total Compensation Overview" summary="Salary + pension + bonus breakdown" defaultOpen storageKey="income-total-comp">
       <section className="space-y-4">
-        <h2 className="text-2xl font-semibold">Total Compensation Overview</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {personAnalysis.map(({ person, personIncome, bonus }) => {
             const salary = personIncome.grossSalary;
@@ -601,10 +607,11 @@ export default function IncomePage() {
           })}
         </div>
       </section>
+      </CollapsibleSection>
 
       {/* Cash Flow Waterfall */}
+      <CollapsibleSection title="Cash Flow Waterfall" summary="Gross income through deductions to savings" defaultOpen storageKey="income-waterfall">
       <section className="space-y-4">
-        <h2 className="text-2xl font-semibold">Cash Flow Waterfall</h2>
         <p className="text-muted-foreground">
           Combined household cash flow from gross income through deductions to savings allocation.
         </p>
@@ -614,10 +621,11 @@ export default function IncomePage() {
           </CardContent>
         </Card>
       </section>
+      </CollapsibleSection>
 
       {/* Tax Band Consumption */}
+      <CollapsibleSection title="Tax Band Consumption" summary="How income fills each tax band" storageKey="income-tax-bands">
       <section className="space-y-4">
-        <h2 className="text-2xl font-semibold">Tax Band Consumption</h2>
         <p className="text-muted-foreground">
           How each person&apos;s income fills the tax bands from Personal Allowance through to Additional Rate.
         </p>
@@ -641,10 +649,11 @@ export default function IncomePage() {
           </CardContent>
         </Card>
       </section>
+      </CollapsibleSection>
 
       {/* Effective Tax Rate Curve */}
+      <CollapsibleSection title="Effective Tax Rate Curve" summary="Marginal and effective rates vs income level" storageKey="income-tax-curve">
       <section className="space-y-4">
-        <h2 className="text-2xl font-semibold">Effective Tax Rate Curve</h2>
         <p className="text-muted-foreground">
           Combined marginal and effective tax + NI rate across income levels. The red area shows the marginal rate — note the 60% trap between £100k and £125k where the personal allowance tapers away.
         </p>
@@ -654,10 +663,11 @@ export default function IncomePage() {
           </CardContent>
         </Card>
       </section>
+      </CollapsibleSection>
 
       {/* Tax Efficiency Score */}
+      <CollapsibleSection title="Tax Efficiency Score" summary={`${Math.round(taxEfficiencyScore * 100)}% tax-advantaged`} storageKey="income-tax-efficiency">
       <section className="space-y-4">
-        <h2 className="text-2xl font-semibold">Tax Efficiency Score</h2>
         <Card>
           <CardHeader>
             <CardTitle>Savings Tax Efficiency</CardTitle>
@@ -698,6 +708,7 @@ export default function IncomePage() {
           </CardContent>
         </Card>
       </section>
+      </CollapsibleSection>
     </div>
   );
 }

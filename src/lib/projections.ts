@@ -3,6 +3,7 @@
 // ============================================================
 
 import { roundPence } from "@/lib/format";
+import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 
 // --- Types ---
 
@@ -242,4 +243,93 @@ export function calculateSWR(pot: number, rate: number): number {
 export function calculateRequiredPot(annualIncome: number, rate: number): number {
   if (rate <= 0) return Infinity;
   return roundPence(annualIncome / rate);
+}
+
+// --- State Pension ---
+
+/**
+ * Calculate the pro-rata state pension based on NI qualifying years.
+ *
+ * - Below minimum qualifying years (10): £0
+ * - Between minimum and required (10–35): proportional
+ * - At or above required (35+): full pension
+ *
+ * HMRC/DWP ref: https://www.gov.uk/new-state-pension/what-youll-get
+ *
+ * @param qualifyingYears - Number of NI qualifying years
+ */
+export function calculateProRataStatePension(qualifyingYears: number): number {
+  const { fullNewStatePensionAnnual, qualifyingYearsRequired, minimumQualifyingYears } =
+    UK_TAX_CONSTANTS.statePension;
+
+  if (qualifyingYears < minimumQualifyingYears) return 0;
+  const proportion = Math.min(1, qualifyingYears / qualifyingYearsRequired);
+  return roundPence(proportion * fullNewStatePensionAnnual);
+}
+
+// --- Age Calculation ---
+
+/**
+ * Calculate age in whole years from a date of birth.
+ *
+ * Uses calendar-based calculation (not millisecond division) for
+ * correct handling of leap years and month boundaries.
+ *
+ * @param dateOfBirth - ISO date string (e.g. "1972-03-15")
+ * @param now - Reference date (defaults to current date)
+ */
+export function calculateAge(dateOfBirth: string, now: Date = new Date()): number {
+  const dob = new Date(dateOfBirth);
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+    age--;
+  }
+  return age;
+}
+
+// --- Tax Efficiency ---
+
+/**
+ * Calculate the tax efficiency score: proportion of total savings
+ * going into tax-advantaged wrappers (ISA + Pension).
+ *
+ * @param isaContributions - Total ISA contributions
+ * @param pensionContributions - Total pension contributions
+ * @param giaContributions - Total GIA contributions
+ * @returns Score between 0 and 1 (0 = all GIA, 1 = all tax-advantaged)
+ */
+export function calculateTaxEfficiencyScore(
+  isaContributions: number,
+  pensionContributions: number,
+  giaContributions: number
+): number {
+  const total = isaContributions + pensionContributions + giaContributions;
+  if (total <= 0) return 0;
+  return (isaContributions + pensionContributions) / total;
+}
+
+// --- Deferred Bonus Projection ---
+
+/**
+ * Project the value of a deferred bonus tranche at vesting,
+ * using compound growth from grant date to vesting date.
+ *
+ * @param amount - Original bonus amount
+ * @param grantDate - ISO date string of grant
+ * @param vestingDate - ISO date string of vesting
+ * @param estimatedAnnualReturn - Expected annual return as a decimal
+ */
+export function projectDeferredBonusValue(
+  amount: number,
+  grantDate: string,
+  vestingDate: string,
+  estimatedAnnualReturn: number
+): number {
+  const grant = new Date(grantDate);
+  const vesting = new Date(vestingDate);
+  const yearsToVest =
+    (vesting.getTime() - grant.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+  if (yearsToVest <= 0) return amount;
+  return roundPence(amount * Math.pow(1 + estimatedAnnualReturn, yearsToVest));
 }

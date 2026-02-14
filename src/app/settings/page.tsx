@@ -213,10 +213,10 @@ export default function SettingsPage() {
   // ----------------------------------------------------------
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 p-4 md:p-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Settings</h1>
+        <p className="text-sm text-muted-foreground">
           Manage all your financial data. Changes are saved automatically.
         </p>
       </div>
@@ -347,9 +347,9 @@ export default function SettingsPage() {
       </Tabs>
 
       {/* Data Management */}
-      <Card>
+      <Card className="border-destructive/50">
         <CardHeader>
-          <CardTitle>Data Management</CardTitle>
+          <CardTitle className="text-destructive">Data Management</CardTitle>
           <CardDescription>
             Export your data as JSON to back up or transfer between devices.
             Import a previously exported file to restore.

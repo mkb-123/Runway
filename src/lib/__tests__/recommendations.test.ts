@@ -4,10 +4,13 @@ import {
   analyzeSalaryTaper,
   analyzeISAUsage,
   analyzePensionHeadroom,
+  analyzeBedAndISA,
   analyzeEmergencyFund,
   analyzeRetirementProgress,
   analyzeConcentrationRisk,
   analyzeGIAOverweight,
+  analyzeExcessCash,
+  analyzeSavingsRate,
 } from "../recommendations";
 import type {
   HouseholdData,
@@ -448,5 +451,243 @@ describe("generateRecommendations", () => {
     const recs = generateRecommendations(household, emptyTransactions);
     const bobRecs = recs.filter((r) => r.personId === "person-2");
     expect(bobRecs).toHaveLength(0);
+  });
+});
+
+// --- Previously untested analyzers ---
+
+describe("analyzeBedAndISA", () => {
+  it("recommends zero-cost Bed & ISA when gains within CGT allowance", () => {
+    const giaAccount = makeAccount({
+      id: "gia-1",
+      type: "gia",
+      currentValue: 30000,
+      holdings: [
+        { fundId: "fund-1", units: 100, purchasePrice: 200, currentPrice: 300 },
+      ],
+    });
+
+    const ctx = {
+      person: makePerson(),
+      income: makeIncome(),
+      contributions: makeContributions({ isaContribution: 5000 }),
+      accounts: [giaAccount],
+      adjustedGross: 60000,
+      allAccounts: [giaAccount],
+    };
+
+    // GIA value: 30,000, ISA remaining: 15,000
+    // Unrealised gain: 100 * (300-200) = 10,000 - but we use transactions for pool
+    // With no transactions, it uses holding purchasePrice -> gain = 100*(300-200) = 10,000
+    // Wait, 10,000 > 3,000 CGT allowance, so analyzeBedAndISA filters this out
+
+    // Let's make the gain within CGT allowance
+    const smallGainAccount = makeAccount({
+      id: "gia-2",
+      type: "gia",
+      currentValue: 10300,
+      holdings: [
+        { fundId: "fund-1", units: 100, purchasePrice: 100, currentPrice: 103 },
+      ],
+    });
+
+    const ctx2 = {
+      person: makePerson(),
+      income: makeIncome(),
+      contributions: makeContributions({ isaContribution: 5000 }),
+      accounts: [smallGainAccount],
+      adjustedGross: 60000,
+      allAccounts: [smallGainAccount],
+    };
+
+    const recs = analyzeBedAndISA(ctx2, emptyTransactions);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].id).toContain("bed-isa-free");
+    expect(recs[0].priority).toBe("high");
+    expect(recs[0].category).toBe("tax");
+  });
+
+  it("returns nothing when GIA value is zero", () => {
+    const emptyGia = makeAccount({
+      id: "gia-1",
+      type: "gia",
+      currentValue: 0,
+      holdings: [],
+    });
+
+    const ctx = {
+      person: makePerson(),
+      income: makeIncome(),
+      contributions: makeContributions({ isaContribution: 5000 }),
+      accounts: [emptyGia],
+      adjustedGross: 60000,
+      allAccounts: [emptyGia],
+    };
+
+    expect(analyzeBedAndISA(ctx, emptyTransactions)).toHaveLength(0);
+  });
+
+  it("returns nothing when ISA fully used", () => {
+    const giaAccount = makeAccount({
+      id: "gia-1",
+      type: "gia",
+      currentValue: 10000,
+      holdings: [
+        { fundId: "fund-1", units: 100, purchasePrice: 80, currentPrice: 100 },
+      ],
+    });
+
+    const ctx = {
+      person: makePerson(),
+      income: makeIncome(),
+      contributions: makeContributions({ isaContribution: 20000 }),
+      accounts: [giaAccount],
+      adjustedGross: 60000,
+      allAccounts: [giaAccount],
+    };
+
+    expect(analyzeBedAndISA(ctx, emptyTransactions)).toHaveLength(0);
+  });
+});
+
+describe("analyzeExcessCash", () => {
+  it("warns when excess cash is > £10k and > 15% of net worth", () => {
+    const household = makeHousehold({
+      accounts: [
+        makeAccount({
+          id: "cash-1",
+          type: "cash_savings",
+          currentValue: 40000,
+        }),
+        makeAccount({
+          id: "isa-1",
+          type: "stocks_and_shares_isa",
+          currentValue: 60000,
+        }),
+      ],
+      emergencyFund: {
+        monthlyEssentialExpenses: 2000,
+        targetMonths: 6,
+      },
+    });
+    // Emergency target: 12,000
+    // Total cash: 40,000
+    // Excess: 28,000
+    // NW: 100,000
+    // Excess/NW: 28% > 15% and > 10k
+
+    const recs = analyzeExcessCash(household);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].id).toBe("excess-cash");
+    expect(recs[0].priority).toBe("medium");
+    expect(recs[0].category).toBe("investment");
+  });
+
+  it("returns nothing when cash is just above emergency target but small fraction of NW", () => {
+    const household = makeHousehold({
+      accounts: [
+        makeAccount({
+          id: "cash-1",
+          type: "cash_savings",
+          currentValue: 15000,
+        }),
+        makeAccount({
+          id: "isa-1",
+          type: "stocks_and_shares_isa",
+          currentValue: 500000,
+        }),
+      ],
+      emergencyFund: {
+        monthlyEssentialExpenses: 2000,
+        targetMonths: 6,
+      },
+    });
+    // Emergency target: 12,000
+    // Excess: 3,000
+    // NW: 515,000
+    // 3,000/515,000 = 0.6% < 15%
+
+    expect(analyzeExcessCash(household)).toHaveLength(0);
+  });
+
+  it("returns nothing when cash is below emergency target", () => {
+    const household = makeHousehold({
+      accounts: [
+        makeAccount({
+          id: "cash-1",
+          type: "cash_savings",
+          currentValue: 5000,
+        }),
+      ],
+      emergencyFund: {
+        monthlyEssentialExpenses: 2000,
+        targetMonths: 6,
+      },
+    });
+
+    expect(analyzeExcessCash(household)).toHaveLength(0);
+  });
+});
+
+describe("analyzeSavingsRate", () => {
+  it("warns when savings rate is below 15%", () => {
+    const household = makeHousehold({
+      income: [makeIncome({ grossSalary: 100000 })],
+      annualContributions: [
+        makeContributions({
+          isaContribution: 5000,
+          pensionContribution: 5000,
+          giaContribution: 0,
+        }),
+      ],
+    });
+    // Total contributions: 10,000 / 100,000 = 10% < 15%
+
+    const recs = analyzeSavingsRate(household);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].id).toBe("low-savings-rate");
+    expect(recs[0].category).toBe("retirement");
+  });
+
+  it("returns nothing when savings rate is >= 15%", () => {
+    const household = makeHousehold({
+      income: [makeIncome({ grossSalary: 100000 })],
+      annualContributions: [
+        makeContributions({
+          isaContribution: 10000,
+          pensionContribution: 6000,
+          giaContribution: 0,
+        }),
+      ],
+    });
+    // Total: 16,000 / 100,000 = 16% > 15%
+
+    expect(analyzeSavingsRate(household)).toHaveLength(0);
+  });
+
+  it("flags high priority when savings rate is below 5%", () => {
+    const household = makeHousehold({
+      income: [makeIncome({ grossSalary: 100000 })],
+      annualContributions: [
+        makeContributions({
+          isaContribution: 2000,
+          pensionContribution: 1000,
+          giaContribution: 0,
+        }),
+      ],
+    });
+    // Total: 3,000 / 100,000 = 3% < 5%
+
+    const recs = analyzeSavingsRate(household);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].priority).toBe("high");
+  });
+
+  it("returns nothing when no income", () => {
+    const household = makeHousehold({
+      income: [makeIncome({ grossSalary: 0 })],
+    });
+
+    expect(analyzeSavingsRate(household)).toHaveLength(0);
   });
 });
