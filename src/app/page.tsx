@@ -30,6 +30,8 @@ import { projectScenarios } from "@/lib/projections";
 import {
   calculateRetirementCountdown,
   calculateRequiredPot,
+  calculateAdjustedRequiredPot,
+  calculateProRataStatePension,
 } from "@/lib/projections";
 import {
   generateRecommendations,
@@ -315,6 +317,12 @@ export default function Home() {
       };
     }, [snapshots]);
 
+  // --- Household state pension total ---
+  const totalStatePensionAnnual = useMemo(
+    () => household.persons.reduce((sum, p) => sum + calculateProRataStatePension(p.niQualifyingYears), 0),
+    [household.persons]
+  );
+
   // --- Retirement countdown ---
   const { retirementCountdownYears, retirementCountdownMonths } = useMemo(() => {
     const { retirement, contributions } = household;
@@ -322,11 +330,14 @@ export default function Home() {
       (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
       0
     );
-    const requiredPot = calculateRequiredPot(retirement.targetAnnualIncome, retirement.withdrawalRate);
+    const requiredPot = calculateAdjustedRequiredPot(
+      retirement.targetAnnualIncome, retirement.withdrawalRate,
+      retirement.includeStatePension, totalStatePensionAnnual
+    );
     const midRate = retirement.scenarioRates[Math.floor(retirement.scenarioRates.length / 2)] ?? 0.07;
     const countdown = calculateRetirementCountdown(totalNetWorth, totalAnnual, requiredPot, midRate);
     return { retirementCountdownYears: countdown.years, retirementCountdownMonths: countdown.months };
-  }, [household, totalNetWorth]);
+  }, [household, totalNetWorth, totalStatePensionAnnual]);
 
   // --- Savings rate + FIRE progress ---
   const savingsRate = useMemo(() => {
@@ -339,9 +350,12 @@ export default function Home() {
   }, [household]);
 
   const fireProgress = useMemo(() => {
-    const req = calculateRequiredPot(household.retirement.targetAnnualIncome, household.retirement.withdrawalRate);
+    const req = calculateAdjustedRequiredPot(
+      household.retirement.targetAnnualIncome, household.retirement.withdrawalRate,
+      household.retirement.includeStatePension, totalStatePensionAnnual
+    );
     return req > 0 ? (totalNetWorth / req) * 100 : 0;
-  }, [household.retirement, totalNetWorth]);
+  }, [household.retirement, totalNetWorth, totalStatePensionAnnual]);
 
   // --- Hero data ---
   const heroData: HeroMetricData = useMemo(
@@ -376,17 +390,17 @@ export default function Home() {
     const rates = household.retirement.scenarioRates;
     const years = 30;
     const projScenarios = projectScenarios(totalNetWorth, monthlyContrib, rates, years);
-    const targetPot =
-      household.retirement.withdrawalRate > 0
-        ? household.retirement.targetAnnualIncome / household.retirement.withdrawalRate
-        : 0;
+    const targetPot = calculateAdjustedRequiredPot(
+      household.retirement.targetAnnualIncome, household.retirement.withdrawalRate,
+      household.retirement.includeStatePension, totalStatePensionAnnual
+    );
     const ms = [
       { label: "FIRE Target", value: targetPot },
       { label: "\u00A31m", value: 1_000_000 },
       { label: "\u00A32m", value: 2_000_000 },
     ].filter((m) => m.value > 0);
     return { scenarios: projScenarios, scenarioRates: rates, projectionYears: years, milestones: ms };
-  }, [household, totalNetWorth]);
+  }, [household, totalNetWorth, totalStatePensionAnnual]);
 
   // --- Chart data ---
   const personChartData = useMemo(() => byPerson.map((p) => ({ name: p.name, value: p.value })), [byPerson]);

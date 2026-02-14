@@ -24,6 +24,7 @@ import {
 } from "@/lib/format";
 import {
   calculateRequiredPot,
+  calculateAdjustedRequiredPot,
   calculateRetirementCountdown,
   calculateCoastFIRE,
   calculateRequiredSavings,
@@ -72,14 +73,22 @@ export default function RetirementPage() {
 
   const { retirement } = household;
 
-  // Required pot
+  // Household total state pension
+  const totalStatePensionAnnual = useMemo(
+    () => persons.reduce((sum, p) => sum + calculateProRataStatePension(p.niQualifyingYears ?? 0), 0),
+    [persons]
+  );
+
+  // Required pot (adjusted for state pension if enabled)
   const requiredPot = useMemo(
     () =>
-      calculateRequiredPot(
+      calculateAdjustedRequiredPot(
         retirement.targetAnnualIncome,
-        retirement.withdrawalRate
+        retirement.withdrawalRate,
+        retirement.includeStatePension,
+        totalStatePensionAnnual
       ),
-    [retirement.targetAnnualIncome, retirement.withdrawalRate]
+    [retirement.targetAnnualIncome, retirement.withdrawalRate, retirement.includeStatePension, totalStatePensionAnnual]
   );
 
   // Progress
@@ -266,7 +275,9 @@ export default function RetirementPage() {
           <CardContent>
             <p className="text-2xl font-bold">{formatCurrency(requiredPot)}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Income / withdrawal rate
+              {retirement.includeStatePension && totalStatePensionAnnual > 0
+                ? `After ${formatCurrency(totalStatePensionAnnual)}/yr state pension`
+                : "Income / withdrawal rate"}
             </p>
           </CardContent>
         </Card>

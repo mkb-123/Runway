@@ -39,7 +39,9 @@ import type {
 import {
   CONTRIBUTION_TARGET_LABELS,
   CONTRIBUTION_FREQUENCY_LABELS,
+  annualiseContribution,
 } from "@/types";
+import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { clone, setField, renderField } from "./field-helpers";
 import { FieldWarning } from "./field-warning";
 
@@ -660,7 +662,7 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                     {personContributions.map((contrib) => (
                       <Card key={contrib.id} className="border-dashed">
                         <CardContent className="pt-4">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {renderField(
                               "Label",
                               <Input
@@ -754,6 +756,21 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                         </CardContent>
                       </Card>
                     ))}
+                    {/* Aggregate ISA allowance warning */}
+                    {(() => {
+                      const totalISA = personContributions
+                        .filter((c) => c.target === "isa")
+                        .reduce((s, c) => s + annualiseContribution(c.amount, c.frequency), 0);
+                      const allowance = UK_TAX_CONSTANTS.isaAnnualAllowance;
+                      if (totalISA > allowance) {
+                        return (
+                          <p className="flex items-center gap-1 text-xs text-amber-600">
+                            <span className="font-medium">ISA warning:</span> {person.name}&apos;s total ISA contributions ({"\u00A3"}{Math.round(totalISA).toLocaleString()}/yr) exceed the {"\u00A3"}{allowance.toLocaleString()} annual allowance
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                     <Button
                       variant="outline"
                       size="sm"
