@@ -19,6 +19,7 @@ import type {
   TaxWrapper,
 } from "@/types";
 import { getAccountTaxWrapper } from "@/types";
+import { roundPence } from "@/lib/format";
 
 import householdJson from "../../data/household.json";
 import transactionsJson from "../../data/transactions.json";
@@ -94,7 +95,7 @@ export function getNetWorthByPerson(): { personId: string; name: string; value: 
     return {
       personId: person.id,
       name: person.name,
-      value: Math.round(value * 100) / 100,
+      value: roundPence(value),
     };
   });
 }
@@ -112,7 +113,7 @@ export function getNetWorthByWrapper(): { wrapper: TaxWrapper; value: number }[]
 
   return Array.from(totals.entries()).map(([wrapper, value]) => ({
     wrapper,
-    value: Math.round(value * 100) / 100,
+    value: roundPence(value),
   }));
 }
 
@@ -128,7 +129,7 @@ export function getNetWorthByAccountType(): { type: AccountType; value: number }
 
   return Array.from(totals.entries()).map(([type, value]) => ({
     type,
-    value: Math.round(value * 100) / 100,
+    value: roundPence(value),
   }));
 }
 
@@ -137,5 +138,5 @@ export function getNetWorthByAccountType(): { type: AccountType; value: number }
  */
 export function getTotalNetWorth(): number {
   const total = householdData.accounts.reduce((sum, acc) => sum + acc.currentValue, 0);
-  return Math.round(total * 100) / 100;
+  return roundPence(total);
 }

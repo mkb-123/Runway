@@ -2,7 +2,7 @@
 
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from "recharts";
 import { TAX_WRAPPER_LABELS, type TaxWrapper } from "@/types";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { formatCurrency, formatPercent, roundPence } from "@/lib/format";
 
 interface WrapperSplitData {
   wrapper: TaxWrapper;
@@ -47,7 +47,7 @@ export function WrapperSplitChart({ data }: WrapperSplitChartProps) {
     .filter((d) => d.value > 0)
     .map((d) => ({
       name: TAX_WRAPPER_LABELS[d.wrapper],
-      value: Math.round(d.value * 100) / 100,
+      value: roundPence(d.value),
       wrapper: d.wrapper,
       percent: total > 0 ? d.value / total : 0,
     }));

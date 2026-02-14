@@ -8,6 +8,7 @@
 // when they want to be scenario-aware.
 
 import { useMemo } from "react";
+import { roundPence } from "@/lib/format";
 import { useData } from "@/context/data-context";
 import { useScenario } from "@/context/scenario-context";
 import type { HouseholdData, TaxWrapper, AccountType } from "@/types";
@@ -40,9 +41,9 @@ export function useScenarioData(): ScenarioAwareData {
 
   const getTotalNetWorth = useMemo(
     () => () => {
-      return Math.round(
-        household.accounts.reduce((sum, acc) => sum + acc.currentValue, 0) * 100
-      ) / 100;
+      return roundPence(
+        household.accounts.reduce((sum, acc) => sum + acc.currentValue, 0)
+      );
     },
     [household.accounts]
   );
@@ -56,7 +57,7 @@ export function useScenarioData(): ScenarioAwareData {
         return {
           personId: person.id,
           name: person.name,
-          value: Math.round(value * 100) / 100,
+          value: roundPence(value),
         };
       });
     },
@@ -72,7 +73,7 @@ export function useScenarioData(): ScenarioAwareData {
       }
       return Array.from(totals.entries()).map(([wrapper, value]) => ({
         wrapper,
-        value: Math.round(value * 100) / 100,
+        value: roundPence(value),
       }));
     },
     [household.accounts]
@@ -89,7 +90,7 @@ export function useScenarioData(): ScenarioAwareData {
       }
       return Array.from(totals.entries()).map(([type, value]) => ({
         type,
-        value: Math.round(value * 100) / 100,
+        value: roundPence(value),
       }));
     },
     [household.accounts]

@@ -1,6 +1,7 @@
 "use client";
 
 import { useData } from "@/context/data-context";
+import { roundPence } from "@/lib/format";
 import {
   ACCOUNT_TYPE_LABELS,
   ASSET_CLASS_LABELS,
@@ -425,7 +426,7 @@ export default function SettingsPage() {
     if (field === "units" || field === "pricePerUnit") {
       const units = Number(updated.transactions[index].units);
       const price = Number(updated.transactions[index].pricePerUnit);
-      updated.transactions[index].amount = Math.round(units * price * 100) / 100;
+      updated.transactions[index].amount = roundPence(units * price);
     }
     updateTransactions(updated);
   }

@@ -3,6 +3,7 @@
 import * as XLSX from "xlsx";
 import { useData } from "@/context/data-context";
 import { ACCOUNT_TYPE_LABELS, ASSET_CLASS_LABELS, REGION_LABELS } from "@/types";
+import { roundPence } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -78,9 +79,9 @@ export default function ExportPage() {
           Units: holding.units,
           "Avg Cost Per Unit": holding.purchasePrice,
           "Current Price Per Unit": holding.currentPrice,
-          "Total Cost": Math.round(totalCost * 100) / 100,
-          "Current Value": Math.round(currentValue * 100) / 100,
-          "Gain / Loss": Math.round(gain * 100) / 100,
+          "Total Cost": roundPence(totalCost),
+          "Current Value": roundPence(currentValue),
+          "Gain / Loss": roundPence(gain),
           "Gain %": Math.round(gainPct * 10000) / 10000,
         });
       }

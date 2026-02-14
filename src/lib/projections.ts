@@ -2,6 +2,8 @@
 // Growth Projection & Retirement Planning Functions
 // ============================================================
 
+import { roundPence } from "@/lib/format";
+
 // --- Types ---
 
 export interface YearlyProjection {
@@ -52,7 +54,7 @@ export function projectCompoundGrowth(
     }
     projections.push({
       year,
-      value: Math.round(value * 100) / 100,
+      value: roundPence(value),
     });
   }
 
@@ -181,14 +183,14 @@ export function calculateRequiredSavings(
 
   // If return rate is effectively 0, simple division
   if (Math.abs(monthlyRate) < 1e-10) {
-    return Math.round((remaining / totalMonths) * 100) / 100;
+    return roundPence(remaining / totalMonths);
   }
 
   // Future value of annuity factor
   const fvAnnuityFactor = (Math.pow(1 + monthlyRate, totalMonths) - 1) / monthlyRate;
 
   const monthlyAmount = remaining / fvAnnuityFactor;
-  return Math.round(monthlyAmount * 100) / 100;
+  return roundPence(monthlyAmount);
 }
 
 // --- Pension Bridge ---
@@ -213,8 +215,8 @@ export function calculatePensionBridge(
   const shortfall = Math.max(0, bridgePotRequired - accessibleWealth);
 
   return {
-    bridgePotRequired: Math.round(bridgePotRequired * 100) / 100,
-    shortfall: Math.round(shortfall * 100) / 100,
+    bridgePotRequired: roundPence(bridgePotRequired),
+    shortfall: roundPence(shortfall),
     sufficient: accessibleWealth >= bridgePotRequired,
   };
 }
@@ -228,7 +230,7 @@ export function calculatePensionBridge(
  * @param rate - Annual withdrawal rate as a decimal (e.g. 0.04 for 4%)
  */
 export function calculateSWR(pot: number, rate: number): number {
-  return Math.round(pot * rate * 100) / 100;
+  return roundPence(pot * rate);
 }
 
 /**
@@ -239,5 +241,5 @@ export function calculateSWR(pot: number, rate: number): number {
  */
 export function calculateRequiredPot(annualIncome: number, rate: number): number {
   if (rate <= 0) return Infinity;
-  return Math.round((annualIncome / rate) * 100) / 100;
+  return roundPence(annualIncome / rate);
 }

@@ -4,6 +4,7 @@
 
 import type { Transaction, Account } from "@/types";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
+import { roundPence } from "@/lib/format";
 
 // --- Types ---
 
@@ -143,14 +144,14 @@ export function calculateSection104Pool(
 
     // Avoid floating point artifacts
     totalUnits = Math.round(totalUnits * 1e8) / 1e8;
-    pooledCost = Math.round(pooledCost * 100) / 100;
+    pooledCost = roundPence(pooledCost);
 
     pools.push({
       fundId,
       accountId,
       totalUnits,
       pooledCost,
-      averageCost: totalUnits > 0 ? Math.round((pooledCost / totalUnits) * 100) / 100 : 0,
+      averageCost: totalUnits > 0 ? roundPence(pooledCost / totalUnits) : 0,
     });
   }
 
@@ -290,8 +291,8 @@ export function calculateGainsForTaxYear(
             units: matched,
             proceedsPerUnit: tx.pricePerUnit,
             proceeds: matched * tx.pricePerUnit,
-            costBasis: Math.round(matchedCost * 100) / 100,
-            gain: Math.round((matched * tx.pricePerUnit - matchedCost) * 100) / 100,
+            costBasis: roundPence(matchedCost),
+            gain: roundPence(matched * tx.pricePerUnit - matchedCost),
             rule: "section_104",
           });
         }
@@ -335,12 +336,12 @@ export function calculateGainsForTaxYear(
 
   return {
     taxYear,
-    totalGains: Math.round(totalGains * 100) / 100,
-    totalLosses: Math.round(totalLosses * 100) / 100,
-    netGain: Math.round(netGain * 100) / 100,
+    totalGains: roundPence(totalGains),
+    totalLosses: roundPence(totalLosses),
+    netGain: roundPence(netGain),
     annualExemptAmount,
-    taxableGain: Math.round(taxableGain * 100) / 100,
-    taxDue: Math.round(taxDue * 100) / 100,
+    taxableGain: roundPence(taxableGain),
+    taxDue: roundPence(taxDue),
     disposals,
   };
 }
@@ -376,9 +377,9 @@ export function getUnrealisedGains(
       results.push({
         accountId: account.id,
         fundId: holding.fundId,
-        unrealisedGain: Math.round(unrealisedGain * 100) / 100,
+        unrealisedGain: roundPence(unrealisedGain),
         units,
-        averageCost: Math.round(averageCost * 100) / 100,
+        averageCost: roundPence(averageCost),
         currentPrice,
       });
     }
@@ -406,12 +407,12 @@ export function calculateBedAndISA(
 ): BedAndISAResult {
   // Taxable gain after applying remaining allowance
   const taxableGain = Math.max(0, unrealisedGain - cgtAllowanceRemaining);
-  const cgtCost = Math.round(taxableGain * cgtRate * 100) / 100;
+  const cgtCost = roundPence(taxableGain * cgtRate);
 
   // Annual tax saved: future gains on this amount would be tax-free in ISA
   // Estimate based on average expected return (use unrealisedGain as proxy for capital moved)
   // The actual saving depends on future returns, so we report the CGT cost of the transfer
-  const annualTaxSaved = Math.round(unrealisedGain * cgtRate * 100) / 100;
+  const annualTaxSaved = roundPence(unrealisedGain * cgtRate);
 
   return {
     sellAmount: unrealisedGain,

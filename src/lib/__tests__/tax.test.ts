@@ -7,6 +7,7 @@ import {
   calculateTakeHomePayWithStudentLoan,
 } from "../tax";
 import type { PersonIncome } from "@/types";
+import { roundPence } from "@/lib/format";
 
 describe("calculateIncomeTax", () => {
   it("returns zero tax for income below personal allowance", () => {
@@ -290,7 +291,7 @@ describe("calculateTakeHomePayWithStudentLoan", () => {
     expect(withLoan.studentLoan).toBeGreaterThan(0);
     expect(withLoan.takeHome).toBeLessThan(withoutLoan.takeHome);
     expect(withLoan.takeHome).toBe(
-      Math.round((withoutLoan.takeHome - withLoan.studentLoan) * 100) / 100
+      roundPence(withoutLoan.takeHome - withLoan.studentLoan)
     );
   });
 

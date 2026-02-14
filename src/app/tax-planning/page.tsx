@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useData } from "@/context/data-context";
+import { useScenarioData } from "@/context/use-scenario-data";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import {
   getUnrealisedGains,
@@ -31,7 +32,10 @@ import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
 import type { PersonIncome } from "@/types";
 
 export default function TaxPlanningPage() {
-  const { household, transactions: transactionsData, getAccountsForPerson, getNetWorthByWrapper } = useData();
+  const { transactions: transactionsData, getAccountsForPerson } = useData();
+  const scenarioData = useScenarioData();
+  const household = scenarioData.household;
+  const getNetWorthByWrapper = scenarioData.getNetWorthByWrapper;
   const { transactions } = transactionsData;
   const { persons, income, annualContributions } = household;
 
