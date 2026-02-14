@@ -5,6 +5,7 @@ import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import {
@@ -25,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AllocationPie } from "@/components/charts/allocation-pie";
+import { CollapsibleSection } from "@/components/collapsible-section";
 
 export default function IHTPage() {
   const scenarioData = useScenarioData();
@@ -196,18 +198,9 @@ export default function IHTPage() {
 
   return (
     <div className="space-y-8 p-4 md:p-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Inheritance Tax Planning
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Estimate your estate value, IHT liability, and track gifts within the
-            7-year window.
-          </p>
-        </div>
+      <PageHeader title="Inheritance Tax Planning" description="Estimate your estate value, IHT liability, and track gifts within the 7-year window.">
         <PersonToggle />
-      </div>
+      </PageHeader>
 
       {household.persons.length === 0 && (
         <EmptyState message="No household data yet. Add people and accounts to estimate your IHT position." settingsTab="household" />
@@ -276,252 +269,262 @@ export default function IHTPage() {
       </Card>
 
       {/* IHT Threshold */}
-      <Card>
-        <CardHeader>
-          <CardTitle>IHT Threshold</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <span className="text-sm">
-                Nil Rate Band ({formatCurrency(nilRateBandPerPerson)} per person
-                x {numberOfPersons})
-              </span>
-              <span className="font-semibold">
-                {formatCurrency(totalNilRateBand)}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div className="flex items-center gap-2">
+      <CollapsibleSection title="IHT Threshold" summary="Nil rate bands & allowances" storageKey="iht-threshold" defaultOpen>
+        <Card>
+          <CardHeader>
+            <CardTitle>IHT Threshold</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-lg border p-3">
                 <span className="text-sm">
-                  Residence Nil Rate Band (
-                  {formatCurrency(residenceNilRateBandPerPerson)} per person x{" "}
-                  {numberOfPersons})
+                  Nil Rate Band ({formatCurrency(nilRateBandPerPerson)} per person
+                  x {numberOfPersons})
                 </span>
-                {ihtConfig.passingToDirectDescendants ? (
-                  <Badge variant="secondary">Passing to descendants</Badge>
-                ) : (
-                  <Badge variant="outline">Not applicable</Badge>
-                )}
+                <span className="font-semibold">
+                  {formatCurrency(totalNilRateBand)}
+                </span>
               </div>
-              <span className="font-semibold">
-                {formatCurrency(totalResidenceNilRateBand)}
-              </span>
-            </div>
 
-            <div className="flex items-center justify-between rounded-lg border bg-green-50 dark:bg-green-950/20 p-3">
-              <span className="text-sm font-medium">
-                Combined Couple Allowance
-              </span>
-              <span className="text-lg font-bold">
-                {formatCurrency(combinedThreshold)}
-              </span>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">
+                    Residence Nil Rate Band (
+                    {formatCurrency(residenceNilRateBandPerPerson)} per person x{" "}
+                    {numberOfPersons})
+                  </span>
+                  {ihtConfig.passingToDirectDescendants ? (
+                    <Badge variant="secondary">Passing to descendants</Badge>
+                  ) : (
+                    <Badge variant="outline">Not applicable</Badge>
+                  )}
+                </div>
+                <span className="font-semibold">
+                  {formatCurrency(totalResidenceNilRateBand)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border bg-green-50 dark:bg-green-950/20 p-3">
+                <span className="text-sm font-medium">
+                  Combined Couple Allowance
+                </span>
+                <span className="text-lg font-bold">
+                  {formatCurrency(combinedThreshold)}
+                </span>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {/* IHT Liability Estimate */}
-      <Card>
-        <CardHeader>
-          <CardTitle>IHT Liability Estimate</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border p-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                Estate Value (in estate)
-              </p>
-              <p className="text-2xl font-bold">{formatCurrency(inEstate)}</p>
+      <CollapsibleSection title="IHT Liability Estimate" summary="Taxable amount & payable" storageKey="iht-liability" defaultOpen>
+        <Card>
+          <CardHeader>
+            <CardTitle>IHT Liability Estimate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-lg border p-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Estate Value (in estate)
+                </p>
+                <p className="text-2xl font-bold">{formatCurrency(inEstate)}</p>
+              </div>
+              <div className="rounded-lg border p-4 text-center">
+                <p className="text-sm text-muted-foreground">Taxable Amount</p>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(taxableAmount)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Estate - {formatCurrency(combinedThreshold)} threshold
+                </p>
+              </div>
+              <div className="rounded-lg border bg-destructive/5 border-destructive/30 p-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  IHT Payable at {formatPercent(ihtRate)}
+                </p>
+                <p className="text-2xl font-bold text-destructive">
+                  {formatCurrency(ihtLiability)}
+                </p>
+              </div>
             </div>
-            <div className="rounded-lg border p-4 text-center">
-              <p className="text-sm text-muted-foreground">Taxable Amount</p>
-              <p className="text-2xl font-bold">
-                {formatCurrency(taxableAmount)}
+            {taxableAmount <= 0 && (
+              <p className="mt-4 text-sm text-muted-foreground">
+                Your estate is currently below the combined IHT threshold. No IHT
+                would be due at current values.
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Estate - {formatCurrency(combinedThreshold)} threshold
-              </p>
-            </div>
-            <div className="rounded-lg border bg-destructive/5 border-destructive/30 p-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                IHT Payable at {formatPercent(ihtRate)}
-              </p>
-              <p className="text-2xl font-bold text-destructive">
-                {formatCurrency(ihtLiability)}
-              </p>
-            </div>
-          </div>
-          {taxableAmount <= 0 && (
-            <p className="mt-4 text-sm text-muted-foreground">
-              Your estate is currently below the combined IHT threshold. No IHT
-              would be due at current values.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {/* IHT-Sheltered vs Exposed */}
-      <Card>
-        <CardHeader>
-          <CardTitle>IHT-Sheltered vs Exposed</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 md:grid-cols-2">
-            <div>
-              <AllocationPie data={shelteredVsExposedData} height={280} />
-            </div>
-            <div className="flex flex-col justify-center space-y-4">
-              <div className="rounded-lg border bg-green-50 dark:bg-green-950/20 p-4">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Sheltered (Pensions - outside estate)
-                </p>
-                <p className="text-2xl font-bold">
-                  {formatCurrency(outsideEstate)}
-                </p>
-                <Badge variant="secondary" className="mt-1">
-                  {formatPercent(shelteredPct)}
-                </Badge>
+      <CollapsibleSection title="IHT-Sheltered vs Exposed" summary="Pension vs estate split" storageKey="iht-sheltered">
+        <Card>
+          <CardHeader>
+            <CardTitle>IHT-Sheltered vs Exposed</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-2">
+              <div>
+                <AllocationPie data={shelteredVsExposedData} height={280} />
               </div>
-              <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/20 p-4">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Exposed (In estate)
-                </p>
-                <p className="text-2xl font-bold">
-                  {formatCurrency(inEstate)}
-                </p>
-                <Badge variant="secondary" className="mt-1">
-                  {formatPercent(exposedPct)}
-                </Badge>
+              <div className="flex flex-col justify-center space-y-4">
+                <div className="rounded-lg border bg-green-50 dark:bg-green-950/20 p-4">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Sheltered (Pensions - outside estate)
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(outsideEstate)}
+                  </p>
+                  <Badge variant="secondary" className="mt-1">
+                    {formatPercent(shelteredPct)}
+                  </Badge>
+                </div>
+                <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/20 p-4">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Exposed (In estate)
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(inEstate)}
+                  </p>
+                  <Badge variant="secondary" className="mt-1">
+                    {formatPercent(exposedPct)}
+                  </Badge>
+                </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {/* 7-Year Gift Tracker */}
-      <Card>
-        <CardHeader>
-          <CardTitle>7-Year Gift Tracker</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {giftsWithStatus.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Recipient</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right">Years Ago</TableHead>
-                    <TableHead className="text-right">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {giftsWithStatus.map((gift) => (
-                    <TableRow key={gift.id}>
-                      <TableCell>{formatDate(gift.date)}</TableCell>
-                      <TableCell>{gift.recipient}</TableCell>
-                      <TableCell>{gift.description}</TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(gift.amount)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {gift.yearsSinceGift.toFixed(1)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {gift.fallenOut ? (
-                          <Badge variant="secondary">
-                            Fallen out of estate
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive">
-                            Within 7-year window
-                          </Badge>
-                        )}
-                      </TableCell>
+      <CollapsibleSection title="7-Year Gift Tracker" summary="PET tracking" storageKey="iht-gifts">
+        <Card>
+          <CardHeader>
+            <CardTitle>7-Year Gift Tracker</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {giftsWithStatus.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Recipient</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Years Ago</TableHead>
+                      <TableHead className="text-right">Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No gifts recorded. Gifts made more than 7 years before death are
-              exempt from IHT.
+                  </TableHeader>
+                  <TableBody>
+                    {giftsWithStatus.map((gift) => (
+                      <TableRow key={gift.id}>
+                        <TableCell>{formatDate(gift.date)}</TableCell>
+                        <TableCell>{gift.recipient}</TableCell>
+                        <TableCell>{gift.description}</TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(gift.amount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {gift.yearsSinceGift.toFixed(1)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {gift.fallenOut ? (
+                            <Badge variant="secondary">
+                              Fallen out of estate
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive">
+                              Within 7-year window
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No gifts recorded. Gifts made more than 7 years before death are
+                exempt from IHT.
+              </p>
+            )}
+            <p className="mt-4 text-sm text-muted-foreground">
+              Potentially Exempt Transfers (PETs) fall out of the estate after 7
+              years. Taper relief may apply for gifts made between 3 and 7 years
+              before death.
             </p>
-          )}
-          <p className="mt-4 text-sm text-muted-foreground">
-            Potentially Exempt Transfers (PETs) fall out of the estate after 7
-            years. Taper relief may apply for gifts made between 3 and 7 years
-            before death.
-          </p>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {/* Estate Growth Projection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Estate Growth Projection</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-lg border p-4">
-                <p className="text-sm text-muted-foreground">
-                  Annual Savings Into Estate (ISA + GIA)
-                </p>
-                <p className="text-2xl font-bold">
-                  {formatCurrency(annualSavingsInEstate)}
-                </p>
+      <CollapsibleSection title="Estate Growth Projection" summary="Time until IHT threshold exceeded" storageKey="iht-growth">
+        <Card>
+          <CardHeader>
+            <CardTitle>Estate Growth Projection</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Annual Savings Into Estate (ISA + GIA)
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(annualSavingsInEstate)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Combined IHT Threshold
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(combinedThreshold)}
+                  </p>
+                </div>
               </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-sm text-muted-foreground">
-                  Combined IHT Threshold
-                </p>
-                <p className="text-2xl font-bold">
-                  {formatCurrency(combinedThreshold)}
-                </p>
-              </div>
-            </div>
 
-            <div className="rounded-lg border bg-muted/50 p-4">
-              {yearsUntilExceeded === 0 ? (
-                <p className="text-sm">
-                  <span className="font-medium">Your estate already exceeds the IHT threshold.</span>{" "}
-                  The current estate value of {formatCurrency(inEstate)} is above
-                  the combined threshold of {formatCurrency(combinedThreshold)}.
-                  Consider IHT planning strategies such as making gifts,
-                  increasing pension contributions (outside estate), or
-                  establishing trusts.
-                </p>
-              ) : yearsUntilExceeded !== null ? (
-                <p className="text-sm">
-                  At the current savings rate of{" "}
-                  {formatCurrency(annualSavingsInEstate)} per year into
-                  estate-exposed accounts, your estate will exceed the{" "}
-                  {formatCurrency(combinedThreshold)} IHT threshold in
-                  approximately{" "}
-                  <span className="font-medium">
-                    {yearsUntilExceeded} year
-                    {yearsUntilExceeded !== 1 ? "s" : ""}
-                  </span>
-                  . This does not account for investment growth, which would
-                  bring this date closer.
-                </p>
-              ) : (
-                <p className="text-sm">
-                  With no additional savings flowing into estate-exposed
-                  accounts, your estate is projected to remain below the IHT
-                  threshold at current values (excluding investment growth).
-                </p>
-              )}
+              <div className="rounded-lg border bg-muted/50 p-4">
+                {yearsUntilExceeded === 0 ? (
+                  <p className="text-sm">
+                    <span className="font-medium">Your estate already exceeds the IHT threshold.</span>{" "}
+                    The current estate value of {formatCurrency(inEstate)} is above
+                    the combined threshold of {formatCurrency(combinedThreshold)}.
+                    Consider IHT planning strategies such as making gifts,
+                    increasing pension contributions (outside estate), or
+                    establishing trusts.
+                  </p>
+                ) : yearsUntilExceeded !== null ? (
+                  <p className="text-sm">
+                    At the current savings rate of{" "}
+                    {formatCurrency(annualSavingsInEstate)} per year into
+                    estate-exposed accounts, your estate will exceed the{" "}
+                    {formatCurrency(combinedThreshold)} IHT threshold in
+                    approximately{" "}
+                    <span className="font-medium">
+                      {yearsUntilExceeded} year
+                      {yearsUntilExceeded !== 1 ? "s" : ""}
+                    </span>
+                    . This does not account for investment growth, which would
+                    bring this date closer.
+                  </p>
+                ) : (
+                  <p className="text-sm">
+                    With no additional savings flowing into estate-exposed
+                    accounts, your estate is projected to remain below the IHT
+                    threshold at current values (excluding investment growth).
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
     </div>
   );
 }

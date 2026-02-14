@@ -11,9 +11,10 @@ import {
   Printer,
   ArrowRight,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page-header";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -135,29 +136,6 @@ function resolveMetric(
       };
   }
 }
-
-function HeroMetric({ type, data, primary }: { type: HeroMetricType; data: HeroMetricData; primary?: boolean }) {
-  const { label, value, subtext, color, trend } = resolveMetric(type, data);
-  return (
-    <div className={`flex flex-col gap-1 ${!primary ? "sm:border-l sm:border-border/40 sm:pl-6" : ""}`}>
-      <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-        {label}
-      </span>
-      <div className="flex items-center gap-2">
-        <span className={`${primary ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl"} font-bold tracking-tight tabular-nums ${color}`}>
-          {value}
-        </span>
-        {trend === "up" && <TrendingUp className="size-5 text-emerald-500" />}
-        {trend === "down" && <TrendingDown className="size-5 text-red-500" />}
-      </div>
-      {subtext && <span className="text-xs text-muted-foreground">{subtext}</span>}
-    </div>
-  );
-}
-
-// ============================================================
-// Collapsible Dashboard Section — progressive disclosure
-// ============================================================
 
 // CollapsibleSection is now the shared CollapsibleSection component
 
@@ -449,175 +427,229 @@ export default function Home() {
   const heroMetrics = household.dashboardConfig.heroMetrics;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* Print header */}
-        <div className="print-report-header hidden print:block">
-          <h1>Runway — Financial Report</h1>
-          <p>
-            Generated{" "}
-            {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(new Date())}
-            {" | "}
-            Household net worth: {formatCurrency(totalNetWorth)}
-          </p>
-        </div>
+    <div className="space-y-8 p-4 md:p-8">
+      {/* Print header */}
+      <div className="print-report-header hidden print:block">
+        <h1>Runway — Financial Report</h1>
+        <p>
+          Generated{" "}
+          {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(new Date())}
+          {" | "}
+          Household net worth: {formatCurrency(totalNetWorth)}
+        </p>
+      </div>
 
-        {/* Getting Started */}
-        {(!bannerDismissed || household.persons.length === 0) && (
-          <div className="relative mb-6 rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
-            <button
-              onClick={dismissBanner}
-              className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
-              aria-label="Dismiss getting started banner"
-            >
-              <X className="size-4" />
-            </button>
-            <div className="flex flex-col gap-3 pr-8 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold sm:text-xl">Getting Started</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Head to <strong>Settings</strong> first to enter your personal financial data.
-                </p>
-              </div>
-              <Link href="/settings">
-                <Button size="lg" className="w-full gap-2 sm:w-auto">
-                  <Settings className="size-4" />
-                  Open Settings
-                </Button>
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* Header + Person Toggle */}
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">
-              {latestSnapshot
-                ? new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" }).format(
-                    new Date(latestSnapshot.date)
-                  )
-                : "now"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <PersonToggle />
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0 gap-1.5 print:hidden"
-              onClick={() => window.print()}
-            >
-              <Printer className="size-3.5" />
-              <span className="hidden sm:inline">Print</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* HERO METRICS — 3 configurable slots, zero scrolling */}
-        <div className="mb-8 grid grid-cols-1 gap-3 rounded-2xl border bg-gradient-to-br from-card via-card to-primary/5 p-5 shadow-sm sm:grid-cols-3 sm:gap-6 sm:p-8">
-          {heroMetrics.map((metric, i) => (
-            <HeroMetric key={`${metric}-${i}`} type={metric} data={heroData} primary={i === 0} />
-          ))}
-        </div>
-
-        {/* RECOMMENDATIONS — collapsible */}
-        {filteredRecommendations.length > 0 && (
-          <div className="mb-6">
-            <CollapsibleSection
-              title="Recommendations"
-              summary={`${filteredRecommendations.length} suggestion${filteredRecommendations.length !== 1 ? "s" : ""}`}
-              defaultOpen
-              storageKey="recommendations"
-            >
-              <div className="grid gap-3">
-                {filteredRecommendations.map((rec) => (
-                  <RecommendationCard key={rec.id} rec={rec} />
-                ))}
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {/* PRIMARY CHARTS — always visible, 2-col on desktop */}
-        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card>
-            <CardContent className="pt-5">
-              <div className="mb-4 flex items-baseline justify-between">
-                <h2 className="text-base font-semibold tracking-tight">Net Worth by Wrapper</h2>
-                <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
-              </div>
-              <WrapperSplitChart data={byWrapper} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5">
-              <div className="mb-4 flex items-baseline justify-between">
-                <h2 className="text-base font-semibold tracking-tight">Net Worth Trajectory</h2>
-                <span className="hidden text-xs text-muted-foreground sm:inline">
-                  {scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over {projectionYears}yr
-                </span>
-              </div>
-              <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} />
-              <p className="mt-3 text-[11px] text-muted-foreground">
-                Projections are estimates, not guarantees. Capital is at risk. Past performance does not predict future returns.
+      {/* Getting Started */}
+      {(!bannerDismissed || household.persons.length === 0) && (
+        <div className="relative rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
+          <button
+            onClick={dismissBanner}
+            className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
+            aria-label="Dismiss getting started banner"
+          >
+            <X className="size-4" />
+          </button>
+          <div className="flex flex-col gap-3 pr-8 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold sm:text-xl">Getting Started</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Head to <strong>Settings</strong> first to enter your personal financial data.
               </p>
-            </CardContent>
-          </Card>
+            </div>
+            <Link href="/settings">
+              <Button size="lg" className="w-full gap-2 sm:w-auto">
+                <Settings className="size-4" />
+                Open Settings
+              </Button>
+            </Link>
+          </div>
         </div>
+      )}
 
-        {/* SECONDARY SECTIONS — collapsible */}
-        <CollapsibleSection title="Net Worth History" summary="By tax wrapper over time" storageKey="history">
+      {/* Header */}
+      <PageHeader
+        title="Dashboard"
+        description={
+          latestSnapshot
+            ? new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" }).format(
+                new Date(latestSnapshot.date)
+              )
+            : "Your financial overview"
+        }
+      >
+        <PersonToggle />
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0 gap-1.5 print:hidden"
+          onClick={() => window.print()}
+        >
+          <Printer className="size-3.5" />
+          <span className="hidden sm:inline">Print</span>
+        </Button>
+      </PageHeader>
+
+      {/* HERO — primary metric large, secondary metrics as accent cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {heroMetrics.map((metric, i) => {
+          const resolved = resolveMetric(metric, heroData);
+          const isPrimary = i === 0;
+          return (
+            <Card
+              key={`${metric}-${i}`}
+              className={
+                isPrimary
+                  ? "sm:col-span-1 bg-gradient-to-br from-primary/10 via-card to-card border-primary/20"
+                  : ""
+              }
+            >
+              <CardContent className="pt-6">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  {resolved.label}
+                </span>
+                <div className="mt-1 flex items-center gap-2">
+                  <span
+                    className={`${isPrimary ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl"} font-bold tracking-tight tabular-nums ${resolved.color}`}
+                  >
+                    {resolved.value}
+                  </span>
+                  {resolved.trend === "up" && <TrendingUp className="size-5 text-emerald-500" />}
+                  {resolved.trend === "down" && <TrendingDown className="size-5 text-red-500" />}
+                </div>
+                {resolved.subtext && (
+                  <span className="mt-0.5 block text-xs text-muted-foreground">{resolved.subtext}</span>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* FIRE progress bar */}
+      {heroData.fireProgress > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">FIRE Progress</span>
+              <span className="text-sm font-bold tabular-nums">
+                {heroData.fireProgress.toFixed(1)}%
+              </span>
+            </div>
+            <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-all"
+                style={{ width: `${Math.min(heroData.fireProgress, 100)}%` }}
+              />
+            </div>
+            <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+              <span>{formatCurrencyCompact(heroData.totalNetWorth)} saved</span>
+              <span>
+                Target: {formatCurrencyCompact(
+                  heroData.fireProgress > 0 ? heroData.totalNetWorth / (heroData.fireProgress / 100) : 0
+                )}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* RECOMMENDATIONS — collapsible */}
+      {filteredRecommendations.length > 0 && (
+        <CollapsibleSection
+          title="Recommendations"
+          summary={`${filteredRecommendations.length} suggestion${filteredRecommendations.length !== 1 ? "s" : ""}`}
+          defaultOpen
+          storageKey="recommendations"
+        >
+          <div className="grid gap-3">
+            {filteredRecommendations.map((rec) => (
+              <RecommendationCard key={rec.id} rec={rec} />
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* PRIMARY CHARTS — 2-col on desktop */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <div className="flex items-baseline justify-between">
+              <CardTitle>Net Worth by Wrapper</CardTitle>
+              <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <WrapperSplitChart data={byWrapper} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-baseline justify-between">
+              <CardTitle>Net Worth Trajectory</CardTitle>
+              <span className="hidden text-xs text-muted-foreground sm:inline">
+                {scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over {projectionYears}yr
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} />
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Projections are estimates, not guarantees. Capital is at risk. Past performance does not predict future returns.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* SECONDARY SECTIONS — collapsible */}
+      <CollapsibleSection title="Net Worth History" summary="By tax wrapper over time" storageKey="history">
+        <Card>
+          <CardContent className="pt-6">
+            <NetWorthHistoryChart snapshots={snapshots} />
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
+
+      {selectedView === "household" && (
+        <CollapsibleSection
+          title="Net Worth by Person"
+          summary={byPerson.map((p) => `${p.name}: ${formatCurrencyCompact(p.value)}`).join(", ")}
+          storageKey="by-person"
+        >
           <Card>
             <CardContent className="pt-6">
-              <NetWorthHistoryChart snapshots={snapshots} />
+              <ByPersonChart data={personChartData} />
             </CardContent>
           </Card>
         </CollapsibleSection>
+      )}
 
-        {selectedView === "household" && (
-          <CollapsibleSection
-            title="Net Worth by Person"
-            summary={byPerson.map((p) => `${p.name}: ${formatCurrencyCompact(p.value)}`).join(", ")}
-            storageKey="by-person"
-          >
-            <Card>
-              <CardContent className="pt-6">
-                <ByPersonChart data={personChartData} />
-              </CardContent>
-            </Card>
-          </CollapsibleSection>
-        )}
-
-        {household.committedOutgoings.length > 0 && (
-          <CollapsibleSection
-            title="Committed Outgoings"
-            summary={`${formatCurrencyCompact(totalAnnualCommitments)}/yr across ${household.committedOutgoings.length} items`}
-            storageKey="commitments"
-          >
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {household.committedOutgoings.map((o) => (
-                <Card key={o.id}>
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{o.label || o.category}</span>
-                      <Badge variant="secondary" className="text-[10px]">
-                        {o.frequency}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-lg font-bold tabular-nums">{formatCurrency(o.amount)}</p>
-                    <p className="text-xs text-muted-foreground tabular-nums">
-                      {formatCurrencyCompact(annualiseOutgoing(o.amount, o.frequency))}/yr
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </CollapsibleSection>
-        )}
-      </div>
+      {household.committedOutgoings.length > 0 && (
+        <CollapsibleSection
+          title="Committed Outgoings"
+          summary={`${formatCurrencyCompact(totalAnnualCommitments)}/yr across ${household.committedOutgoings.length} items`}
+          storageKey="commitments"
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {household.committedOutgoings.map((o) => (
+              <Card key={o.id}>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{o.label || o.category}</span>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {o.frequency}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-lg font-bold tabular-nums">{formatCurrency(o.amount)}</p>
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    {formatCurrencyCompact(annualiseOutgoing(o.amount, o.frequency))}/yr
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
     </div>
   );
 }

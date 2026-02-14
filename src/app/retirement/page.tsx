@@ -16,6 +16,7 @@ import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { getAccountTaxWrapper, annualiseContribution } from "@/types";
 import {
   formatCurrency,
@@ -31,6 +32,7 @@ import {
   calculateProRataStatePension,
   calculateAge,
 } from "@/lib/projections";
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { RetirementProgress } from "@/components/charts/retirement-progress";
 import { RetirementDrawdownChart } from "@/components/charts/retirement-drawdown-chart";
 import {
@@ -231,17 +233,9 @@ export default function RetirementPage() {
 
   return (
     <div className="space-y-8 p-4 md:p-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Retirement Planning
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Track your progress toward financial independence
-          </p>
-        </div>
+      <PageHeader title="Retirement Planning" description="Track your progress toward financial independence">
         <PersonToggle />
-      </div>
+      </PageHeader>
 
       {persons.length === 0 && (
         <EmptyState message="No household data yet. Add people and pension accounts to plan your retirement." settingsTab="household" />
@@ -326,315 +320,325 @@ export default function RetirementPage() {
       </Card>
 
       {/* Retirement Countdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Retirement Countdown</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Estimated time to reach {formatCurrencyCompact(requiredPot)} target
-            pot at different growth rates
-          </p>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {retirement.scenarioRates.map((rate) => {
-              const countdown = calculateRetirementCountdown(
-                currentPot,
-                totalAnnualContributions,
-                requiredPot,
-                rate
-              );
-              return (
-                <Card key={rate}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge variant="secondary">
-                        {formatPercent(rate)} return
-                      </Badge>
-                    </div>
-                    <p className="text-3xl font-bold">
-                      {countdown.years}y {countdown.months}m
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {countdown.years === 0 && countdown.months === 0
-                        ? "Target already reached"
-                        : `Approx. age ${currentAge + countdown.years}`}
-                    </p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      <CollapsibleSection title="Retirement Countdown" summary="Time to reach target at different growth rates" storageKey="retirement-countdown" defaultOpen>
+        <Card>
+          <CardHeader>
+            <CardTitle>Retirement Countdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Estimated time to reach {formatCurrencyCompact(requiredPot)} target
+              pot at different growth rates
+            </p>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {retirement.scenarioRates.map((rate) => {
+                const countdown = calculateRetirementCountdown(
+                  currentPot,
+                  totalAnnualContributions,
+                  requiredPot,
+                  rate
+                );
+                return (
+                  <Card key={rate}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant="secondary">
+                          {formatPercent(rate)} return
+                        </Badge>
+                      </div>
+                      <p className="text-3xl font-bold">
+                        {countdown.years}y {countdown.months}m
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {countdown.years === 0 && countdown.months === 0
+                          ? "Target already reached"
+                          : `Approx. age ${currentAge + countdown.years}`}
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {/* Combined Retirement Income Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Combined Retirement Income Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="mb-4 text-sm text-muted-foreground">
-            All household income sources stacked by year: state pensions, DC pension
-            drawdown, and ISA/savings bridge. Shows whether combined income meets
-            the {formatCurrency(retirement.targetAnnualIncome)}/yr target at{" "}
-            {formatPercent(midRate)} growth.
-          </p>
-          <RetirementIncomeTimeline
-            persons={personRetirementInputs}
-            targetAnnualIncome={retirement.targetAnnualIncome}
-            retirementAge={plannedRetirementAge}
-            growthRate={midRate}
-          />
-          <div className="mt-4 grid gap-2 sm:grid-cols-3">
-            {personRetirementInputs.map((p) => (
-              <div key={p.name} className="rounded-lg border p-3">
-                <p className="text-xs font-medium text-muted-foreground">
-                  {p.name}
-                </p>
-                <div className="mt-1 space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Pension pot</span>
-                    <span className="font-mono">
-                      {formatCurrencyCompact(p.pensionPot)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>ISA/Savings</span>
-                    <span className="font-mono">
-                      {formatCurrencyCompact(p.accessibleWealth)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>State pension</span>
-                    <span className="font-mono">
-                      {formatCurrency(p.statePensionAnnual)}/yr
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Pension access</span>
-                    <span>Age {p.pensionAccessAge}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>State pension</span>
-                    <span>Age {p.stateRetirementAge}</span>
+      <CollapsibleSection title="Combined Retirement Income Timeline" summary="All household income sources stacked by year" storageKey="retirement-income-timeline" defaultOpen>
+        <Card>
+          <CardHeader>
+            <CardTitle>Combined Retirement Income Timeline</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              All household income sources stacked by year: state pensions, DC pension
+              drawdown, and ISA/savings bridge. Shows whether combined income meets
+              the {formatCurrency(retirement.targetAnnualIncome)}/yr target at{" "}
+              {formatPercent(midRate)} growth.
+            </p>
+            <RetirementIncomeTimeline
+              persons={personRetirementInputs}
+              targetAnnualIncome={retirement.targetAnnualIncome}
+              retirementAge={plannedRetirementAge}
+              growthRate={midRate}
+            />
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              {personRetirementInputs.map((p) => (
+                <div key={p.name} className="rounded-lg border p-3">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {p.name}
+                  </p>
+                  <div className="mt-1 space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span>Pension pot</span>
+                      <span className="font-mono">
+                        {formatCurrencyCompact(p.pensionPot)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>ISA/Savings</span>
+                      <span className="font-mono">
+                        {formatCurrencyCompact(p.accessibleWealth)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>State pension</span>
+                      <span className="font-mono">
+                        {formatCurrency(p.statePensionAnnual)}/yr
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Pension access</span>
+                      <span>Age {p.pensionAccessAge}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>State pension</span>
+                      <span>Age {p.stateRetirementAge}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {/* Retirement Drawdown Projection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Retirement Drawdown Projection</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="mb-4 text-sm text-muted-foreground">
-            How your pot depletes during retirement at {formatCurrency(retirement.targetAnnualIncome)}/yr
-            spending, with state pension income reducing withdrawals from age{" "}
-            {primaryPerson?.stateRetirementAge ?? 67}. Capital at risk — projections are illustrative only.
-          </p>
-          <RetirementDrawdownChart
-            startingPot={requiredPot}
-            annualSpend={retirement.targetAnnualIncome}
-            retirementAge={plannedRetirementAge}
-            scenarioRates={retirement.scenarioRates}
-            statePensionAge={primaryPerson?.stateRetirementAge ?? 67}
-            statePensionAnnual={primaryStatePensionAnnual}
-          />
-        </CardContent>
-      </Card>
+      <CollapsibleSection title="Retirement Drawdown Projection" summary="How your pot depletes during retirement" storageKey="retirement-drawdown">
+        <Card>
+          <CardHeader>
+            <CardTitle>Retirement Drawdown Projection</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              How your pot depletes during retirement at {formatCurrency(retirement.targetAnnualIncome)}/yr
+              spending, with state pension income reducing withdrawals from age{" "}
+              {primaryPerson?.stateRetirementAge ?? 67}. Capital at risk — projections are illustrative only.
+            </p>
+            <RetirementDrawdownChart
+              startingPot={requiredPot}
+              annualSpend={retirement.targetAnnualIncome}
+              retirementAge={plannedRetirementAge}
+              scenarioRates={retirement.scenarioRates}
+              statePensionAge={primaryPerson?.stateRetirementAge ?? 67}
+              statePensionAnnual={primaryStatePensionAnnual}
+            />
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {/* FIRE Metrics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>FIRE Metrics</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Savings Rate */}
-          <div>
-            <h3 className="text-sm font-medium mb-1">Savings Rate</h3>
-            <p className="text-2xl font-bold">{savingsRate.toFixed(1)}%</p>
-            <p className="text-xs text-muted-foreground">
-              {formatCurrency(totalAnnualContributions)} contributions /{" "}
-              {formatCurrency(totalGrossIncome)} gross income
-            </p>
-          </div>
-
-          {/* Coast FIRE */}
-          <div>
-            <h3 className="text-sm font-medium mb-1">Coast FIRE</h3>
-            <div className="flex items-center gap-2">
-              <Badge variant={coastFIRE ? "default" : "outline"}>
-                {coastFIRE ? "Achieved" : "Not Yet"}
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                {coastFIRE
-                  ? `Your current pot will grow to ${formatCurrencyCompact(
-                      requiredPot
-                    )} by age ${pensionAccessAge} at ${formatPercent(
-                      midRate
-                    )} without further contributions`
-                  : `You need to continue contributing to reach ${formatCurrencyCompact(
-                      requiredPot
-                    )} by age ${pensionAccessAge} at ${formatPercent(midRate)}`}
-              </span>
+      <CollapsibleSection title="FIRE Metrics" summary="Savings rate, Coast FIRE, and required monthly savings" storageKey="retirement-fire">
+        <Card>
+          <CardHeader>
+            <CardTitle>FIRE Metrics</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Savings Rate */}
+            <div>
+              <h3 className="text-sm font-medium mb-1">Savings Rate</h3>
+              <p className="text-2xl font-bold">{savingsRate.toFixed(1)}%</p>
+              <p className="text-xs text-muted-foreground">
+                {formatCurrency(totalAnnualContributions)} contributions /{" "}
+                {formatCurrency(totalGrossIncome)} gross income
+              </p>
             </div>
-          </div>
 
-          {/* Required Monthly Savings */}
-          <div>
-            <h3 className="text-sm font-medium mb-2">
-              Required Monthly Savings to Hit Target
-            </h3>
-            <p className="text-xs text-muted-foreground mb-3">
-              At {formatPercent(midRate)} annual return
-            </p>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Timeframe</TableHead>
-                    <TableHead className="text-right">Monthly Savings</TableHead>
-                    <TableHead className="text-right">Annual Savings</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {requiredMonthlySavings.map(({ years, monthly }) => (
-                    <TableRow key={years}>
-                      <TableCell>{years} years</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatCurrency(monthly)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatCurrency(monthly * 12)}
-                      </TableCell>
+            {/* Coast FIRE */}
+            <div>
+              <h3 className="text-sm font-medium mb-1">Coast FIRE</h3>
+              <div className="flex items-center gap-2">
+                <Badge variant={coastFIRE ? "default" : "outline"}>
+                  {coastFIRE ? "Achieved" : "Not Yet"}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  {coastFIRE
+                    ? `Your current pot will grow to ${formatCurrencyCompact(
+                        requiredPot
+                      )} by age ${pensionAccessAge} at ${formatPercent(
+                        midRate
+                      )} without further contributions`
+                    : `You need to continue contributing to reach ${formatCurrencyCompact(
+                        requiredPot
+                      )} by age ${pensionAccessAge} at ${formatPercent(midRate)}`}
+                </span>
+              </div>
+            </div>
+
+            {/* Required Monthly Savings */}
+            <div>
+              <h3 className="text-sm font-medium mb-2">
+                Required Monthly Savings to Hit Target
+              </h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                At {formatPercent(midRate)} annual return
+              </p>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Timeframe</TableHead>
+                      <TableHead className="text-right">Monthly Savings</TableHead>
+                      <TableHead className="text-right">Annual Savings</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {requiredMonthlySavings.map(({ years, monthly }) => (
+                      <TableRow key={years}>
+                        <TableCell>{years} years</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatCurrency(monthly)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatCurrency(monthly * 12)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {/* Pension Bridge Analysis */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pension Bridge Analysis</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <p className="text-sm text-muted-foreground">
-            If you retire at age {plannedRetirementAge}, can your accessible
-            (non-pension) wealth bridge the gap until pension access at age{" "}
-            {pensionAccessAge}?
-          </p>
+      <CollapsibleSection title="Pension Bridge Analysis" summary="Can accessible wealth bridge the gap to pension access?" storageKey="retirement-bridge">
+        <Card>
+          <CardHeader>
+            <CardTitle>Pension Bridge Analysis</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <p className="text-sm text-muted-foreground">
+              If you retire at age {plannedRetirementAge}, can your accessible
+              (non-pension) wealth bridge the gap until pension access at age{" "}
+              {pensionAccessAge}?
+            </p>
 
-          {/* Accessible vs Locked Stacked Bar */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Accessible (ISA, GIA, Cash, Premium Bonds)</span>
-              <span className="font-mono">
-                {formatCurrencyCompact(accessibleWealth)}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Locked (Pensions)</span>
-              <span className="font-mono">
-                {formatCurrencyCompact(lockedWealth)}
-              </span>
-            </div>
-            <div className="relative h-8 w-full overflow-hidden rounded-full bg-muted">
-              <div className="flex h-full">
-                <div
-                  className="h-full bg-blue-500 transition-all"
-                  style={{ width: `${accessiblePercent}%` }}
-                  title={`Accessible: ${formatCurrencyCompact(accessibleWealth)}`}
-                />
-                <div
-                  className="h-full bg-amber-500 transition-all"
-                  style={{ width: `${lockedPercent}%` }}
-                  title={`Locked: ${formatCurrencyCompact(lockedWealth)}`}
-                />
+            {/* Accessible vs Locked Stacked Bar */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Accessible (ISA, GIA, Cash, Premium Bonds)</span>
+                <span className="font-mono">
+                  {formatCurrencyCompact(accessibleWealth)}
+                </span>
               </div>
-            </div>
-            <div className="flex gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <div className="h-3 w-3 rounded-sm bg-blue-500" />
-                <span>Accessible ({accessiblePercent.toFixed(1)}%)</span>
+              <div className="flex justify-between text-sm">
+                <span>Locked (Pensions)</span>
+                <span className="font-mono">
+                  {formatCurrencyCompact(lockedWealth)}
+                </span>
               </div>
-              <div className="flex items-center gap-1">
-                <div className="h-3 w-3 rounded-sm bg-amber-500" />
-                <span>Locked ({lockedPercent.toFixed(1)}%)</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Bridge Result */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Bridge Pot Required
-                </p>
-                <p className="text-2xl font-bold mt-1">
-                  {formatCurrency(bridgeResult.bridgePotRequired)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {pensionAccessAge - plannedRetirementAge} years x{" "}
-                  {formatCurrencyCompact(retirement.targetAnnualIncome)}/yr
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Status
-                </p>
-                <div className="mt-1">
-                  <Badge
-                    variant={
-                      bridgeResult.sufficient ? "default" : "destructive"
-                    }
-                    className="text-base px-3 py-1"
-                  >
-                    {bridgeResult.sufficient ? "Sufficient" : "Shortfall"}
-                  </Badge>
+              <div className="relative h-8 w-full overflow-hidden rounded-full bg-muted">
+                <div className="flex h-full">
+                  <div
+                    className="h-full bg-blue-500 transition-all"
+                    style={{ width: `${accessiblePercent}%` }}
+                    title={`Accessible: ${formatCurrencyCompact(accessibleWealth)}`}
+                  />
+                  <div
+                    className="h-full bg-amber-500 transition-all"
+                    style={{ width: `${lockedPercent}%` }}
+                    title={`Locked: ${formatCurrencyCompact(lockedWealth)}`}
+                  />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div className="flex gap-4 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <div className="h-3 w-3 rounded-sm bg-blue-500" />
+                  <span>Accessible ({accessiblePercent.toFixed(1)}%)</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="h-3 w-3 rounded-sm bg-amber-500" />
+                  <span>Locked ({lockedPercent.toFixed(1)}%)</span>
+                </div>
+              </div>
+            </div>
 
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-muted-foreground">
-                  {bridgeResult.sufficient ? "Surplus" : "Shortfall Amount"}
-                </p>
-                <p
-                  className={`text-2xl font-bold mt-1 ${
-                    bridgeResult.sufficient
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-red-600 dark:text-red-400"
-                  }`}
-                >
-                  {bridgeResult.sufficient
-                    ? formatCurrency(
-                        accessibleWealth - bridgeResult.bridgePotRequired
-                      )
-                    : formatCurrency(bridgeResult.shortfall)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {bridgeResult.sufficient
-                    ? "Accessible wealth exceeds bridge requirement"
-                    : "Additional accessible savings needed"}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </CardContent>
-      </Card>
+            {/* Bridge Result */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Bridge Pot Required
+                  </p>
+                  <p className="text-2xl font-bold mt-1">
+                    {formatCurrency(bridgeResult.bridgePotRequired)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {pensionAccessAge - plannedRetirementAge} years x{" "}
+                    {formatCurrencyCompact(retirement.targetAnnualIncome)}/yr
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Status
+                  </p>
+                  <div className="mt-1">
+                    <Badge
+                      variant={
+                        bridgeResult.sufficient ? "default" : "destructive"
+                      }
+                      className="text-base px-3 py-1"
+                    >
+                      {bridgeResult.sufficient ? "Sufficient" : "Shortfall"}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {bridgeResult.sufficient ? "Surplus" : "Shortfall Amount"}
+                  </p>
+                  <p
+                    className={`text-2xl font-bold mt-1 ${
+                      bridgeResult.sufficient
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {bridgeResult.sufficient
+                      ? formatCurrency(
+                          accessibleWealth - bridgeResult.bridgePotRequired
+                        )
+                      : formatCurrency(bridgeResult.shortfall)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {bridgeResult.sufficient
+                      ? "Accessible wealth exceeds bridge requirement"
+                      : "Additional accessible savings needed"}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
     </div>
   );
 }

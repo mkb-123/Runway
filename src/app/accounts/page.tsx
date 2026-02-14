@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 
 export default function AccountsPage() {
   const { household } = useData();
@@ -52,15 +53,9 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-8 p-4 md:p-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Accounts</h1>
-          <p className="text-sm text-muted-foreground">
-            Overview of all accounts grouped by person.
-          </p>
-        </div>
+      <PageHeader title="Accounts" description="Overview of all accounts grouped by person.">
         <PersonToggle />
-      </div>
+      </PageHeader>
 
       {accountsByPerson.length === 0 && (
         <EmptyState message="No accounts yet. Add your ISAs, pensions, and savings accounts to get started." settingsTab="accounts" />

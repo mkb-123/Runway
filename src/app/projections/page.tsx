@@ -15,6 +15,7 @@ import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/format";
 import { annualiseContribution } from "@/types";
 import { projectScenarios, calculateRequiredPot } from "@/lib/projections";
@@ -82,15 +83,9 @@ export default function ProjectionsPage() {
 
   return (
     <div className="space-y-8 p-4 md:p-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Projections</h1>
-          <p className="text-sm text-muted-foreground">
-            Growth projections across multiple return scenarios over {PROJECTION_YEARS} years
-          </p>
-        </div>
+      <PageHeader title="Projections" description={`Growth projections across multiple return scenarios over ${PROJECTION_YEARS} years`}>
         <PersonToggle />
-      </div>
+      </PageHeader>
 
       {household.accounts.length === 0 && (
         <EmptyState message="No accounts yet. Add your investment accounts to see growth projections." settingsTab="accounts" />

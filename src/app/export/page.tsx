@@ -5,6 +5,7 @@ import { useData } from "@/context/data-context";
 import { ACCOUNT_TYPE_LABELS } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 
 function downloadWorkbook(wb: XLSX.WorkBook, filename: string) {
@@ -95,17 +96,12 @@ export default function ExportPage() {
 
   return (
     <div className="space-y-8 p-4 md:p-8">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Export Data</h1>
-        <p className="text-sm text-muted-foreground">
-          Download your financial data as Excel spreadsheets for offline analysis or record keeping.
-        </p>
-      </div>
+      <PageHeader title="Export Data" description="Download your financial data as Excel spreadsheets for offline analysis or record keeping." />
 
       {/* Print Financial Report card */}
-      <Card className="mb-6 border-primary/20 bg-primary/5">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base sm:text-lg">Print Financial Report</CardTitle>
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader>
+          <CardTitle>Print Financial Report</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground sm:text-sm">
@@ -126,8 +122,8 @@ export default function ExportPage() {
       <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
         {exportItems.map((exp) => (
           <Card key={exp.title}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base sm:text-lg">{exp.title}</CardTitle>
+            <CardHeader>
+              <CardTitle>{exp.title}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-xs text-muted-foreground sm:text-sm">{exp.description}</p>
