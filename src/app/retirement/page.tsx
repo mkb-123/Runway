@@ -295,7 +295,7 @@ export default function RetirementPage() {
             Estimated time to reach {formatCurrencyCompact(requiredPot)} target
             pot at different growth rates
           </p>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {retirement.scenarioRates.map((rate) => {
               const countdown = calculateRetirementCountdown(
                 currentPot,
