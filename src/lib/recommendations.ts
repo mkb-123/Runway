@@ -82,6 +82,9 @@ interface PersonContext {
   allAccounts: Account[];
   /** FEAT-001: Effective pension annual allowance (tapered for high earners) */
   effectivePensionAllowance: number;
+  /** Total pension contributions from ALL sources: employee + employer + discretionary.
+   *  This is the value that counts against the annual allowance. */
+  totalPensionContributions: number;
 }
 
 // --- Individual analyzers ---
@@ -89,7 +92,7 @@ interface PersonContext {
 /** 1. Salary sacrifice / increased contributions to avoid personal allowance taper (60% trap) */
 // FEAT-013: Checks contribution method — only recommends salary sacrifice for salary_sacrifice users
 export function analyzeSalaryTaper(ctx: PersonContext): Recommendation[] {
-  const { person, income, contributions, adjustedGross, effectivePensionAllowance } = ctx;
+  const { person, income, adjustedGross, effectivePensionAllowance, totalPensionContributions } = ctx;
 
   if (
     adjustedGross <= UK_TAX_CONSTANTS.personalAllowanceTaperThreshold ||
@@ -102,7 +105,7 @@ export function analyzeSalaryTaper(ctx: PersonContext): Recommendation[] {
     adjustedGross - UK_TAX_CONSTANTS.personalAllowanceTaperThreshold;
   const additionalSacrifice = Math.min(
     excessOverThreshold,
-    effectivePensionAllowance - contributions.pensionContribution
+    effectivePensionAllowance - totalPensionContributions
   );
 
   if (additionalSacrifice <= 0) return [];
@@ -211,8 +214,8 @@ export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
 /** 3. Pension allowance headroom */
 // FEAT-001: Uses tapered annual allowance for high earners
 export function analyzePensionHeadroom(ctx: PersonContext): Recommendation[] {
-  const { person, contributions, adjustedGross, effectivePensionAllowance } = ctx;
-  const pensionUsed = contributions.pensionContribution;
+  const { person, adjustedGross, effectivePensionAllowance, totalPensionContributions } = ctx;
+  const pensionUsed = totalPensionContributions;
   const pensionRemaining = effectivePensionAllowance - pensionUsed;
   const pensionPercent = effectivePensionAllowance > 0
     ? Math.round((pensionUsed / effectivePensionAllowance) * 100)
@@ -342,10 +345,16 @@ export function analyzeRetirementProgress(household: HouseholdData): Recommendat
   if (progress >= 0.5) return [];
 
   const shortfall = Math.round(requiredPot - totalNW);
-  const totalAnnualContribs = household.contributions.reduce(
+  // Include ALL contributions: discretionary + employee & employer pension
+  const discretionaryContribs = household.contributions.reduce(
     (s, c) => s + annualiseContribution(c.amount, c.frequency),
     0
   );
+  const employmentPensionContribs = household.income.reduce(
+    (s, i) => s + i.employeePensionContribution + i.employerPensionContribution,
+    0
+  );
+  const totalAnnualContribs = discretionaryContribs + employmentPensionContribs;
   const yearsAtCurrentRate = totalAnnualContribs > 0
     ? Math.ceil(shortfall / totalAnnualContribs)
     : 0;
@@ -433,10 +442,16 @@ export function analyzeSavingsRate(household: HouseholdData): Recommendation[] {
   const totalGrossIncome = household.income.reduce((s, i) => s + i.grossSalary, 0);
   if (totalGrossIncome <= 0) return [];
 
-  const totalAnnualContribs = household.contributions.reduce(
+  // Include ALL savings: discretionary contributions + employee & employer pension contributions
+  const discretionaryContribs = household.contributions.reduce(
     (s, c) => s + annualiseContribution(c.amount, c.frequency),
     0
   );
+  const employmentPensionContribs = household.income.reduce(
+    (s, i) => s + i.employeePensionContribution + i.employerPensionContribution,
+    0
+  );
+  const totalAnnualContribs = discretionaryContribs + employmentPensionContribs;
   const savingsRate = totalAnnualContribs / totalGrossIncome;
 
   if (savingsRate >= 0.15) return []; // 15%+ is reasonable
@@ -515,6 +530,12 @@ export function generateRecommendations(
       adjustedIncomeForTaper
     );
 
+    // Total pension contributions from ALL sources against annual allowance
+    const totalPensionContributions =
+      personIncome.employeePensionContribution +
+      personIncome.employerPensionContribution +
+      personContributions.pensionContribution;
+
     const ctx: PersonContext = {
       person,
       income: personIncome,
@@ -523,6 +544,7 @@ export function generateRecommendations(
       adjustedGross,
       allAccounts: accounts,
       effectivePensionAllowance,
+      totalPensionContributions,
     };
 
     for (const analyze of perPersonAnalyzers) {

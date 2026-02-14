@@ -134,6 +134,12 @@ Every piece of knowledge should have a single, authoritative source in the codeb
 - Derive from principles rather than pattern-matching on memorized practices.
 - Write comprehensive property-based tests before implementation.
 
+### Testing Rules
+
+- **Bug fix testing.** Anytime you find a bug, write a test after fixing the bug. The test must reproduce the original failure and verify the fix.
+- **New code testing.** Any time you add new code, add a test. No new logic lands without corresponding test coverage.
+- **Integration testing.** Write integration tests to test common workflows that span multiple pages — e.g., "change pension contribution and ensure it is reflected on all the pages." These tests verify that data flows correctly through the context and appears consistently across the application.
+
 ## Test Coverage Gaps
 
 Most calculations are now extracted to `src/lib/` with tests. The following remain as **inline page calculations** (low risk, aggregation-only):

@@ -112,6 +112,14 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
   };
 }
 
+/** Helper: compute totalPensionContributions for a per-person test context */
+function computeTotalPension(
+  income: PersonIncome,
+  contributions: { pensionContribution: number }
+): number {
+  return income.employeePensionContribution + income.employerPensionContribution + contributions.pensionContribution;
+}
+
 // --- Tests ---
 
 describe("analyzeSalaryTaper", () => {
@@ -121,16 +129,20 @@ describe("analyzeSalaryTaper", () => {
       employeePensionContribution: 5000,
       pensionContributionMethod: "salary_sacrifice",
     });
+    const contributions = makeContributionTotals({ pensionContribution: 5000 });
     const ctx = {
       person: makePerson(),
       income,
-      contributions: makeContributionTotals({ pensionContribution: 5000 }),
+      contributions,
       accounts: [],
       adjustedGross: 110000,
       allAccounts: [],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
+    // totalPensionContributions = 5000 (employee) + 3000 (employer) + 5000 (discretionary) = 13000
+    // headroom = 60000 - 13000 = 47000; excess over 100k = 10000; additional = min(10000, 47000) = 10000
     const recs = analyzeSalaryTaper(ctx);
     expect(recs).toHaveLength(1);
     expect(recs[0].id).toContain("salary-sacrifice-taper");
@@ -139,44 +151,77 @@ describe("analyzeSalaryTaper", () => {
   });
 
   it("returns nothing when income below £100k", () => {
+    const income = makeIncome({ grossSalary: 80000 });
+    const contributions = makeContributionTotals();
     const ctx = {
       person: makePerson(),
-      income: makeIncome({ grossSalary: 80000 }),
-      contributions: makeContributionTotals(),
+      income,
+      contributions,
       accounts: [],
       adjustedGross: 77000,
       allAccounts: [],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
     expect(analyzeSalaryTaper(ctx)).toHaveLength(0);
   });
 
   it("returns nothing when income above higher rate limit", () => {
+    const income = makeIncome({ grossSalary: 200000 });
+    const contributions = makeContributionTotals();
     const ctx = {
       person: makePerson(),
-      income: makeIncome({ grossSalary: 200000 }),
-      contributions: makeContributionTotals(),
+      income,
+      contributions,
       accounts: [],
       adjustedGross: 197000,
       allAccounts: [],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
+    expect(analyzeSalaryTaper(ctx)).toHaveLength(0);
+  });
+
+  it("returns nothing when pension allowance fully used by salary sacrifice", () => {
+    // Person already contributing 50k via salary sacrifice + 3k employer = 53k of 60k allowance
+    // Plus 7k discretionary pension = 60k total — no headroom left
+    const income = makeIncome({
+      grossSalary: 115000,
+      employeePensionContribution: 50000,
+      employerPensionContribution: 3000,
+    });
+    const contributions = makeContributionTotals({ pensionContribution: 7000 });
+    const ctx = {
+      person: makePerson(),
+      income,
+      contributions,
+      accounts: [],
+      adjustedGross: 65000,
+      allAccounts: [],
+      effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
+    };
+
+    // totalPensionContributions = 50000 + 3000 + 7000 = 60000 = allowance
     expect(analyzeSalaryTaper(ctx)).toHaveLength(0);
   });
 });
 
 describe("analyzeISAUsage", () => {
   it("recommends topping up ISA when partially used", () => {
+    const income = makeIncome();
+    const contributions = makeContributionTotals({ isaContribution: 12000 });
     const ctx = {
       person: makePerson(),
-      income: makeIncome(),
-      contributions: makeContributionTotals({ isaContribution: 12000 }),
+      income,
+      contributions,
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
     const recs = analyzeISAUsage(ctx);
@@ -185,14 +230,17 @@ describe("analyzeISAUsage", () => {
   });
 
   it("recommends opening ISA when completely unused", () => {
+    const income = makeIncome();
+    const contributions = makeContributionTotals({ isaContribution: 0 });
     const ctx = {
       person: makePerson(),
-      income: makeIncome(),
-      contributions: makeContributionTotals({ isaContribution: 0 }),
+      income,
+      contributions,
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
     const recs = analyzeISAUsage(ctx);
@@ -202,14 +250,17 @@ describe("analyzeISAUsage", () => {
   });
 
   it("returns nothing when ISA fully used", () => {
+    const income = makeIncome();
+    const contributions = makeContributionTotals({ isaContribution: 20000 });
     const ctx = {
       person: makePerson(),
-      income: makeIncome(),
-      contributions: makeContributionTotals({ isaContribution: 20000 }),
+      income,
+      contributions,
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
     expect(analyzeISAUsage(ctx)).toHaveLength(0);
@@ -218,32 +269,68 @@ describe("analyzeISAUsage", () => {
 
 describe("analyzePensionHeadroom", () => {
   it("recommends using headroom when > £20k unused", () => {
+    const income = makeIncome({
+      employeePensionContribution: 3000,
+      employerPensionContribution: 3000,
+    });
+    const contributions = makeContributionTotals({ pensionContribution: 10000 });
     const ctx = {
       person: makePerson(),
-      income: makeIncome(),
-      contributions: makeContributionTotals({ pensionContribution: 10000 }),
+      income,
+      contributions,
       accounts: [],
       adjustedGross: 80000,
       allAccounts: [],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
+    // totalPensionContributions = 3000 + 3000 + 10000 = 16000. Remaining = 44000 > 20000.
     const recs = analyzePensionHeadroom(ctx);
     expect(recs).toHaveLength(1);
     expect(recs[0].category).toBe("pension");
   });
 
   it("returns nothing when pension nearly fully used", () => {
+    const income = makeIncome({
+      employeePensionContribution: 20000,
+      employerPensionContribution: 5000,
+    });
+    const contributions = makeContributionTotals({ pensionContribution: 30000 });
     const ctx = {
       person: makePerson(),
-      income: makeIncome(),
-      contributions: makeContributionTotals({ pensionContribution: 55000 }),
+      income,
+      contributions,
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
+    // totalPensionContributions = 20000 + 5000 + 30000 = 55000. Remaining = 5000 <= 20000.
+    expect(analyzePensionHeadroom(ctx)).toHaveLength(0);
+  });
+
+  it("accounts for salary sacrifice in total pension used", () => {
+    // Salary sacrifice of £40k means less headroom than discretionary pension alone would suggest
+    const income = makeIncome({
+      employeePensionContribution: 40000,
+      employerPensionContribution: 5000,
+    });
+    const contributions = makeContributionTotals({ pensionContribution: 0 });
+    const ctx = {
+      person: makePerson(),
+      income,
+      contributions,
+      accounts: [],
+      adjustedGross: 80000,
+      allAccounts: [],
+      effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
+    };
+
+    // totalPensionContributions = 40000 + 5000 + 0 = 45000. Remaining = 15000 <= 20000.
     expect(analyzePensionHeadroom(ctx)).toHaveLength(0);
   });
 });
@@ -261,14 +348,17 @@ describe("analyzeGIAOverweight", () => {
       currentValue: 70000,
     });
 
+    const income = makeIncome();
+    const contributions = makeContributionTotals();
     const ctx = {
       person: makePerson(),
-      income: makeIncome(),
-      contributions: makeContributionTotals(),
+      income,
+      contributions,
       accounts: [giaAccount],
       adjustedGross: 60000,
       allAccounts: [giaAccount, isaAccount],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
     const recs = analyzeGIAOverweight(ctx);
@@ -288,14 +378,17 @@ describe("analyzeGIAOverweight", () => {
       currentValue: 95000,
     });
 
+    const income = makeIncome();
+    const contributions = makeContributionTotals();
     const ctx = {
       person: makePerson(),
-      income: makeIncome(),
-      contributions: makeContributionTotals(),
+      income,
+      contributions,
       accounts: [giaAccount],
       adjustedGross: 60000,
       allAccounts: [giaAccount, isaAccount],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
     expect(analyzeGIAOverweight(ctx)).toHaveLength(0);
@@ -437,14 +530,17 @@ describe("analyzeBedAndISA", () => {
       costBasis: 10000,
     });
 
+    const income = makeIncome();
+    const contributions = makeContributionTotals({ isaContribution: 5000 });
     const ctx = {
       person: makePerson(),
-      income: makeIncome(),
-      contributions: makeContributionTotals({ isaContribution: 5000 }),
+      income,
+      contributions,
       accounts: [smallGainAccount],
       adjustedGross: 60000,
       allAccounts: [smallGainAccount],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
     // Unrealised gain: 10300 - 10000 = 300, within CGT allowance
@@ -463,14 +559,17 @@ describe("analyzeBedAndISA", () => {
       currentValue: 0,
     });
 
+    const income = makeIncome();
+    const contributions = makeContributionTotals({ isaContribution: 5000 });
     const ctx = {
       person: makePerson(),
-      income: makeIncome(),
-      contributions: makeContributionTotals({ isaContribution: 5000 }),
+      income,
+      contributions,
       accounts: [emptyGia],
       adjustedGross: 60000,
       allAccounts: [emptyGia],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
     expect(analyzeBedAndISA(ctx, 15000)).toHaveLength(0);
@@ -484,14 +583,17 @@ describe("analyzeBedAndISA", () => {
       costBasis: 8000,
     });
 
+    const income = makeIncome();
+    const contributions = makeContributionTotals({ isaContribution: 20000 });
     const ctx = {
       person: makePerson(),
-      income: makeIncome(),
-      contributions: makeContributionTotals({ isaContribution: 20000 }),
+      income,
+      contributions,
       accounts: [giaAccount],
       adjustedGross: 60000,
       allAccounts: [giaAccount],
       effectivePensionAllowance: 60000,
+      totalPensionContributions: computeTotalPension(income, contributions),
     };
 
     // ISA fully used: 20000 - 20000 = 0 remaining
@@ -519,11 +621,6 @@ describe("analyzeExcessCash", () => {
         targetMonths: 6,
       },
     });
-    // Emergency target: 12,000
-    // Total cash: 40,000
-    // Excess: 28,000
-    // NW: 100,000
-    // Excess/NW: 28% > 15% and > 10k
 
     const recs = analyzeExcessCash(household);
     expect(recs).toHaveLength(1);
@@ -551,10 +648,6 @@ describe("analyzeExcessCash", () => {
         targetMonths: 6,
       },
     });
-    // Emergency target: 12,000
-    // Excess: 3,000
-    // NW: 515,000
-    // 3,000/515,000 = 0.6% < 15%
 
     expect(analyzeExcessCash(household)).toHaveLength(0);
   });
@@ -579,16 +672,22 @@ describe("analyzeExcessCash", () => {
 });
 
 describe("analyzeSavingsRate", () => {
-  it("warns when savings rate is below 15%", () => {
+  it("warns when savings rate is below 15% (including employment pension)", () => {
     const household = makeHousehold({
-      income: [makeIncome({ grossSalary: 100000 })],
+      // Zero employment pension contributions to isolate discretionary
+      income: [makeIncome({
+        grossSalary: 100000,
+        employeePensionContribution: 0,
+        employerPensionContribution: 0,
+      })],
       contributions: makeContributions("person-1", {
         isaContribution: 5000,
         pensionContribution: 5000,
         giaContribution: 0,
       }),
     });
-    // Total contributions: 10,000 / 100,000 = 10% < 15%
+    // Total contributions: 0 (employment) + 10,000 (discretionary) = 10,000
+    // 10,000 / 100,000 = 10% < 15%
 
     const recs = analyzeSavingsRate(household);
     expect(recs).toHaveLength(1);
@@ -596,23 +695,32 @@ describe("analyzeSavingsRate", () => {
     expect(recs[0].category).toBe("retirement");
   });
 
-  it("returns nothing when savings rate is >= 15%", () => {
+  it("returns nothing when savings rate is >= 15% including salary sacrifice", () => {
     const household = makeHousehold({
-      income: [makeIncome({ grossSalary: 100000 })],
+      income: [makeIncome({
+        grossSalary: 100000,
+        employeePensionContribution: 10000,
+        employerPensionContribution: 5000,
+      })],
       contributions: makeContributions("person-1", {
-        isaContribution: 10000,
-        pensionContribution: 6000,
+        isaContribution: 0,
+        pensionContribution: 0,
         giaContribution: 0,
       }),
     });
-    // Total: 16,000 / 100,000 = 16% > 15%
+    // Total: 10,000 (employee) + 5,000 (employer) + 0 (discretionary) = 15,000
+    // 15,000 / 100,000 = 15% >= 15%
 
     expect(analyzeSavingsRate(household)).toHaveLength(0);
   });
 
   it("flags high priority when savings rate is below 5%", () => {
     const household = makeHousehold({
-      income: [makeIncome({ grossSalary: 100000 })],
+      income: [makeIncome({
+        grossSalary: 100000,
+        employeePensionContribution: 0,
+        employerPensionContribution: 0,
+      })],
       contributions: makeContributions("person-1", {
         isaContribution: 2000,
         pensionContribution: 1000,
@@ -630,6 +738,25 @@ describe("analyzeSavingsRate", () => {
     const household = makeHousehold({
       income: [makeIncome({ grossSalary: 0 })],
     });
+
+    expect(analyzeSavingsRate(household)).toHaveLength(0);
+  });
+
+  it("includes salary sacrifice in savings rate calculation", () => {
+    const household = makeHousehold({
+      income: [makeIncome({
+        grossSalary: 100000,
+        employeePensionContribution: 8000,
+        employerPensionContribution: 5000,
+      })],
+      contributions: makeContributions("person-1", {
+        isaContribution: 3000,
+        pensionContribution: 0,
+        giaContribution: 0,
+      }),
+    });
+    // Total: 8,000 (employee) + 5,000 (employer) + 3,000 (ISA) = 16,000
+    // 16,000 / 100,000 = 16% >= 15%
 
     expect(analyzeSavingsRate(household)).toHaveLength(0);
   });

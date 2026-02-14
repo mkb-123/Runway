@@ -27,16 +27,43 @@ import {
 } from "@/components/ui/table";
 import { AllocationPie } from "@/components/charts/allocation-pie";
 import { CollapsibleSection } from "@/components/collapsible-section";
+import { ScenarioDelta } from "@/components/scenario-delta";
 
 export default function IHTPage() {
   const scenarioData = useScenarioData();
   const { selectedView } = usePersonView();
   const household = scenarioData.household;
+  const baseHousehold = scenarioData.baseHousehold;
 
   const filteredAccounts = useMemo(() => {
     if (selectedView === "household") return household.accounts;
     return household.accounts.filter((a) => a.personId === selectedView);
   }, [household.accounts, selectedView]);
+
+  // Base IHT data for what-if comparison
+  const baseIhtData = useMemo(() => {
+    const baseAccounts = selectedView === "household"
+      ? baseHousehold.accounts
+      : baseHousehold.accounts.filter((a) => a.personId === selectedView);
+    const totalNW = baseAccounts.reduce((sum, a) => sum + a.currentValue, 0);
+    const wrapperTotals = new Map<TaxWrapper, number>();
+    for (const a of baseAccounts) {
+      const w = getAccountTaxWrapper(a.type);
+      wrapperTotals.set(w, (wrapperTotals.get(w) ?? 0) + a.currentValue);
+    }
+    // pensionVal excluded from estate
+    const isaVal = wrapperTotals.get("isa") ?? 0;
+    const giaVal = wrapperTotals.get("gia") ?? 0;
+    const cashVal = wrapperTotals.get("cash") ?? 0;
+    const pbVal = wrapperTotals.get("premium_bonds") ?? 0;
+    const baseInEstate = baseHousehold.iht.estimatedPropertyValue + isaVal + giaVal + cashVal + pbVal;
+    const numberOfPersons = selectedView === "household" ? baseHousehold.persons.length : 1;
+    const giftsWithin7Years = baseHousehold.iht.gifts
+      .filter((g) => yearsSince(g.date) < 7)
+      .reduce((sum, g) => sum + g.amount, 0);
+    const result = calculateIHT(baseInEstate, numberOfPersons, giftsWithin7Years, baseHousehold.iht.passingToDirectDescendants);
+    return { totalNetWorth: totalNW, inEstate: baseInEstate, taxableAmount: result.taxableAmount, ihtLiability: result.ihtLiability };
+  }, [baseHousehold, selectedView]);
 
   const ihtData = useMemo(() => {
     const ihtConfig = household.iht;
@@ -218,7 +245,7 @@ export default function IHTPage() {
                 Total Net Worth (all accounts)
               </p>
               <p className="text-2xl font-bold">
-                {formatCurrency(totalNetWorth)}
+                <ScenarioDelta base={baseIhtData.totalNetWorth} scenario={totalNetWorth} format={formatCurrency} />
               </p>
             </div>
             <div className="rounded-lg border p-4 text-center">
@@ -233,7 +260,9 @@ export default function IHTPage() {
               <p className="text-sm text-muted-foreground">
                 Estimated Estate (excl. pensions)
               </p>
-              <p className="text-2xl font-bold">{formatCurrency(inEstate)}</p>
+              <p className="text-2xl font-bold">
+                <ScenarioDelta base={baseIhtData.inEstate} scenario={inEstate} format={formatCurrency} />
+              </p>
             </div>
           </div>
 
@@ -329,12 +358,14 @@ export default function IHTPage() {
                 <p className="text-sm text-muted-foreground">
                   Estate Value (in estate)
                 </p>
-                <p className="text-2xl font-bold">{formatCurrency(inEstate)}</p>
+                <p className="text-2xl font-bold">
+                  <ScenarioDelta base={baseIhtData.inEstate} scenario={inEstate} format={formatCurrency} />
+                </p>
               </div>
               <div className="rounded-lg border p-4 text-center">
                 <p className="text-sm text-muted-foreground">Taxable Amount</p>
                 <p className="text-2xl font-bold">
-                  {formatCurrency(taxableAmount)}
+                  <ScenarioDelta base={baseIhtData.taxableAmount} scenario={taxableAmount} format={formatCurrency} />
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Estate - {formatCurrency(combinedThreshold)} threshold
@@ -345,7 +376,7 @@ export default function IHTPage() {
                   IHT Payable at {formatPercent(ihtRate)}
                 </p>
                 <p className="text-2xl font-bold text-destructive">
-                  {formatCurrency(ihtLiability)}
+                  <ScenarioDelta base={baseIhtData.ihtLiability} scenario={ihtLiability} format={formatCurrency} />
                 </p>
               </div>
             </div>

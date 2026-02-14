@@ -17,6 +17,8 @@ import { getAccountTaxWrapper } from "@/types";
 export interface ScenarioAwareData {
   /** Household data with scenario overrides applied */
   household: HouseholdData;
+  /** Base (un-overridden) household data for before/after comparison */
+  baseHousehold: HouseholdData;
   /** Whether we're currently in scenario mode */
   isScenarioMode: boolean;
   /** Total net worth (scenario-adjusted) */
@@ -98,6 +100,7 @@ export function useScenarioData(): ScenarioAwareData {
 
   return {
     household,
+    baseHousehold: data.household,
     isScenarioMode,
     getTotalNetWorth,
     getNetWorthByPerson,

@@ -41,6 +41,7 @@ import { TaxBandChart } from "@/components/charts/tax-band-chart";
 import { CashFlowTimeline } from "@/components/charts/cash-flow-timeline";
 import { generateCashFlowTimeline } from "@/lib/cash-flow";
 import type { TaxBandDataItem } from "@/components/charts/tax-band-chart";
+import { ScenarioDelta } from "@/components/scenario-delta";
 
 // --- Helper: projected value at vesting (delegates to lib function) ---
 function projectedValue(tranche: DeferredBonusTranche): number {
@@ -74,6 +75,7 @@ export default function IncomePage() {
   const { selectedView } = usePersonView();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
+  const baseHousehold = scenarioData.baseHousehold;
   const { persons: allPersons, income: allIncome, bonusStructures: allBonusStructures, contributions: allContributions, committedOutgoings, emergencyFund } = household;
 
   const persons = useMemo(() => {
@@ -144,6 +146,48 @@ export default function IncomePage() {
     [persons, income, bonusStructures, contributions]
   );
 
+  // Base income values per person (for what-if comparison)
+  const baseIncomeLookup = useMemo(() => {
+    const map = new Map<string, {
+      grossSalary: number;
+      employeePension: number;
+      employerPension: number;
+      incomeTax: number;
+      ni: number;
+      takeHome: number;
+      monthlyTakeHome: number;
+      adjustedGross: number;
+      pensionDeduction: number;
+      studentLoan: number;
+    }>();
+    for (const person of baseHousehold.persons) {
+      const baseIncome = baseHousehold.income.find((i) => i.personId === person.id);
+      if (!baseIncome) continue;
+      const baseBonus = baseHousehold.bonusStructures.find((b) => b.personId === person.id);
+      const cashBonus = baseBonus?.cashBonusAnnual ?? 0;
+      const totalGross = baseIncome.grossSalary + cashBonus;
+      const tax = calculateIncomeTax(totalGross, baseIncome.employeePensionContribution, baseIncome.pensionContributionMethod);
+      const ni = calculateNI(totalGross, baseIncome.employeePensionContribution, baseIncome.pensionContributionMethod);
+      const slGross = baseIncome.pensionContributionMethod === "salary_sacrifice" ? totalGross - baseIncome.employeePensionContribution : totalGross;
+      const sl = calculateStudentLoan(slGross, person.studentLoanPlan);
+      const incomeWithBonus = { ...baseIncome, grossSalary: totalGross };
+      const th = calculateTakeHomePayWithStudentLoan(incomeWithBonus, person.studentLoanPlan);
+      map.set(person.id, {
+        grossSalary: baseIncome.grossSalary,
+        employeePension: baseIncome.employeePensionContribution,
+        employerPension: baseIncome.employerPensionContribution,
+        incomeTax: tax.tax,
+        ni: ni.ni,
+        takeHome: th.takeHome,
+        monthlyTakeHome: th.monthlyTakeHome,
+        adjustedGross: th.adjustedGross,
+        pensionDeduction: th.pensionDeduction,
+        studentLoan: sl,
+      });
+    }
+    return map;
+  }, [baseHousehold]);
+
   // Compute combined waterfall data
   const {
     waterfallData,
@@ -191,8 +235,14 @@ export default function IncomePage() {
     ];
 
     // Tax Efficiency Score (via lib function)
+    // Include ALL pension contributions: salary sacrifice/net pay from income + discretionary
     const totISA = personAnalysis.reduce((sum, p) => sum + p.contributions.isaContribution, 0);
-    const totPension = personAnalysis.reduce((sum, p) => sum + p.contributions.pensionContribution, 0);
+    const discretionaryPension = personAnalysis.reduce((sum, p) => sum + p.contributions.pensionContribution, 0);
+    const employmentPension = income.reduce(
+      (sum, i) => sum + i.employeePensionContribution + i.employerPensionContribution,
+      0
+    );
+    const totPension = discretionaryPension + employmentPension;
     const totGIA = personAnalysis.reduce((sum, p) => sum + p.contributions.giaContribution, 0);
     const totSavings = totISA + totPension + totGIA;
     const taxAdvSavings = totISA + totPension;
@@ -204,7 +254,7 @@ export default function IncomePage() {
       taxAdvantagedSavings: taxAdvSavings,
       taxEfficiencyScore: taxEffScore,
     };
-  }, [personAnalysis, committedOutgoings, emergencyFund.monthlyLifestyleSpending]);
+  }, [personAnalysis, committedOutgoings, emergencyFund.monthlyLifestyleSpending, income]);
 
   return (
     <div className="space-y-8 p-4 md:p-8">
@@ -239,13 +289,21 @@ export default function IncomePage() {
                 <div className="flex items-baseline justify-between">
                   <span className="text-muted-foreground">Annual gross salary</span>
                   <span className="text-2xl font-bold">
-                    {formatCurrency(personIncome.grossSalary)}
+                    <ScenarioDelta
+                      base={baseIncomeLookup.get(person.id)?.grossSalary ?? personIncome.grossSalary}
+                      scenario={personIncome.grossSalary}
+                      format={formatCurrency}
+                    />
                   </span>
                 </div>
                 <div className="mt-2 flex items-baseline justify-between">
                   <span className="text-sm text-muted-foreground">Monthly gross</span>
                   <span className="text-sm font-medium">
-                    {formatCurrency(personIncome.grossSalary / 12)}
+                    <ScenarioDelta
+                      base={(baseIncomeLookup.get(person.id)?.grossSalary ?? personIncome.grossSalary) / 12}
+                      scenario={personIncome.grossSalary / 12}
+                      format={formatCurrency}
+                    />
                   </span>
                 </div>
               </CardContent>
@@ -290,7 +348,11 @@ export default function IncomePage() {
                           Effective: {formatPercent(incomeTaxResult.effectiveRate)}
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          {formatCurrency(incomeTaxResult.tax)}
+                          <ScenarioDelta
+                            base={baseIncomeLookup.get(person.id)?.incomeTax ?? incomeTaxResult.tax}
+                            scenario={incomeTaxResult.tax}
+                            format={formatCurrency}
+                          />
                         </TableCell>
                       </TableRow>
                     </TableFooter>
@@ -333,7 +395,11 @@ export default function IncomePage() {
                           Total National Insurance
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          {formatCurrency(niResult.ni)}
+                          <ScenarioDelta
+                            base={baseIncomeLookup.get(person.id)?.ni ?? niResult.ni}
+                            scenario={niResult.ni}
+                            format={formatCurrency}
+                          />
                         </TableCell>
                       </TableRow>
                     </TableFooter>
@@ -385,22 +451,31 @@ export default function IncomePage() {
                   <div className="flex items-baseline justify-between">
                     <span className="text-muted-foreground">Employee contribution (annual)</span>
                     <span className="font-medium">
-                      {formatCurrency(personIncome.employeePensionContribution)}
+                      <ScenarioDelta
+                        base={baseIncomeLookup.get(person.id)?.employeePension ?? personIncome.employeePensionContribution}
+                        scenario={personIncome.employeePensionContribution}
+                        format={formatCurrency}
+                      />
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between">
                     <span className="text-muted-foreground">Employer contribution (annual)</span>
                     <span className="font-medium">
-                      {formatCurrency(personIncome.employerPensionContribution)}
+                      <ScenarioDelta
+                        base={baseIncomeLookup.get(person.id)?.employerPension ?? personIncome.employerPensionContribution}
+                        scenario={personIncome.employerPensionContribution}
+                        format={formatCurrency}
+                      />
                     </span>
                   </div>
                   <div className="border-t pt-3 flex items-baseline justify-between">
                     <span className="font-semibold">Total pension (annual)</span>
                     <span className="font-semibold">
-                      {formatCurrency(
-                        personIncome.employeePensionContribution +
-                          personIncome.employerPensionContribution
-                      )}
+                      <ScenarioDelta
+                        base={(baseIncomeLookup.get(person.id)?.employeePension ?? 0) + (baseIncomeLookup.get(person.id)?.employerPension ?? 0)}
+                        scenario={personIncome.employeePensionContribution + personIncome.employerPensionContribution}
+                        format={formatCurrency}
+                      />
                     </span>
                   </div>
                 </div>
@@ -413,52 +488,59 @@ export default function IncomePage() {
                 <CardTitle>Take-Home Pay</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-muted-foreground">Gross salary</span>
-                    <span className="font-medium">{formatCurrency(takeHome.gross)}</span>
-                  </div>
-                  {takeHome.adjustedGross !== takeHome.gross && (
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-muted-foreground">Adjusted gross (after pension)</span>
-                      <span className="font-medium">
-                        {formatCurrency(takeHome.adjustedGross)}
-                      </span>
+                {(() => {
+                  const base = baseIncomeLookup.get(person.id);
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-muted-foreground">Gross salary</span>
+                        <span className="font-medium">
+                          <ScenarioDelta base={base?.grossSalary ?? takeHome.gross} scenario={takeHome.gross} format={formatCurrency} />
+                        </span>
+                      </div>
+                      {takeHome.adjustedGross !== takeHome.gross && (
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-muted-foreground">Adjusted gross (after pension)</span>
+                          <span className="font-medium">
+                            <ScenarioDelta base={base?.adjustedGross ?? takeHome.adjustedGross} scenario={takeHome.adjustedGross} format={formatCurrency} />
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-baseline justify-between text-red-600">
+                        <span>Income tax</span>
+                        <span>-<ScenarioDelta base={base?.incomeTax ?? takeHome.incomeTax} scenario={takeHome.incomeTax} format={formatCurrency} /></span>
+                      </div>
+                      <div className="flex items-baseline justify-between text-red-600">
+                        <span>National Insurance</span>
+                        <span>-<ScenarioDelta base={base?.ni ?? takeHome.ni} scenario={takeHome.ni} format={formatCurrency} /></span>
+                      </div>
+                      {takeHome.studentLoan > 0 && (
+                        <div className="flex items-baseline justify-between text-red-600">
+                          <span>Student loan</span>
+                          <span>-<ScenarioDelta base={base?.studentLoan ?? takeHome.studentLoan} scenario={takeHome.studentLoan} format={formatCurrency} /></span>
+                        </div>
+                      )}
+                      <div className="flex items-baseline justify-between text-red-600">
+                        <span>Pension deduction</span>
+                        <span>-<ScenarioDelta base={base?.pensionDeduction ?? takeHome.pensionDeduction} scenario={takeHome.pensionDeduction} format={formatCurrency} /></span>
+                      </div>
+                      <div className="border-t pt-3">
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-lg font-semibold">Annual take-home</span>
+                          <span className="text-lg font-bold text-green-600">
+                            <ScenarioDelta base={base?.takeHome ?? takeHome.takeHome} scenario={takeHome.takeHome} format={formatCurrency} />
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-baseline justify-between">
+                          <span className="text-muted-foreground">Monthly take-home</span>
+                          <span className="font-semibold text-green-600">
+                            <ScenarioDelta base={base?.monthlyTakeHome ?? takeHome.monthlyTakeHome} scenario={takeHome.monthlyTakeHome} format={formatCurrency} />
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  <div className="flex items-baseline justify-between text-red-600">
-                    <span>Income tax</span>
-                    <span>-{formatCurrency(takeHome.incomeTax)}</span>
-                  </div>
-                  <div className="flex items-baseline justify-between text-red-600">
-                    <span>National Insurance</span>
-                    <span>-{formatCurrency(takeHome.ni)}</span>
-                  </div>
-                  {takeHome.studentLoan > 0 && (
-                    <div className="flex items-baseline justify-between text-red-600">
-                      <span>Student loan</span>
-                      <span>-{formatCurrency(takeHome.studentLoan)}</span>
-                    </div>
-                  )}
-                  <div className="flex items-baseline justify-between text-red-600">
-                    <span>Pension deduction</span>
-                    <span>-{formatCurrency(takeHome.pensionDeduction)}</span>
-                  </div>
-                  <div className="border-t pt-3">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-lg font-semibold">Annual take-home</span>
-                      <span className="text-lg font-bold text-green-600">
-                        {formatCurrency(takeHome.takeHome)}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex items-baseline justify-between">
-                      <span className="text-muted-foreground">Monthly take-home</span>
-                      <span className="font-semibold text-green-600">
-                        {formatCurrency(takeHome.monthlyTakeHome)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </CardContent>
             </Card>
 
