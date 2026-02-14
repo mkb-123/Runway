@@ -10,7 +10,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (124 tests)
+- **Testing:** Vitest + Testing Library (145 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
@@ -45,6 +45,7 @@ This project uses a **Finance Agent Team** for design and architecture decisions
 | Devil's Advocate | `.claude/agents/devils-advocate.md` | Challenges assumptions, identifies risks, stress-tests ideas |
 | HNW Customer (James) | `.claude/agents/hnw-customer.md` | Real user perspective, retirement planning, tax optimisation, couple's finances |
 | HNW Customer (Priya) | `.claude/agents/hnw-customer-priya.md` | Busy family perspective, cash flow under school fees, bonus tranches, variable household income |
+| Senior Web Architect | `.claude/agents/web-architect.md` | 30 years building web apps, separation of concerns, testability, no inline computation, anti-duplication |
 
 ### Decision Process
 
@@ -105,6 +106,23 @@ Producing wrong results is worse than going down. When you can't guarantee corre
 - Fail fast, fail visibly. When invariants are violated beyond recovery, crash immediately.
 - Bound uncertainty. If you serve stale data, bound how stale. If you retry, bound how many times. If you queue, bound how deep.
 
+### 6. No Inline Financial Computation
+
+Financial calculations must never live inside React components. Inline computation in `useMemo` or render logic is a code smell — it's untestable, unreviewable, and impossible to verify against HMRC rules.
+
+- **Extract all financial math to `src/lib/`**. Components call pure functions and render results. No arithmetic in JSX or `useMemo` beyond trivial aggregation (e.g. `array.reduce` for totals).
+- **Every financial calculation must have a test**. If you add a formula, add a test. If you change a rate, update the test. No exceptions.
+- **Name the formula**. Don't write `Math.max(0, Math.floor((x - threshold) / 2))` inline — extract it as `calculateRnrbTaperReduction(estateValue)` with a docstring citing the HMRC rule.
+
+### 7. No Duplication
+
+Every piece of knowledge should have a single, authoritative source in the codebase.
+
+- **Constants live in `tax-constants.ts`**. Never hardcode a tax rate, threshold, or allowance in a component.
+- **Shared calculations live in `src/lib/`**. If two pages compute the same thing, extract it.
+- **Shared UI patterns live in `src/components/`**. If two pages render the same structure, extract it.
+- Before writing new code, search for existing implementations. Prefer reuse over reinvention.
+
 ### Guidance for Coding Agents
 
 - Test hypotheses by running code; leverage computational advantages.
@@ -114,3 +132,37 @@ Producing wrong results is worse than going down. When you can't guarantee corre
 - Question unclear directions rather than producing extensive wrong approaches.
 - Derive from principles rather than pattern-matching on memorized practices.
 - Write comprehensive property-based tests before implementation.
+
+## Test Coverage Gaps
+
+Calculations in `src/lib/` are well-tested. The following **inline page calculations** need extracting to `src/lib/` with tests:
+
+### High Priority (Financial Correctness)
+
+| Page | Inline Calculation | Risk |
+|------|--------------------|------|
+| `iht/page.tsx` | RNRB taper: `Math.floor((estate - threshold) / 2)` | Must match HMRC formula exactly |
+| `iht/page.tsx` | 7-year gift NRB reduction | Complex gift relief taper rules |
+| `iht/page.tsx` | IHT liability: `taxableAmount * rate` | Combines multiple thresholds |
+| `tax-planning/page.tsx` | CGT rate determination (gross salary vs basic rate limit) | Ignores pension method effect on marginal rate |
+| `tax-planning/page.tsx` | Bed & ISA break-even: hardcoded 7% return | Should be configurable or documented |
+| `retirement/page.tsx` | Age calculation from DOB: `365.25 * ms` | Leap year precision over long spans |
+| `income/page.tsx` | Tax efficiency score: `taxAdvSavings / totSavings` | Excludes employer contributions |
+| `income/page.tsx` | Deferred bonus projection: compound growth to vesting | Fractional year handling |
+
+### Medium Priority (Accuracy)
+
+| Page | Inline Calculation | Risk |
+|------|--------------------|------|
+| `holdings/page.tsx` | Unrealised gain/loss aggregation | Floating-point drift across many holdings |
+| `allocation/page.tsx` | By-asset-class/region percentage aggregation | Same floating-point concern |
+| `retirement/page.tsx` | Mid-scenario rate selection | Array index assumption |
+| `retirement/page.tsx` | Savings rate: `contributions / grossIncome * 100` | Division by zero if no income |
+
+### Untested Recommendation Analyzers
+
+| Function | What it does |
+|----------|-------------|
+| `analyzeBedAndISA()` | GIA value + ISA remaining + unrealised gains check |
+| `analyzeExcessCash()` | Cash vs emergency target + 15% of net worth |
+| `analyzeSavingsRate()` | 15% savings rate target calculation |

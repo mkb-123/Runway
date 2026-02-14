@@ -8,13 +8,13 @@
                        │  Final decision maker│
                        └─────────┬───────────┘
                                  │
-     ┌───────────┬───────────┬───┴────┬───────────┬───────────┬───────────┐
-     │           │           │        │           │           │           │
-┌────┴─────┐ ┌──┴────┐ ┌────┴───┐ ┌──┴──────┐ ┌──┴──────────┐ ┌──┴──────────┐
-│  Mobile  │ │Chart- │ │Finan-  │ │Devil's  │ │ HNW Customer│ │ HNW Customer│
-│  Web     │ │  ing  │ │ cial   │ │Advocate │ │  (James)    │ │  (Priya)    │
-│ Designer │ │Expert │ │Advisor │ │         │ │             │ │             │
-└──────────┘ └───────┘ └────────┘ └─────────┘ └─────────────┘ └─────────────┘
+     ┌───────────┬───────────┬───┴────┬───────────┬───────────┬───────────┬───────────┐
+     │           │           │        │           │           │           │           │
+┌────┴─────┐ ┌──┴────┐ ┌────┴───┐ ┌──┴──────┐ ┌──┴──────────┐ ┌──┴──────────┐ ┌──┴──────────┐
+│  Mobile  │ │Chart- │ │Finan-  │ │Devil's  │ │ HNW Customer│ │ HNW Customer│ │   Senior    │
+│  Web     │ │  ing  │ │ cial   │ │Advocate │ │  (James)    │ │  (Priya)    │ │    Web      │
+│ Designer │ │Expert │ │Advisor │ │         │ │             │ │             │ │  Architect  │
+└──────────┘ └───────┘ └────────┘ └─────────┘ └─────────────┘ └─────────────┘ └─────────────┘
 ```
 
 ## When to Convene the Team
@@ -81,6 +81,11 @@ Each agent responds in character, using their defined response format:
    - Recommends specific Recharts implementation.
    - Warns about visualisation anti-patterns.
 
+**5. Senior Web Architect speaks sixth**
+   - Evaluates separation of concerns — is logic in the right layer?
+   - Checks for inline computation, duplication, and testability.
+   - Assesses overall code architecture and maintainability.
+
 **6. Devil's Advocate speaks last**
    - Challenges the consensus.
    - Identifies failure modes and edge cases.
@@ -116,6 +121,7 @@ As Team Lead, I (Claude) will:
 - Financial Advisor: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Mobile Web Designer: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Charting Expert: [SUPPORT / CONCERN / OPPOSE] — [one line]
+- Senior Web Architect: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Devil's Advocate: [SUPPORT / CONCERN / OPPOSE] — [one line]
 
 ### Key Modifications (if any)
