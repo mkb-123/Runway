@@ -165,6 +165,47 @@ export const EmergencyFundConfigSchema = z.object({
   targetMonths: z.number().int().min(0),
 });
 
+// --- Committed Outgoings ---
+
+export const CommittedOutgoingCategorySchema = z.enum([
+  "school_fees",
+  "mortgage",
+  "rent",
+  "childcare",
+  "insurance",
+  "other",
+]);
+
+export const OutgoingFrequencySchema = z.enum(["monthly", "termly", "annually"]);
+
+export const CommittedOutgoingSchema = z.object({
+  id: z.string().min(1),
+  category: CommittedOutgoingCategorySchema,
+  label: z.string().min(1),
+  amount: z.number().min(0),
+  frequency: OutgoingFrequencySchema,
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  personId: z.string().optional(),
+});
+
+// --- Dashboard Configuration ---
+
+export const HeroMetricTypeSchema = z.enum([
+  "net_worth",
+  "cash_position",
+  "retirement_countdown",
+  "period_change",
+  "year_on_year_change",
+  "savings_rate",
+  "fire_progress",
+  "net_worth_after_commitments",
+]);
+
+export const DashboardConfigSchema = z.object({
+  heroMetrics: z.tuple([HeroMetricTypeSchema, HeroMetricTypeSchema, HeroMetricTypeSchema]),
+});
+
 // --- IHT ---
 
 export const GiftSchema = z.object({
@@ -231,6 +272,10 @@ export const HouseholdDataSchema = z.object({
   annualContributions: z.array(AnnualContributionsSchema),
   retirement: RetirementConfigSchema,
   emergencyFund: EmergencyFundConfigSchema,
+  committedOutgoings: z.array(CommittedOutgoingSchema).default([]),
+  dashboardConfig: DashboardConfigSchema.default({
+    heroMetrics: ["net_worth", "period_change", "retirement_countdown"],
+  }),
   iht: IHTConfigSchema,
   estimatedAnnualExpenses: z.number().min(0),
 });

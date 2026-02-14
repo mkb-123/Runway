@@ -132,6 +132,83 @@ export interface EmergencyFundConfig {
   targetMonths: number; // e.g. 6
 }
 
+// --- Committed Outgoings ---
+
+export type CommittedOutgoingCategory =
+  | "school_fees"
+  | "mortgage"
+  | "rent"
+  | "childcare"
+  | "insurance"
+  | "other";
+
+export type OutgoingFrequency = "monthly" | "termly" | "annually";
+
+export interface CommittedOutgoing {
+  id: string;
+  category: CommittedOutgoingCategory;
+  label: string;
+  amount: number; // per-occurrence amount
+  frequency: OutgoingFrequency;
+  startDate?: string; // ISO date
+  endDate?: string; // ISO date (ongoing if omitted)
+  personId?: string; // optional, for person-specific outgoings
+}
+
+export const OUTGOING_CATEGORY_LABELS: Record<CommittedOutgoingCategory, string> = {
+  school_fees: "School Fees",
+  mortgage: "Mortgage",
+  rent: "Rent",
+  childcare: "Childcare",
+  insurance: "Insurance",
+  other: "Other",
+};
+
+export const OUTGOING_FREQUENCY_LABELS: Record<OutgoingFrequency, string> = {
+  monthly: "Monthly",
+  termly: "Termly (3x/year)",
+  annually: "Annually",
+};
+
+/** Annualise an outgoing amount based on its frequency */
+export function annualiseOutgoing(amount: number, frequency: OutgoingFrequency): number {
+  switch (frequency) {
+    case "monthly":
+      return amount * 12;
+    case "termly":
+      return amount * 3;
+    case "annually":
+      return amount;
+  }
+}
+
+// --- Dashboard Configuration ---
+
+export type HeroMetricType =
+  | "net_worth"
+  | "cash_position"
+  | "retirement_countdown"
+  | "period_change"
+  | "year_on_year_change"
+  | "savings_rate"
+  | "fire_progress"
+  | "net_worth_after_commitments";
+
+export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
+  net_worth: "Total Net Worth",
+  cash_position: "Cash Position",
+  retirement_countdown: "Retirement Countdown",
+  period_change: "Period Change",
+  year_on_year_change: "Year-on-Year Change",
+  savings_rate: "Savings Rate",
+  fire_progress: "FIRE Progress",
+  net_worth_after_commitments: "Net Worth After Commitments",
+};
+
+export interface DashboardConfig {
+  heroMetrics: [HeroMetricType, HeroMetricType, HeroMetricType];
+}
+
 // --- IHT ---
 
 export interface Gift {
@@ -200,6 +277,8 @@ export interface HouseholdData {
   emergencyFund: EmergencyFundConfig;
   iht: IHTConfig;
   estimatedAnnualExpenses: number;
+  committedOutgoings: CommittedOutgoing[];
+  dashboardConfig: DashboardConfig;
 }
 
 export interface TransactionsData {

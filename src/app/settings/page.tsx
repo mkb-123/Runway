@@ -8,6 +8,7 @@ import {
   Target,
   Shield,
   ArrowRightLeft,
+  Receipt,
   CheckCircle2,
   Circle,
 } from "lucide-react";
@@ -29,6 +30,7 @@ import { FundsTab } from "./components/funds-tab";
 import { PlanningTab } from "./components/planning-tab";
 import { IhtTab } from "./components/iht-tab";
 import { TransactionsTab } from "./components/transactions-tab";
+import { CommitmentsTab } from "./components/commitments-tab";
 import { SettingsSummaryBar } from "./components/settings-summary-bar";
 
 // ============================================================
@@ -183,6 +185,11 @@ export default function SettingsPage() {
             <Target className="size-3.5" />
             Planning
           </TabsTrigger>
+          <TabsTrigger value="commitments" className="gap-1.5 shrink-0">
+            <Receipt className="size-3.5" />
+            <span className="hidden sm:inline">Commitments</span>
+            <span className="sm:hidden">Bills</span>
+          </TabsTrigger>
           <TabsTrigger value="iht" className="gap-1.5 shrink-0">
             <Shield className="size-3.5" />
             IHT
@@ -217,6 +224,13 @@ export default function SettingsPage() {
 
         <TabsContent value="planning">
           <PlanningTab
+            household={household}
+            updateHousehold={updateHousehold}
+          />
+        </TabsContent>
+
+        <TabsContent value="commitments">
+          <CommitmentsTab
             household={household}
             updateHousehold={updateHousehold}
           />
