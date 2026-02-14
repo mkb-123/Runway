@@ -10,6 +10,8 @@ import {
   X,
   Lightbulb,
   Printer,
+  ArrowRight,
+  MessageCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +27,7 @@ import { projectScenarios } from "@/lib/projections";
 import {
   generateRecommendations,
   type RecommendationPriority,
+  type Recommendation,
 } from "@/lib/recommendations";
 import { TAX_WRAPPER_LABELS } from "@/types";
 import type { TaxWrapper } from "@/types";
@@ -56,6 +59,107 @@ const priorityConfig: Record<
     border: "border-blue-200 dark:border-blue-900",
   },
 };
+
+function RecommendationsSection({
+  recommendations,
+  highPriorityCount,
+}: {
+  recommendations: Recommendation[];
+  highPriorityCount: number;
+}) {
+  const [plainMode, setPlainMode] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const displayed = showAll ? recommendations : recommendations.slice(0, 5);
+
+  return (
+    <div className="mb-8">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold text-foreground">
+            Recommended Actions
+          </h2>
+          {highPriorityCount > 0 && (
+            <Badge variant="destructive">
+              {highPriorityCount} high priority
+            </Badge>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setPlainMode(!plainMode)}
+          className="gap-1.5 text-xs text-muted-foreground"
+        >
+          <MessageCircle className="size-3.5" />
+          {plainMode ? "Detailed" : "Simple"}
+        </Button>
+      </div>
+      <div className="grid gap-3">
+        {displayed.map((rec) => {
+          const config = priorityConfig[rec.priority];
+          return (
+            <Card
+              key={rec.id}
+              className={`border ${config.border} ${config.bg}`}
+            >
+              <CardContent className="py-4">
+                <div className="flex items-start gap-3">
+                  <Lightbulb
+                    className={`mt-0.5 size-5 shrink-0 ${config.color}`}
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold">{rec.title}</h3>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${config.color}`}
+                      >
+                        {config.label}
+                      </Badge>
+                      {rec.personName && (
+                        <Badge variant="secondary" className="text-xs">
+                          {rec.personName}
+                        </Badge>
+                      )}
+                    </div>
+                    {plainMode && rec.plainAction ? (
+                      <p className="text-sm text-foreground">{rec.plainAction}</p>
+                    ) : (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          {rec.description}
+                        </p>
+                        <p className="text-sm font-medium">{rec.impact}</p>
+                      </>
+                    )}
+                    {rec.actionUrl && (
+                      <Link
+                        href={rec.actionUrl}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        Take action <ArrowRight className="size-3" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+        {recommendations.length > 5 && (
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="text-center text-sm font-medium text-primary hover:underline"
+          >
+            {showAll
+              ? "Show fewer"
+              : `+${recommendations.length - 5} more recommendations`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   // --- Data Loading ---
@@ -411,62 +515,10 @@ export default function Home() {
         {/* Section 2: Actionable Recommendations                        */}
         {/* ============================================================ */}
         {recommendations.length > 0 && (
-          <div className="mb-8">
-            <div className="mb-4 flex items-center gap-3">
-              <h2 className="text-xl font-semibold text-foreground">
-                Recommended Actions
-              </h2>
-              {highPriorityCount > 0 && (
-                <Badge variant="destructive">
-                  {highPriorityCount} high priority
-                </Badge>
-              )}
-            </div>
-            <div className="grid gap-3">
-              {recommendations.slice(0, 5).map((rec) => {
-                const config = priorityConfig[rec.priority];
-                return (
-                  <Card
-                    key={rec.id}
-                    className={`border ${config.border} ${config.bg}`}
-                  >
-                    <CardContent className="py-4">
-                      <div className="flex items-start gap-3">
-                        <Lightbulb
-                          className={`mt-0.5 size-5 shrink-0 ${config.color}`}
-                        />
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">{rec.title}</h3>
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${config.color}`}
-                            >
-                              {config.label}
-                            </Badge>
-                            {rec.personName && (
-                              <Badge variant="secondary" className="text-xs">
-                                {rec.personName}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {rec.description}
-                          </p>
-                          <p className="text-sm font-medium">{rec.impact}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-              {recommendations.length > 5 && (
-                <p className="text-center text-sm text-muted-foreground">
-                  +{recommendations.length - 5} more recommendations
-                </p>
-              )}
-            </div>
-          </div>
+          <RecommendationsSection
+            recommendations={recommendations}
+            highPriorityCount={highPriorityCount}
+          />
         )}
 
         {/* ============================================================ */}

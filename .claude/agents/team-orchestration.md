@@ -8,13 +8,13 @@
                        │  Final decision maker│
                        └─────────┬───────────┘
                                  │
-     ┌───────────┬───────────┬───┴────┬───────────┬───────────┐
-     │           │           │        │           │           │
-┌────┴─────┐ ┌──┴────┐ ┌────┴───┐ ┌──┴──────┐ ┌──┴──────────┐
-│  Mobile  │ │Chart- │ │Finan-  │ │Devil's  │ │ HNW Customer│
-│  Web     │ │  ing  │ │ cial   │ │Advocate │ │  (James)    │
-│ Designer │ │Expert │ │Advisor │ │         │ │             │
-└──────────┘ └───────┘ └────────┘ └─────────┘ └─────────────┘
+     ┌───────────┬───────────┬───┴────┬───────────┬───────────┬───────────┐
+     │           │           │        │           │           │           │
+┌────┴─────┐ ┌──┴────┐ ┌────┴───┐ ┌──┴──────┐ ┌──┴──────────┐ ┌──┴──────────┐
+│  Mobile  │ │Chart- │ │Finan-  │ │Devil's  │ │ HNW Customer│ │ HNW Customer│
+│  Web     │ │  ing  │ │ cial   │ │Advocate │ │  (James)    │ │  (Priya)    │
+│ Designer │ │Expert │ │Advisor │ │         │ │             │ │             │
+└──────────┘ └───────┘ └────────┘ └─────────┘ └─────────────┘ └─────────────┘
 ```
 
 ## When to Convene the Team
@@ -56,27 +56,32 @@ Present the proposal clearly:
 
 Each agent responds in character, using their defined response format:
 
-**1. HNW Customer (James) speaks first**
+**1a. HNW Customer (James) speaks first**
    - Reacts as a real user. Would he actually use this feature?
    - Tests it against his and Sarah's financial situation.
    - Flags if it answers a question he actually has.
 
-**2. Financial Advisor speaks second**
+**1b. HNW Customer (Priya) speaks second**
+   - Reacts as a busy, cash-flow-constrained user. Would she use this in a 90-second window?
+   - Tests it against her family's situation: bonus tranches, school fees, variable household income.
+   - Flags if the feature assumes stable income or retirement-first priorities.
+
+**2. Financial Advisor speaks third**
    - Validates the user need. Is this something real clients care about?
    - Provides priority ranking (Priority 1-5).
    - Flags any regulatory or accuracy concerns.
 
-**3. Mobile Web Designer speaks third**
+**3. Mobile Web Designer speaks fourth**
    - Evaluates the responsive design — does it work at 375px AND 1440px?
    - Assesses touch targets, thumb zones, and interaction patterns.
    - Proposes specific responsive implementation (breakpoints, layout, components).
 
-**4. Charting Expert speaks fourth** (if charts are involved)
+**4. Charting Expert speaks fifth** (if charts are involved)
    - Audits chart type selection.
    - Recommends specific Recharts implementation.
    - Warns about visualisation anti-patterns.
 
-**5. Devil's Advocate speaks last**
+**6. Devil's Advocate speaks last**
    - Challenges the consensus.
    - Identifies failure modes and edge cases.
    - Delivers the "kill question" and risk rating.
@@ -107,6 +112,7 @@ As Team Lead, I (Claude) will:
 
 ### Agent Consensus
 - HNW Customer (James): [WANT / NEUTRAL / DON'T NEED] — [one line]
+- HNW Customer (Priya): [WANT / NEUTRAL / DON'T NEED] — [one line]
 - Financial Advisor: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Mobile Web Designer: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Charting Expert: [SUPPORT / CONCERN / OPPOSE] — [one line]
@@ -128,7 +134,9 @@ As Team Lead, I (Claude) will:
 
 When agents disagree:
 
-1. **HNW Customer vs anyone** — If James says "I wouldn't use this", that's a strong signal. Features should solve real user problems. If the team wants it but the user doesn't, justify why or cut it.
+1. **HNW Customers vs anyone** — If both James and Priya say "I wouldn't use this", that's a kill signal. If only one of them wants it, consider whether the feature serves a specific life-stage need. Features should solve real user problems across different household types.
+
+1a. **James vs Priya** — When they disagree, it usually reflects a life-stage difference (retirement-focused vs cash-flow-focused). The right answer is typically to support both perspectives — e.g., configurable dashboard priorities, or showing both retirement readiness and cash flow survival metrics.
 
 2. **Financial Advisor vs Mobile Web Designer** — If the advisor says users need it but the designer says it's cluttered: find a progressive disclosure solution (show summary, let users drill in).
 

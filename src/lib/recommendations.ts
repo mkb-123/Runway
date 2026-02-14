@@ -1,8 +1,9 @@
 // ============================================================
-// Actionable Recommendations Engine
+// Actionable Recommendations Engine (Enhanced)
 // ============================================================
 // Analyzes the household's financial position and generates
-// prioritised, specific recommendations with concrete numbers.
+// prioritised, specific recommendations with concrete numbers,
+// plain-English descriptions, and links to relevant pages.
 //
 // Each analyzer is a pure function that examines one aspect of
 // the financial position and returns zero or more recommendations.
@@ -37,6 +38,10 @@ export interface Recommendation {
   category: RecommendationCategory;
   personId?: string;
   personName?: string;
+  /** Link to the relevant page for taking action */
+  actionUrl?: string;
+  /** Plain-English action for non-financial users (the "Tom test") */
+  plainAction?: string;
 }
 
 // --- Internal helper ---
@@ -112,53 +117,65 @@ export function analyzeSalaryTaper(ctx: PersonContext): Recommendation[] {
   }
 
   const totalSaved = Math.round(taxSaved + niSaved);
+  const effectiveCost = Math.round(additionalSacrifice - totalSaved);
 
   return [
     {
       id: `salary-sacrifice-taper-${person.id}`,
       title: `Salary sacrifice to avoid 60% trap`,
       description: `${person.name}'s adjusted income is £${Math.round(adjustedGross).toLocaleString()}, within the personal allowance taper zone (£100k-£125k). Increasing pension contributions by £${Math.round(additionalSacrifice).toLocaleString()} via salary sacrifice would bring adjusted income to £100,000 or below.`,
-      impact: `Save £${totalSaved.toLocaleString()}/yr in tax${niSaved > 0 ? ` and NI` : ""}. Effective cost after relief: £${Math.round(additionalSacrifice - totalSaved).toLocaleString()}.`,
+      impact: `Save £${totalSaved.toLocaleString()}/yr in tax${niSaved > 0 ? ` and NI` : ""}. Effective cost after relief: £${effectiveCost.toLocaleString()}.`,
       priority: "high",
       category: "tax",
       personId: person.id,
       personName: person.name,
+      actionUrl: "/tax-planning",
+      plainAction: `Ask your employer to increase your pension salary sacrifice by £${Math.round(additionalSacrifice).toLocaleString()} per year. This saves you £${totalSaved.toLocaleString()} in tax — it only costs you £${effectiveCost.toLocaleString()} in take-home pay.`,
     },
   ];
 }
 
-/** 2. ISA allowance usage */
+/** 2. ISA allowance usage — specific to actual usage */
 export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
   const { person, contributions } = ctx;
   const isaUsed = contributions.isaContribution;
-  const isaRemaining = UK_TAX_CONSTANTS.isaAnnualAllowance - isaUsed;
+  const isaAllowance = UK_TAX_CONSTANTS.isaAnnualAllowance;
+  const isaRemaining = isaAllowance - isaUsed;
+  const isaPercent = Math.round((isaUsed / isaAllowance) * 100);
 
-  if (isaRemaining > 0 && isaRemaining <= UK_TAX_CONSTANTS.isaAnnualAllowance * 0.5) {
+  if (isaRemaining > 0 && isaRemaining <= isaAllowance * 0.5) {
+    const monthsLeft = 12 - new Date().getMonth(); // rough estimate to April
+    const monthlyNeeded = Math.round(isaRemaining / Math.max(1, monthsLeft));
+
     return [
       {
         id: `isa-topup-${person.id}`,
-        title: `Top up ISA before year-end`,
-        description: `${person.name} has £${isaRemaining.toLocaleString()} of ISA allowance remaining for this tax year. ISA allowances cannot be carried forward — use it or lose it.`,
-        impact: `Shelter £${isaRemaining.toLocaleString()} from future capital gains and income tax.`,
+        title: `Top up ${person.name}'s ISA — £${isaRemaining.toLocaleString()} remaining`,
+        description: `${person.name} has used ${isaPercent}% of their ISA allowance (£${isaUsed.toLocaleString()} of £${isaAllowance.toLocaleString()}). ${monthsLeft > 0 ? `That's roughly £${monthlyNeeded.toLocaleString()}/month to max it out before April.` : `Year-end is approaching — act soon.`}`,
+        impact: `Shelter £${isaRemaining.toLocaleString()} from future capital gains and income tax. ISA allowances cannot be carried forward.`,
         priority: isaRemaining >= 10000 ? "high" : "medium",
         category: "isa",
         personId: person.id,
         personName: person.name,
+        actionUrl: "/settings",
+        plainAction: `Transfer £${isaRemaining.toLocaleString()} into your ISA before 5 April. You can't get this allowance back once the tax year ends.`,
       },
     ];
   }
 
-  if (isaRemaining === UK_TAX_CONSTANTS.isaAnnualAllowance) {
+  if (isaRemaining === isaAllowance) {
     return [
       {
         id: `isa-unused-${person.id}`,
-        title: `Open/fund ISA for this tax year`,
-        description: `${person.name} has not used any of their £${UK_TAX_CONSTANTS.isaAnnualAllowance.toLocaleString()} ISA allowance. This is a significant missed opportunity for tax-efficient savings.`,
-        impact: `Full £${UK_TAX_CONSTANTS.isaAnnualAllowance.toLocaleString()} tax-free growth potential.`,
+        title: `${person.name} hasn't used any ISA allowance`,
+        description: `${person.name}'s full £${isaAllowance.toLocaleString()} ISA allowance is unused this tax year. At a higher rate tax band, ISA shielding saves you tax on dividends, interest, and capital gains indefinitely.`,
+        impact: `Full £${isaAllowance.toLocaleString()} of tax-free growth potential — compounding year after year.`,
         priority: "high",
         category: "isa",
         personId: person.id,
         personName: person.name,
+        actionUrl: "/settings",
+        plainAction: `Open or fund an ISA with up to £${isaAllowance.toLocaleString()}. Everything inside grows tax-free, forever.`,
       },
     ];
   }
@@ -169,21 +186,28 @@ export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
 /** 3. Pension allowance headroom */
 export function analyzePensionHeadroom(ctx: PersonContext): Recommendation[] {
   const { person, contributions, adjustedGross } = ctx;
-  const pensionRemaining =
-    UK_TAX_CONSTANTS.pensionAnnualAllowance - contributions.pensionContribution;
+  const pensionUsed = contributions.pensionContribution;
+  const pensionAllowance = UK_TAX_CONSTANTS.pensionAnnualAllowance;
+  const pensionRemaining = pensionAllowance - pensionUsed;
+  const pensionPercent = Math.round((pensionUsed / pensionAllowance) * 100);
 
   if (pensionRemaining <= 20000) return [];
+
+  const reliefRate = adjustedGross > UK_TAX_CONSTANTS.incomeTax.basicRateUpperLimit ? 0.4 : 0.2;
+  const taxRelief = Math.round(pensionRemaining * reliefRate);
 
   return [
     {
       id: `pension-headroom-${person.id}`,
-      title: `Use pension allowance headroom`,
-      description: `${person.name} has £${pensionRemaining.toLocaleString()} of unused pension annual allowance. Consider increasing contributions to reduce taxable income.`,
-      impact: `Tax relief of £${Math.round(pensionRemaining * (adjustedGross > UK_TAX_CONSTANTS.incomeTax.basicRateUpperLimit ? 0.4 : 0.2)).toLocaleString()} on additional contributions.`,
+      title: `${person.name}: £${pensionRemaining.toLocaleString()} pension headroom unused`,
+      description: `Only ${pensionPercent}% of ${person.name}'s £${pensionAllowance.toLocaleString()} pension annual allowance is used (£${pensionUsed.toLocaleString()} contributed). As a ${reliefRate === 0.4 ? "higher" : "basic"} rate taxpayer, additional contributions get ${(reliefRate * 100).toFixed(0)}% tax relief.`,
+      impact: `Tax relief of £${taxRelief.toLocaleString()} on the unused £${pensionRemaining.toLocaleString()} headroom.`,
       priority: pensionRemaining > 40000 ? "high" : "medium",
       category: "pension",
       personId: person.id,
       personName: person.name,
+      actionUrl: "/tax-planning",
+      plainAction: `You could put up to £${pensionRemaining.toLocaleString()} more into your pension this year. The government adds back £${taxRelief.toLocaleString()} in tax relief — that's free money.`,
     },
   ];
 }
@@ -214,16 +238,20 @@ export function analyzeBedAndISA(
     return [];
   }
 
+  const transferAmount = Math.min(giaValue, isaRemaining);
+
   return [
     {
       id: `bed-isa-free-${person.id}`,
-      title: `Zero-cost Bed & ISA transfer`,
-      description: `${person.name}'s GIA unrealised gains (£${Math.round(totalGain).toLocaleString()}) are within the CGT annual exempt amount. Transfer up to £${Math.min(giaValue, isaRemaining).toLocaleString()} to ISA at zero tax cost.`,
-      impact: `Shelter £${Math.min(giaValue, isaRemaining).toLocaleString()} from future CGT and income tax — completely free.`,
+      title: `Zero-cost Bed & ISA — move £${Math.round(transferAmount).toLocaleString()} to ISA`,
+      description: `${person.name}'s GIA has £${Math.round(totalGain).toLocaleString()} of unrealised gains, within the £${UK_TAX_CONSTANTS.cgt.annualExemptAmount.toLocaleString()} CGT annual exempt amount. You can sell and rebuy inside your ISA with zero tax.`,
+      impact: `Shelter £${Math.round(transferAmount).toLocaleString()} from future CGT and income tax — completely free.`,
       priority: "high",
       category: "tax",
       personId: person.id,
       personName: person.name,
+      actionUrl: "/tax-planning",
+      plainAction: `Sell £${Math.round(transferAmount).toLocaleString()} from your general account and buy the same funds inside your ISA. No tax to pay because your gains are below the exempt amount.`,
     },
   ];
 }
@@ -237,16 +265,20 @@ export function analyzeGIAOverweight(ctx: PersonContext): Recommendation[] {
 
   if (totalNW <= 0 || giaValue / totalNW <= 0.15) return [];
 
+  const giaPercent = ((giaValue / totalNW) * 100).toFixed(0);
+
   return [
     {
       id: `gia-overweight-${person.id}`,
-      title: `Reduce GIA exposure`,
-      description: `${person.name}'s GIA holdings represent ${((giaValue / totalNW) * 100).toFixed(1)}% of the household portfolio. GIA assets are subject to CGT on gains and income tax on dividends.`,
-      impact: `Prioritise ISA and pension contributions to reduce tax drag over time.`,
+      title: `GIA is ${giaPercent}% of portfolio — consider rebalancing`,
+      description: `${person.name}'s GIA holds £${Math.round(giaValue).toLocaleString()} (${giaPercent}% of household portfolio). GIA assets face CGT on gains and income tax on dividends, unlike ISA or pension.`,
+      impact: `Prioritise filling ISA (£${UK_TAX_CONSTANTS.isaAnnualAllowance.toLocaleString()}/yr) and pension (£${UK_TAX_CONSTANTS.pensionAnnualAllowance.toLocaleString()}/yr) before adding to GIA.`,
       priority: "medium",
       category: "investment",
       personId: person.id,
       personName: person.name,
+      actionUrl: "/allocation",
+      plainAction: `When you next invest, put the money into your ISA or pension first — they're tax-free. Only overflow into your general account.`,
     },
   ];
 }
@@ -259,17 +291,29 @@ export function analyzeRetirementProgress(household: HouseholdData): Recommendat
       ? household.retirement.targetAnnualIncome / household.retirement.withdrawalRate
       : 0;
   const progress = requiredPot > 0 ? totalNW / requiredPot : 0;
+  const progressPercent = (progress * 100).toFixed(0);
 
   if (progress >= 0.5) return [];
+
+  const shortfall = Math.round(requiredPot - totalNW);
+  const totalAnnualContribs = household.annualContributions.reduce(
+    (s, c) => s + c.isaContribution + c.pensionContribution + c.giaContribution,
+    0
+  );
+  const yearsAtCurrentRate = totalAnnualContribs > 0
+    ? Math.ceil(shortfall / totalAnnualContribs)
+    : 0;
 
   return [
     {
       id: "retirement-behind",
-      title: "Increase retirement savings rate",
-      description: `You're ${(progress * 100).toFixed(0)}% of the way to your £${Math.round(requiredPot).toLocaleString()} retirement target. Consider increasing contributions to close the gap.`,
-      impact: `Current shortfall: £${Math.round(requiredPot - totalNW).toLocaleString()}.`,
+      title: `${progressPercent}% to retirement target — £${shortfall.toLocaleString()} shortfall`,
+      description: `Your combined net worth is £${totalNW.toLocaleString()} against a target of £${Math.round(requiredPot).toLocaleString()} (based on £${household.retirement.targetAnnualIncome.toLocaleString()}/yr at ${(household.retirement.withdrawalRate * 100).toFixed(0)}% withdrawal rate).${yearsAtCurrentRate > 0 ? ` At your current contribution rate, that's roughly ${yearsAtCurrentRate} years of saving — before investment growth.` : ""}`,
+      impact: `Current shortfall: £${shortfall.toLocaleString()}.`,
       priority: "high",
       category: "retirement",
+      actionUrl: "/retirement",
+      plainAction: `You need to save another £${shortfall.toLocaleString()} to hit your retirement target. Check the retirement page to see how different contribution rates change the timeline.`,
     },
   ];
 }
@@ -287,14 +331,20 @@ export function analyzeEmergencyFund(household: HouseholdData): Recommendation[]
   if (totalCash >= emergencyTarget) return [];
 
   const shortfall = emergencyTarget - totalCash;
+  const monthsCovered = household.emergencyFund.monthlyEssentialExpenses > 0
+    ? (totalCash / household.emergencyFund.monthlyEssentialExpenses).toFixed(1)
+    : "0";
+
   return [
     {
       id: "emergency-fund-low",
-      title: "Top up emergency fund",
-      description: `Your cash savings (£${totalCash.toLocaleString()}) are below your ${household.emergencyFund.targetMonths}-month emergency fund target of £${emergencyTarget.toLocaleString()}.`,
-      impact: `Shortfall of £${Math.round(shortfall).toLocaleString()}. Consider building cash reserves before investing.`,
+      title: `Emergency fund covers ${monthsCovered} months — target is ${household.emergencyFund.targetMonths}`,
+      description: `Your cash savings (£${totalCash.toLocaleString()}) cover ${monthsCovered} months of essential expenses. Your target is ${household.emergencyFund.targetMonths} months (£${emergencyTarget.toLocaleString()}).`,
+      impact: `Shortfall of £${Math.round(shortfall).toLocaleString()}. Build cash reserves before investing.`,
       priority: shortfall > emergencyTarget * 0.5 ? "high" : "medium",
       category: "risk",
+      actionUrl: "/settings",
+      plainAction: `You need £${Math.round(shortfall).toLocaleString()} more in easy-access savings to cover ${household.emergencyFund.targetMonths} months of expenses. Keep this separate from investments.`,
     },
   ];
 }
@@ -318,18 +368,84 @@ export function analyzeConcentrationRisk(household: HouseholdData): Recommendati
     const pct = value / totalHoldingsValue;
     if (pct > 0.4) {
       const fund = household.funds.find((f) => f.id === fundId);
+      const fundName = fund?.name ?? fundId;
       results.push({
         id: `concentration-${fundId}`,
-        title: `High concentration in ${fund?.name ?? fundId}`,
-        description: `${((pct * 100).toFixed(0))}% of your invested portfolio is in a single fund. This creates significant concentration risk.`,
+        title: `${((pct * 100).toFixed(0))}% in ${fundName} — diversification risk`,
+        description: `${((pct * 100).toFixed(0))}% of your £${Math.round(totalHoldingsValue).toLocaleString()} invested portfolio is in a single fund. Even good funds can underperform for extended periods.`,
         impact: `Consider diversifying across additional funds or asset classes.`,
         priority: "medium",
         category: "risk",
+        actionUrl: "/allocation",
+        plainAction: `Almost half your investments are in one fund. Consider spreading across 2-3 different funds to reduce risk.`,
       });
     }
   }
 
   return results;
+}
+
+/** 9. High cash balance — excess above emergency fund */
+export function analyzeExcessCash(household: HouseholdData): Recommendation[] {
+  const cashAccounts = household.accounts.filter((a) =>
+    ["cash_savings", "premium_bonds"].includes(a.type)
+  );
+  const totalCash = cashAccounts.reduce((s, a) => s + a.currentValue, 0);
+  const emergencyTarget =
+    household.emergencyFund.monthlyEssentialExpenses *
+    household.emergencyFund.targetMonths;
+
+  const excessCash = totalCash - emergencyTarget;
+  const totalNW = household.accounts.reduce((s, a) => s + a.currentValue, 0);
+
+  // Only flag if excess is > £10k and > 15% of net worth
+  if (excessCash <= 10000 || totalNW <= 0 || excessCash / totalNW <= 0.15) return [];
+
+  const cashPercent = ((totalCash / totalNW) * 100).toFixed(0);
+
+  return [
+    {
+      id: "excess-cash",
+      title: `£${Math.round(excessCash).toLocaleString()} excess cash above emergency fund`,
+      description: `You hold £${totalCash.toLocaleString()} in cash (${cashPercent}% of net worth), which is £${Math.round(excessCash).toLocaleString()} above your ${household.emergencyFund.targetMonths}-month emergency target. Cash typically loses value to inflation.`,
+      impact: `Consider investing the excess in ISA or pension for long-term growth.`,
+      priority: "medium",
+      category: "investment",
+      actionUrl: "/allocation",
+      plainAction: `You have more cash than you need for emergencies. The extra £${Math.round(excessCash).toLocaleString()} could be working harder in an ISA or pension.`,
+    },
+  ];
+}
+
+/** 10. Savings rate tracker */
+export function analyzeSavingsRate(household: HouseholdData): Recommendation[] {
+  const totalGrossIncome = household.income.reduce((s, i) => s + i.grossSalary, 0);
+  if (totalGrossIncome <= 0) return [];
+
+  const totalAnnualContribs = household.annualContributions.reduce(
+    (s, c) => s + c.isaContribution + c.pensionContribution + c.giaContribution,
+    0
+  );
+  const savingsRate = totalAnnualContribs / totalGrossIncome;
+
+  if (savingsRate >= 0.15) return []; // 15%+ is reasonable
+
+  const savingsPercent = (savingsRate * 100).toFixed(1);
+  const targetContrib = Math.round(totalGrossIncome * 0.15);
+  const increase = Math.round(targetContrib - totalAnnualContribs);
+
+  return [
+    {
+      id: "low-savings-rate",
+      title: `Savings rate is ${savingsPercent}% — aim for 15%+`,
+      description: `Your household saves £${totalAnnualContribs.toLocaleString()}/yr on gross income of £${totalGrossIncome.toLocaleString()}/yr (${savingsPercent}%). Financial planners typically recommend saving at least 15% of gross income for long-term wealth building.`,
+      impact: `Increasing to 15% would mean saving £${targetContrib.toLocaleString()}/yr — an extra £${increase.toLocaleString()}/yr.`,
+      priority: savingsRate < 0.05 ? "high" : "medium",
+      category: "retirement",
+      actionUrl: "/retirement",
+      plainAction: `You're saving ${savingsPercent}% of your income. Try to get this to 15% by increasing ISA or pension contributions by £${Math.round(increase / 12).toLocaleString()}/month.`,
+    },
+  ];
 }
 
 // --- Per-person analyzers (applied for each person) ---
@@ -353,6 +469,8 @@ const householdAnalyzers: ((
   analyzeRetirementProgress,
   analyzeEmergencyFund,
   analyzeConcentrationRisk,
+  analyzeExcessCash,
+  analyzeSavingsRate,
 ];
 
 // --- Sort order ---
