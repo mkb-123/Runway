@@ -343,7 +343,8 @@ export function ScenarioPanel() {
     }
 
     // Income overrides (salary)
-    const salaryChanges = Object.entries(incomeOverrides).filter(([, val]) => val > 0);
+    // BUG-013: Allow zero income (val >= 0) for redundancy scenarios
+    const salaryChanges = Object.entries(incomeOverrides).filter(([, val]) => val >= 0);
     if (salaryChanges.length > 0 && !newOverrides.income) {
       newOverrides.income = salaryChanges.map(([personId, grossSalary]) => ({
         personId,
@@ -432,9 +433,10 @@ export function ScenarioPanel() {
       </SheetTrigger>
 
       {/* Bottom sheet on mobile, side panel on desktop */}
+      {/* BUG-006: Use w-full on mobile to avoid 384px overflow on 375px viewport */}
       <SheetContent
         side="bottom"
-        className="max-h-[85vh] overflow-y-auto rounded-t-2xl p-0 sm:inset-y-0 sm:right-0 sm:bottom-auto sm:left-auto sm:h-full sm:max-h-none sm:w-[420px] sm:rounded-none sm:border-l sm:data-[state=closed]:slide-out-to-right sm:data-[state=open]:slide-in-from-right"
+        className="max-h-[85vh] overflow-y-auto rounded-t-2xl p-0 sm:inset-y-0 sm:right-0 sm:bottom-auto sm:left-auto sm:h-full sm:max-h-none sm:w-full sm:max-w-[420px] sm:rounded-none sm:border-l sm:data-[state=closed]:slide-out-to-right sm:data-[state=open]:slide-in-from-right"
       >
         <SheetHeader className="sticky top-0 z-10 border-b bg-background px-4 py-3">
           <SheetTitle className="flex items-center gap-2 text-base">
@@ -556,12 +558,14 @@ export function ScenarioPanel() {
             <div className="space-y-3">
               {household.persons.map((person) => {
                 const currentIncome = household.income.find((i) => i.personId === person.id);
+                const inputId = `income-${person.id}`;
                 return (
                   <div key={person.id}>
-                    <Label className="text-xs text-muted-foreground">
+                    <Label htmlFor={inputId} className="text-xs text-muted-foreground">
                       {person.name} (currently {formatCurrency(currentIncome?.grossSalary ?? 0)})
                     </Label>
                     <Input
+                      id={inputId}
                       type="number"
                       placeholder="New gross salary"
                       value={incomeOverrides[person.id] ?? ""}
@@ -583,10 +587,11 @@ export function ScenarioPanel() {
           <Section title="Market Shock" icon={TrendingDown}>
             <div className="space-y-3">
               <div>
-                <Label className="text-xs text-muted-foreground">
+                <Label htmlFor="market-shock-input" className="text-xs text-muted-foreground">
                   Market shock (%, e.g. -30)
                 </Label>
                 <Input
+                  id="market-shock-input"
                   type="number"
                   placeholder="-30"
                   value={marketShock}
@@ -607,8 +612,9 @@ export function ScenarioPanel() {
                     <p className="text-xs font-medium">{person.name}</p>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <Label className="text-xs text-muted-foreground">ISA</Label>
+                        <Label htmlFor={`contrib-isa-${person.id}`} className="text-xs text-muted-foreground">ISA</Label>
                         <Input
+                          id={`contrib-isa-${person.id}`}
                           type="number"
                           placeholder={String(currentContrib.isaContribution)}
                           value={contributionOverrides[person.id]?.isa ?? ""}
@@ -625,8 +631,9 @@ export function ScenarioPanel() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-muted-foreground">Pension</Label>
+                        <Label htmlFor={`contrib-pension-${person.id}`} className="text-xs text-muted-foreground">Pension</Label>
                         <Input
+                          id={`contrib-pension-${person.id}`}
                           type="number"
                           placeholder={String(currentContrib.pensionContribution)}
                           value={contributionOverrides[person.id]?.pension ?? ""}
@@ -643,8 +650,9 @@ export function ScenarioPanel() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-muted-foreground">GIA</Label>
+                        <Label htmlFor={`contrib-gia-${person.id}`} className="text-xs text-muted-foreground">GIA</Label>
                         <Input
+                          id={`contrib-gia-${person.id}`}
                           type="number"
                           placeholder={String(currentContrib.giaContribution)}
                           value={contributionOverrides[person.id]?.gia ?? ""}

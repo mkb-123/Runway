@@ -12,6 +12,7 @@ import {
   calculateAge,
   calculateTaxEfficiencyScore,
   projectDeferredBonusValue,
+  calculateTaperedAnnualAllowance,
 } from "../projections";
 
 describe("projectCompoundGrowth", () => {
@@ -383,5 +384,46 @@ describe("projectDeferredBonusValue", () => {
       0
     );
     expect(result).toBe(10000);
+  });
+});
+
+describe("calculateTaperedAnnualAllowance", () => {
+  it("returns full allowance when threshold income <= £200k", () => {
+    expect(calculateTaperedAnnualAllowance(200000, 270000)).toBe(60000);
+  });
+
+  it("returns full allowance when adjusted income <= £260k", () => {
+    expect(calculateTaperedAnnualAllowance(250000, 260000)).toBe(60000);
+  });
+
+  it("tapers by £1 for every £2 over £260k adjusted income", () => {
+    // Threshold income: £250k (> £200k), adjusted income: £280k
+    // Excess: £280k - £260k = £20k, reduction: £10k
+    // Tapered: £60k - £10k = £50k
+    expect(calculateTaperedAnnualAllowance(250000, 280000)).toBe(50000);
+  });
+
+  it("floors at £10k minimum tapered allowance", () => {
+    // Adjusted income: £360k, excess: £100k, reduction: £50k
+    // Tapered: £60k - £50k = £10k (at minimum)
+    expect(calculateTaperedAnnualAllowance(300000, 360000)).toBe(10000);
+  });
+
+  it("does not go below £10k even with extreme income", () => {
+    expect(calculateTaperedAnnualAllowance(500000, 500000)).toBe(10000);
+  });
+
+  it("returns full allowance for typical higher-rate earner", () => {
+    // £80k salary, £3k employer pension = £83k adjusted
+    expect(calculateTaperedAnnualAllowance(80000, 83000)).toBe(60000);
+  });
+
+  it("correctly handles boundary at exactly £260k adjusted income", () => {
+    expect(calculateTaperedAnnualAllowance(250000, 260000)).toBe(60000);
+  });
+
+  it("tapers by £500 when £1k over threshold", () => {
+    // Adjusted income: £261k, excess: £1k, reduction: £500
+    expect(calculateTaperedAnnualAllowance(250000, 261000)).toBe(59500);
   });
 });

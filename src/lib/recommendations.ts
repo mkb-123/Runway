@@ -7,6 +7,15 @@
 //
 // Each analyzer is a pure function that examines one aspect of
 // the financial position and returns zero or more recommendations.
+//
+// Fixes applied:
+// - FEAT-001: Tapered annual allowance for high earners
+// - BUG-008: ISA recommendation now covers 50-99% remaining (no gap)
+// - BUG-009: Bed & ISA now also fires for gains above exempt amount
+// - BUG-010: Emergency fund includes cash ISA and premium bonds
+// - FEAT-013: Salary sacrifice recommendation checks contribution method
+// - FEAT-014: ISA recommendations coordinated to not exceed allowance
+// - FEAT-005: All recommendations include actionUrl
 
 import type {
   HouseholdData,
@@ -17,6 +26,7 @@ import type {
 import { getPersonContributionTotals, annualiseContribution } from "@/types";
 import { calculateIncomeTax, calculateNI } from "@/lib/tax";
 import { getUnrealisedGains } from "@/lib/cgt";
+import { calculateTaperedAnnualAllowance } from "@/lib/projections";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 
 export type RecommendationPriority = "high" | "medium" | "low";
@@ -70,13 +80,16 @@ interface PersonContext {
   accounts: Account[];
   adjustedGross: number;
   allAccounts: Account[];
+  /** FEAT-001: Effective pension annual allowance (tapered for high earners) */
+  effectivePensionAllowance: number;
 }
 
 // --- Individual analyzers ---
 
-/** 1. Salary sacrifice to avoid personal allowance taper (60% trap) */
+/** 1. Salary sacrifice / increased contributions to avoid personal allowance taper (60% trap) */
+// FEAT-013: Checks contribution method — only recommends salary sacrifice for salary_sacrifice users
 export function analyzeSalaryTaper(ctx: PersonContext): Recommendation[] {
-  const { person, income, contributions, adjustedGross } = ctx;
+  const { person, income, contributions, adjustedGross, effectivePensionAllowance } = ctx;
 
   if (
     adjustedGross <= UK_TAX_CONSTANTS.personalAllowanceTaperThreshold ||
@@ -89,10 +102,14 @@ export function analyzeSalaryTaper(ctx: PersonContext): Recommendation[] {
     adjustedGross - UK_TAX_CONSTANTS.personalAllowanceTaperThreshold;
   const additionalSacrifice = Math.min(
     excessOverThreshold,
-    UK_TAX_CONSTANTS.pensionAnnualAllowance - contributions.pensionContribution
+    effectivePensionAllowance - contributions.pensionContribution
   );
 
   if (additionalSacrifice <= 0) return [];
+
+  // FEAT-013: Adapt recommendation based on contribution method
+  const isSalarySacrifice = income.pensionContributionMethod === "salary_sacrifice";
+  const methodLabel = isSalarySacrifice ? "salary sacrifice" : "pension contribution";
 
   const currentTax = calculateIncomeTax(
     income.grossSalary,
@@ -107,7 +124,7 @@ export function analyzeSalaryTaper(ctx: PersonContext): Recommendation[] {
   const taxSaved = currentTax.tax - newTax.tax;
 
   let niSaved = 0;
-  if (income.pensionContributionMethod === "salary_sacrifice") {
+  if (isSalarySacrifice) {
     const currentNI = calculateNI(
       income.grossSalary,
       income.employeePensionContribution,
@@ -127,20 +144,23 @@ export function analyzeSalaryTaper(ctx: PersonContext): Recommendation[] {
   return [
     {
       id: `salary-sacrifice-taper-${person.id}`,
-      title: `Salary sacrifice to avoid 60% trap`,
-      description: `${person.name}'s adjusted income is £${Math.round(adjustedGross).toLocaleString()}, within the personal allowance taper zone (£100k-£125k). Increasing pension contributions by £${Math.round(additionalSacrifice).toLocaleString()} via salary sacrifice would bring adjusted income to £100,000 or below.`,
+      title: `Increase ${methodLabel} to avoid 60% trap`,
+      description: `${person.name}'s adjusted income is £${Math.round(adjustedGross).toLocaleString()}, within the personal allowance taper zone (£100k-£125k). Increasing ${methodLabel} by £${Math.round(additionalSacrifice).toLocaleString()} would bring adjusted income to £100,000 or below.`,
       impact: `Save £${totalSaved.toLocaleString()}/yr in tax${niSaved > 0 ? ` and NI` : ""}. Effective cost after relief: £${effectiveCost.toLocaleString()}.`,
       priority: "high",
       category: "tax",
       personId: person.id,
       personName: person.name,
       actionUrl: "/tax-planning",
-      plainAction: `Ask your employer to increase your pension salary sacrifice by £${Math.round(additionalSacrifice).toLocaleString()} per year. This saves you £${totalSaved.toLocaleString()} in tax — it only costs you £${effectiveCost.toLocaleString()} in take-home pay.`,
+      plainAction: isSalarySacrifice
+        ? `Ask your employer to increase your pension salary sacrifice by £${Math.round(additionalSacrifice).toLocaleString()} per year. This saves you £${totalSaved.toLocaleString()} in tax — it only costs you £${effectiveCost.toLocaleString()} in take-home pay.`
+        : `Increase your pension contribution by £${Math.round(additionalSacrifice).toLocaleString()} per year. You'll get £${Math.round(taxSaved).toLocaleString()} back in tax relief.`,
     },
   ];
 }
 
 /** 2. ISA allowance usage — specific to actual usage */
+// BUG-008: Now covers any unused ISA allowance (no 50-99% gap)
 export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
   const { person, contributions } = ctx;
   const isaUsed = contributions.isaContribution;
@@ -148,27 +168,10 @@ export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
   const isaRemaining = isaAllowance - isaUsed;
   const isaPercent = Math.round((isaUsed / isaAllowance) * 100);
 
-  if (isaRemaining > 0 && isaRemaining <= isaAllowance * 0.5) {
-    const monthsLeft = 12 - new Date().getMonth(); // rough estimate to April
-    const monthlyNeeded = Math.round(isaRemaining / Math.max(1, monthsLeft));
+  if (isaRemaining <= 0) return [];
 
-    return [
-      {
-        id: `isa-topup-${person.id}`,
-        title: `Top up ${person.name}'s ISA — £${isaRemaining.toLocaleString()} remaining`,
-        description: `${person.name} has used ${isaPercent}% of their ISA allowance (£${isaUsed.toLocaleString()} of £${isaAllowance.toLocaleString()}). ${monthsLeft > 0 ? `That's roughly £${monthlyNeeded.toLocaleString()}/month to max it out before April.` : `Year-end is approaching — act soon.`}`,
-        impact: `Shelter £${isaRemaining.toLocaleString()} from future capital gains and income tax. ISA allowances cannot be carried forward.`,
-        priority: isaRemaining >= 10000 ? "high" : "medium",
-        category: "isa",
-        personId: person.id,
-        personName: person.name,
-        actionUrl: "/settings",
-        plainAction: `Transfer £${isaRemaining.toLocaleString()} into your ISA before 5 April. You can't get this allowance back once the tax year ends.`,
-      },
-    ];
-  }
-
-  if (isaRemaining === isaAllowance) {
+  if (isaUsed === 0) {
+    // Fully unused
     return [
       {
         id: `isa-unused-${person.id}`,
@@ -185,19 +188,39 @@ export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
     ];
   }
 
-  return [];
+  // Partially used — any remaining amount triggers recommendation
+  const monthsLeft = 12 - new Date().getMonth(); // rough estimate to April
+  const monthlyNeeded = Math.round(isaRemaining / Math.max(1, monthsLeft));
+
+  return [
+    {
+      id: `isa-topup-${person.id}`,
+      title: `Top up ${person.name}'s ISA — £${isaRemaining.toLocaleString()} remaining`,
+      description: `${person.name} has used ${isaPercent}% of their ISA allowance (£${isaUsed.toLocaleString()} of £${isaAllowance.toLocaleString()}). ${monthsLeft > 0 ? `That's roughly £${monthlyNeeded.toLocaleString()}/month to max it out before April.` : `Year-end is approaching — act soon.`}`,
+      impact: `Shelter £${isaRemaining.toLocaleString()} from future capital gains and income tax. ISA allowances cannot be carried forward.`,
+      priority: isaRemaining >= 10000 ? "high" : "medium",
+      category: "isa",
+      personId: person.id,
+      personName: person.name,
+      actionUrl: "/settings",
+      plainAction: `Transfer £${isaRemaining.toLocaleString()} into your ISA before 5 April. You can't get this allowance back once the tax year ends.`,
+    },
+  ];
 }
 
 /** 3. Pension allowance headroom */
+// FEAT-001: Uses tapered annual allowance for high earners
 export function analyzePensionHeadroom(ctx: PersonContext): Recommendation[] {
-  const { person, contributions, adjustedGross } = ctx;
+  const { person, contributions, adjustedGross, effectivePensionAllowance } = ctx;
   const pensionUsed = contributions.pensionContribution;
-  const pensionAllowance = UK_TAX_CONSTANTS.pensionAnnualAllowance;
-  const pensionRemaining = pensionAllowance - pensionUsed;
-  const pensionPercent = Math.round((pensionUsed / pensionAllowance) * 100);
+  const pensionRemaining = effectivePensionAllowance - pensionUsed;
+  const pensionPercent = effectivePensionAllowance > 0
+    ? Math.round((pensionUsed / effectivePensionAllowance) * 100)
+    : 0;
 
   if (pensionRemaining <= 20000) return [];
 
+  const isTapered = effectivePensionAllowance < UK_TAX_CONSTANTS.pensionAnnualAllowance;
   const reliefRate = adjustedGross > UK_TAX_CONSTANTS.incomeTax.basicRateUpperLimit ? 0.4 : 0.2;
   const taxRelief = Math.round(pensionRemaining * reliefRate);
 
@@ -205,7 +228,7 @@ export function analyzePensionHeadroom(ctx: PersonContext): Recommendation[] {
     {
       id: `pension-headroom-${person.id}`,
       title: `${person.name}: £${pensionRemaining.toLocaleString()} pension headroom unused`,
-      description: `Only ${pensionPercent}% of ${person.name}'s £${pensionAllowance.toLocaleString()} pension annual allowance is used (£${pensionUsed.toLocaleString()} contributed). As a ${reliefRate === 0.4 ? "higher" : "basic"} rate taxpayer, additional contributions get ${(reliefRate * 100).toFixed(0)}% tax relief.`,
+      description: `Only ${pensionPercent}% of ${person.name}'s £${effectivePensionAllowance.toLocaleString()} pension annual allowance is used (£${pensionUsed.toLocaleString()} contributed).${isTapered ? ` Note: allowance is tapered from £${UK_TAX_CONSTANTS.pensionAnnualAllowance.toLocaleString()} due to high income.` : ""} As a ${reliefRate === 0.4 ? "higher" : "basic"} rate taxpayer, additional contributions get ${(reliefRate * 100).toFixed(0)}% tax relief.`,
       impact: `Tax relief of £${taxRelief.toLocaleString()} on the unused £${pensionRemaining.toLocaleString()} headroom.`,
       priority: pensionRemaining > 40000 ? "high" : "medium",
       category: "pension",
@@ -218,16 +241,17 @@ export function analyzePensionHeadroom(ctx: PersonContext): Recommendation[] {
 }
 
 /** 4. Bed & ISA opportunity */
+// BUG-009: Now also fires for gains above the exempt amount (with CGT cost estimate)
+// FEAT-014: Uses isaRemainingForBedAndIsa to avoid exceeding ISA allowance
 export function analyzeBedAndISA(
-  ctx: PersonContext
+  ctx: PersonContext,
+  isaRemainingForBedAndIsa: number
 ): Recommendation[] {
-  const { person, accounts, contributions } = ctx;
-  const isaRemaining =
-    UK_TAX_CONSTANTS.isaAnnualAllowance - contributions.isaContribution;
+  const { person, accounts } = ctx;
   const giaAccounts = accounts.filter((a) => a.type === "gia");
   const giaValue = giaAccounts.reduce((sum, a) => sum + a.currentValue, 0);
 
-  if (giaValue <= 0 || isaRemaining <= 0) return [];
+  if (giaValue <= 0 || isaRemainingForBedAndIsa <= 0) return [];
 
   const unrealisedGains = getUnrealisedGains(giaAccounts);
   const totalGain = unrealisedGains.reduce(
@@ -235,24 +259,45 @@ export function analyzeBedAndISA(
     0
   );
 
-  if (totalGain <= 0 || totalGain > UK_TAX_CONSTANTS.cgt.annualExemptAmount) {
-    return [];
+  if (totalGain <= 0) return [];
+
+  const transferAmount = Math.min(giaValue, isaRemainingForBedAndIsa);
+  const exemptAmount = UK_TAX_CONSTANTS.cgt.annualExemptAmount;
+
+  if (totalGain <= exemptAmount) {
+    // Zero-cost Bed & ISA — gains within exempt amount
+    return [
+      {
+        id: `bed-isa-free-${person.id}`,
+        title: `Zero-cost Bed & ISA — move £${Math.round(transferAmount).toLocaleString()} to ISA`,
+        description: `${person.name}'s GIA has £${Math.round(totalGain).toLocaleString()} of unrealised gains, within the £${exemptAmount.toLocaleString()} CGT annual exempt amount. You can sell and rebuy inside your ISA with zero tax.`,
+        impact: `Shelter £${Math.round(transferAmount).toLocaleString()} from future CGT and income tax — completely free.`,
+        priority: "high",
+        category: "tax",
+        personId: person.id,
+        personName: person.name,
+        actionUrl: "/tax-planning",
+        plainAction: `Sell £${Math.round(transferAmount).toLocaleString()} from your general account and buy the same funds inside your ISA. No tax to pay because your gains are below the exempt amount.`,
+      },
+    ];
   }
 
-  const transferAmount = Math.min(giaValue, isaRemaining);
+  // BUG-009: Gains above exempt amount — still recommend, but flag CGT cost
+  const taxableGain = totalGain - exemptAmount;
+  const estimatedCGT = Math.round(taxableGain * UK_TAX_CONSTANTS.cgt.higherRate);
 
   return [
     {
-      id: `bed-isa-free-${person.id}`,
-      title: `Zero-cost Bed & ISA — move £${Math.round(transferAmount).toLocaleString()} to ISA`,
-      description: `${person.name}'s GIA has £${Math.round(totalGain).toLocaleString()} of unrealised gains, within the £${UK_TAX_CONSTANTS.cgt.annualExemptAmount.toLocaleString()} CGT annual exempt amount. You can sell and rebuy inside your ISA with zero tax.`,
-      impact: `Shelter £${Math.round(transferAmount).toLocaleString()} from future CGT and income tax — completely free.`,
-      priority: "high",
+      id: `bed-isa-taxable-${person.id}`,
+      title: `Bed & ISA opportunity — £${Math.round(transferAmount).toLocaleString()} to ISA (CGT applies)`,
+      description: `${person.name}'s GIA has £${Math.round(totalGain).toLocaleString()} of unrealised gains, exceeding the £${exemptAmount.toLocaleString()} exempt amount by £${Math.round(taxableGain).toLocaleString()}. A Bed & ISA would crystallise some CGT now but shelter future growth tax-free.`,
+      impact: `Estimated CGT cost: ~£${estimatedCGT.toLocaleString()}. Long-term ISA tax savings typically outweigh this for holdings kept 5+ years.`,
+      priority: "medium",
       category: "tax",
       personId: person.id,
       personName: person.name,
       actionUrl: "/tax-planning",
-      plainAction: `Sell £${Math.round(transferAmount).toLocaleString()} from your general account and buy the same funds inside your ISA. No tax to pay because your gains are below the exempt amount.`,
+      plainAction: `Consider selling GIA holdings and rebuying inside your ISA. You'll pay ~£${estimatedCGT.toLocaleString()} in CGT now, but everything inside the ISA grows tax-free from here.`,
     },
   ];
 }
@@ -273,7 +318,7 @@ export function analyzeGIAOverweight(ctx: PersonContext): Recommendation[] {
       id: `gia-overweight-${person.id}`,
       title: `GIA is ${giaPercent}% of portfolio — consider rebalancing`,
       description: `${person.name}'s GIA holds £${Math.round(giaValue).toLocaleString()} (${giaPercent}% of household portfolio). GIA assets face CGT on gains and income tax on dividends, unlike ISA or pension.`,
-      impact: `Prioritise filling ISA (£${UK_TAX_CONSTANTS.isaAnnualAllowance.toLocaleString()}/yr) and pension (£${UK_TAX_CONSTANTS.pensionAnnualAllowance.toLocaleString()}/yr) before adding to GIA.`,
+      impact: `Prioritise filling ISA (£${UK_TAX_CONSTANTS.isaAnnualAllowance.toLocaleString()}/yr) and pension before adding to GIA.`,
       priority: "medium",
       category: "investment",
       personId: person.id,
@@ -320,9 +365,10 @@ export function analyzeRetirementProgress(household: HouseholdData): Recommendat
 }
 
 /** 7. Emergency fund check */
+// BUG-010: Now includes cash ISA and premium bonds as emergency fund sources
 export function analyzeEmergencyFund(household: HouseholdData): Recommendation[] {
   const cashAccounts = household.accounts.filter((a) =>
-    ["cash_savings"].includes(a.type)
+    ["cash_savings", "cash_isa", "premium_bonds"].includes(a.type)
   );
   const totalCash = cashAccounts.reduce((s, a) => s + a.currentValue, 0);
   const emergencyTarget =
@@ -340,7 +386,7 @@ export function analyzeEmergencyFund(household: HouseholdData): Recommendation[]
     {
       id: "emergency-fund-low",
       title: `Emergency fund covers ${monthsCovered} months — target is ${household.emergencyFund.targetMonths}`,
-      description: `Your cash savings (£${totalCash.toLocaleString()}) cover ${monthsCovered} months of essential expenses. Your target is ${household.emergencyFund.targetMonths} months (£${emergencyTarget.toLocaleString()}).`,
+      description: `Your accessible cash (savings, Cash ISA, Premium Bonds) totals £${totalCash.toLocaleString()}, covering ${monthsCovered} months of essential expenses. Your target is ${household.emergencyFund.targetMonths} months (£${emergencyTarget.toLocaleString()}).`,
       impact: `Shortfall of £${Math.round(shortfall).toLocaleString()}. Build cash reserves before investing.`,
       priority: shortfall > emergencyTarget * 0.5 ? "high" : "medium",
       category: "risk",
@@ -414,6 +460,7 @@ export function analyzeSavingsRate(household: HouseholdData): Recommendation[] {
 }
 
 // --- Per-person analyzers (applied for each person) ---
+// Note: analyzeBedAndISA is called separately with ISA coordination
 
 const perPersonAnalyzers: ((
   ctx: PersonContext
@@ -421,7 +468,6 @@ const perPersonAnalyzers: ((
   (ctx) => analyzeSalaryTaper(ctx),
   (ctx) => analyzeISAUsage(ctx),
   (ctx) => analyzePensionHeadroom(ctx),
-  (ctx) => analyzeBedAndISA(ctx),
   (ctx) => analyzeGIAOverweight(ctx),
 ];
 
@@ -461,18 +507,38 @@ export function generateRecommendations(
 
     const personContributions = getPersonContributionTotals(contributions, person.id);
 
+    // FEAT-001: Calculate tapered annual allowance
+    const adjustedGross = getAdjustedGrossForTax(personIncome);
+    const adjustedIncomeForTaper = personIncome.grossSalary + personIncome.employerPensionContribution;
+    const effectivePensionAllowance = calculateTaperedAnnualAllowance(
+      personIncome.grossSalary,
+      adjustedIncomeForTaper
+    );
+
     const ctx: PersonContext = {
       person,
       income: personIncome,
       contributions: personContributions,
       accounts: personAccounts,
-      adjustedGross: getAdjustedGrossForTax(personIncome),
+      adjustedGross,
       allAccounts: accounts,
+      effectivePensionAllowance,
     };
 
     for (const analyze of perPersonAnalyzers) {
       recommendations.push(...analyze(ctx));
     }
+
+    // FEAT-014: Coordinate ISA usage — deduct ISA top-up from available allowance for Bed & ISA
+    const isaUsed = personContributions.isaContribution;
+    const isaRemaining = UK_TAX_CONSTANTS.isaAnnualAllowance - isaUsed;
+    // If we already recommended ISA top-up, the Bed & ISA gets what's left (zero, to avoid exceeding allowance)
+    // If the ISA recommendation exists, it claims the remaining allowance — Bed & ISA gets nothing extra
+    const isaRecommendation = recommendations.find(
+      (r) => (r.id === `isa-topup-${person.id}` || r.id === `isa-unused-${person.id}`)
+    );
+    const isaRemainingForBedAndIsa = isaRecommendation ? 0 : isaRemaining;
+    recommendations.push(...analyzeBedAndISA(ctx, isaRemainingForBedAndIsa));
   }
 
   // Household-level analysis

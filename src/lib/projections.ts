@@ -270,6 +270,51 @@ export function calculateAdjustedRequiredPot(
   return calculateRequiredPot(incomeFromPortfolio, withdrawalRate);
 }
 
+// --- Pension Tapered Annual Allowance ---
+
+/**
+ * Calculate the pension annual allowance after tapering for high earners.
+ *
+ * For 2024/25:
+ * - If adjusted income > £260k, allowance reduces by £1 for every £2 over
+ * - Minimum tapered allowance is £10k
+ * - If threshold income ≤ £200k, no taper applies regardless of adjusted income
+ *
+ * HMRC ref: https://www.gov.uk/tax-on-your-private-pension/annual-allowance
+ *
+ * @param thresholdIncome - Net income before pension contributions (broadly: gross salary)
+ * @param adjustedIncome - Threshold income + employer pension contributions
+ */
+export function calculateTaperedAnnualAllowance(
+  thresholdIncome: number,
+  adjustedIncome: number
+): number {
+  const {
+    pensionAnnualAllowance,
+    pensionTaperThresholdIncome,
+    pensionTaperAdjustedIncomeThreshold,
+    pensionTaperRate,
+    pensionMinimumTaperedAllowance,
+  } = UK_TAX_CONSTANTS;
+
+  // No taper if threshold income is at or below £200k
+  if (thresholdIncome <= pensionTaperThresholdIncome) {
+    return pensionAnnualAllowance;
+  }
+
+  // No taper if adjusted income is at or below £260k
+  if (adjustedIncome <= pensionTaperAdjustedIncomeThreshold) {
+    return pensionAnnualAllowance;
+  }
+
+  // Taper: reduce by £1 for every £2 over the adjusted income threshold
+  const excess = adjustedIncome - pensionTaperAdjustedIncomeThreshold;
+  const reduction = Math.floor(excess * pensionTaperRate);
+  const tapered = pensionAnnualAllowance - reduction;
+
+  return Math.max(tapered, pensionMinimumTaperedAllowance);
+}
+
 // --- State Pension ---
 
 /**

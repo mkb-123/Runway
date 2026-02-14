@@ -8,6 +8,18 @@
 // - Per-person state pension
 // - ISA/GIA drawdown to fill the gap
 // Displays from earliest retirement age to age 95.
+//
+// Fixes applied:
+// - BUG-003: Draw-then-grow ordering (correct convention)
+// - BUG-004: State pension paid in full (not capped to remainingNeed)
+// - BUG-005: Proportional drawdown across persons (not first-person priority)
+// - BUG-016: stepAfter interpolation for discrete annual data
+// - BUG-017: Shortfall shown as separate annotation (not stacked with income)
+// - BUG-015: Accessible aria-label on chart container
+// - FEAT-008: Vertical reference lines for pension access and state pension ages
+// - FEAT-009: Colorblind-safe palette with increased hue separation
+// - FEAT-011: Y-axis label
+// - FEAT-012: Filter zero-value tooltip entries
 
 import {
   AreaChart,
@@ -67,34 +79,50 @@ function buildIncomeTimeline(
 
   for (let age = retirementAge; age <= endAge; age++) {
     const point: DataPoint = { age };
-    let remainingNeed = targetAnnualIncome;
 
-    // 1. State pensions first (guaranteed income)
+    // BUG-004: State pensions paid in full (not capped to target).
+    // Total income may exceed target — that's a surplus, which is correct.
+    let totalIncome = 0;
+
+    // 1. State pensions first (guaranteed income, paid in full)
     for (const p of pots) {
       const key = `${p.name} State Pension`;
       if (age >= p.stateRetirementAge) {
-        const statePension = Math.min(p.statePensionAnnual, remainingNeed);
-        point[key] = Math.round(statePension);
-        remainingNeed -= statePension;
+        point[key] = Math.round(p.statePensionAnnual);
+        totalIncome += p.statePensionAnnual;
       } else {
         point[key] = 0;
       }
     }
 
     // 2. DC Pension drawdown (once accessible)
+    // BUG-005: Proportional drawdown across persons
+    const remainingNeedAfterStatePension = Math.max(0, targetAnnualIncome - totalIncome);
+
+    // Calculate total available pension pot for proportional split
+    const availablePensionPots = pots
+      .filter((p) => age >= p.pensionAccessAge && p.pensionPot > 0)
+      .map((p) => ({ p, available: p.pensionPot }));
+    const totalAvailablePension = availablePensionPots.reduce((s, x) => s + x.available, 0);
+
+    let pensionDrawnTotal = 0;
     for (const p of pots) {
       const key = `${p.name} Pension`;
       if (age >= p.pensionAccessAge && p.pensionPot > 0) {
-        // Grow the pot
-        p.pensionPot *= 1 + growthRate;
-        // Draw what we need (or what's left)
-        const draw = Math.min(remainingNeed, p.pensionPot);
+        // BUG-005: Split need proportionally by pot size
+        const share = totalAvailablePension > 0
+          ? (p.pensionPot / totalAvailablePension) * remainingNeedAfterStatePension
+          : 0;
+        // BUG-003: Draw first, then grow
+        const draw = Math.min(share, p.pensionPot);
         p.pensionPot -= draw;
+        p.pensionPot *= 1 + growthRate;
         point[key] = Math.round(draw);
-        remainingNeed -= draw;
+        totalIncome += draw;
+        pensionDrawnTotal += draw;
       } else {
         // Grow even if not drawing
-        if (age < p.pensionAccessAge) {
+        if (p.pensionPot > 0) {
           p.pensionPot *= 1 + growthRate;
         }
         point[key] = 0;
@@ -102,15 +130,27 @@ function buildIncomeTimeline(
     }
 
     // 3. ISA/Accessible drawdown (bridge before pension, or supplement after)
+    const remainingNeedAfterPension = Math.max(0, targetAnnualIncome - totalIncome);
+
+    // BUG-005: Proportional drawdown for ISA/savings too
+    const availableISAPots = pots
+      .filter((p) => p.accessibleWealth > 0)
+      .map((p) => ({ p, available: p.accessibleWealth }));
+    const totalAvailableISA = availableISAPots.reduce((s, x) => s + x.available, 0);
+
     for (const p of pots) {
       const key = `${p.name} ISA/Savings`;
-      if (p.accessibleWealth > 0 && remainingNeed > 0) {
-        // Grow accessible wealth
-        p.accessibleWealth *= 1 + growthRate;
-        const draw = Math.min(remainingNeed, p.accessibleWealth);
+      if (p.accessibleWealth > 0 && remainingNeedAfterPension > 0) {
+        // Split need proportionally
+        const share = totalAvailableISA > 0
+          ? (p.accessibleWealth / totalAvailableISA) * remainingNeedAfterPension
+          : 0;
+        // BUG-003: Draw first, then grow
+        const draw = Math.min(share, p.accessibleWealth);
         p.accessibleWealth -= draw;
+        p.accessibleWealth *= 1 + growthRate;
         point[key] = Math.round(draw);
-        remainingNeed -= draw;
+        totalIncome += draw;
       } else {
         if (p.accessibleWealth > 0) {
           p.accessibleWealth *= 1 + growthRate;
@@ -119,8 +159,8 @@ function buildIncomeTimeline(
       }
     }
 
-    // Track shortfall
-    point["Shortfall"] = Math.round(Math.max(0, remainingNeed));
+    // BUG-017: Shortfall tracked separately (not in income stack)
+    point["Shortfall"] = Math.round(Math.max(0, targetAnnualIncome - totalIncome));
 
     data.push(point);
   }
@@ -128,14 +168,15 @@ function buildIncomeTimeline(
   return data;
 }
 
+// FEAT-009: Colorblind-safe palette with wider hue separation and distinct patterns
 const COLORS = [
-  "hsl(221, 83%, 53%)", // blue - state pension
-  "hsl(262, 83%, 58%)", // purple - state pension 2
-  "hsl(142, 71%, 45%)", // green - DC pension
-  "hsl(160, 60%, 45%)", // teal - DC pension 2
-  "hsl(38, 92%, 50%)",  // amber - ISA
-  "hsl(25, 95%, 53%)",  // orange - ISA 2
-  "hsl(0, 72%, 51%)",   // red - shortfall
+  "hsl(220, 70%, 50%)",  // blue - state pension 1
+  "hsl(280, 60%, 55%)",  // violet - state pension 2
+  "hsl(150, 60%, 40%)",  // green - DC pension 1
+  "hsl(40, 80%, 50%)",   // gold - DC pension 2
+  "hsl(190, 70%, 45%)",  // cyan - ISA 1
+  "hsl(330, 65%, 50%)",  // pink - ISA 2
+  "hsl(0, 70%, 50%)",    // red - shortfall
 ];
 
 export function RetirementIncomeTimeline({
@@ -153,39 +194,64 @@ export function RetirementIncomeTimeline({
     growthRate
   );
 
-  // Build area keys in order: state pensions, DC pensions, ISA/savings, shortfall
-  const areaKeys: { key: string; color: string }[] = [];
+  // Build area keys in order: state pensions, DC pensions, ISA/savings
+  const incomeKeys: { key: string; color: string }[] = [];
   let colorIdx = 0;
   for (const p of persons) {
-    areaKeys.push({
+    incomeKeys.push({
       key: `${p.name} State Pension`,
       color: COLORS[colorIdx++ % COLORS.length],
     });
   }
   for (const p of persons) {
-    areaKeys.push({
+    incomeKeys.push({
       key: `${p.name} Pension`,
       color: COLORS[colorIdx++ % COLORS.length],
     });
   }
   for (const p of persons) {
-    areaKeys.push({
+    incomeKeys.push({
       key: `${p.name} ISA/Savings`,
       color: COLORS[colorIdx++ % COLORS.length],
     });
   }
-  areaKeys.push({
-    key: "Shortfall",
-    color: COLORS[COLORS.length - 1],
-  });
 
   // Filter out series that are always 0
-  const activeKeys = areaKeys.filter(({ key }) =>
+  const activeIncomeKeys = incomeKeys.filter(({ key }) =>
     data.some((d) => (d[key] ?? 0) > 0)
   );
 
+  const hasShortfall = data.some((d) => (d["Shortfall"] ?? 0) > 0);
+
+  // FEAT-008: Collect unique reference line ages for pension access and state pension
+  const referenceLines: { age: number; label: string }[] = [];
+  for (const p of persons) {
+    if (p.pensionAccessAge >= retirementAge && p.pensionAccessAge <= endAge) {
+      referenceLines.push({ age: p.pensionAccessAge, label: `${p.name} Pension Access (${p.pensionAccessAge})` });
+    }
+    if (p.stateRetirementAge >= retirementAge && p.stateRetirementAge <= endAge) {
+      referenceLines.push({ age: p.stateRetirementAge, label: `${p.name} State Pension (${p.stateRetirementAge})` });
+    }
+  }
+  // Deduplicate by age
+  const uniqueReferenceLines = referenceLines.filter(
+    (line, idx, arr) => arr.findIndex((l) => l.age === line.age) === idx
+  );
+
+  // BUG-015: Build accessible summary
+  const lastDataPoint = data[data.length - 1];
+  const accessibleSummary = `Retirement income timeline from age ${retirementAge} to ${endAge}. ${
+    hasShortfall
+      ? `Income falls short of the ${formatCurrencyAxis(targetAnnualIncome)} annual target in some years.`
+      : `Income meets or exceeds the ${formatCurrencyAxis(targetAnnualIncome)} annual target throughout.`
+  }`;
+
   return (
-    <div className="h-[450px] w-full">
+    <div
+      className="h-[450px] w-full"
+      role="img"
+      aria-label={accessibleSummary}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data}
@@ -196,17 +262,23 @@ export function RetirementIncomeTimeline({
             tick={{ fontSize: 12 }}
             label={{ value: "Age", position: "insideBottom", offset: -5 }}
           />
+          {/* FEAT-011: Y-axis label */}
           <YAxis
             tickFormatter={formatCurrencyAxis}
             tick={{ fontSize: 12 }}
-            width={70}
+            width={80}
+            label={{ value: "Annual Income (£)", angle: -90, position: "insideLeft", offset: 5, style: { fontSize: 11, fill: "var(--muted-foreground)" } }}
           />
+          {/* FEAT-012: Filter zero-value entries in tooltip */}
           <Tooltip
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            formatter={(value: any, name: any) => [
-              formatCurrencyTooltip(Number(value ?? 0)),
-              String(name),
-            ]}
+            formatter={(value: any, name: any) => {
+              const num = Number(value ?? 0);
+              if (num === 0) return [null, null] as unknown as [string, string];
+              return [formatCurrencyTooltip(num), String(name)];
+            }}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            itemSorter={(item: any) => -(Number(item.value) || 0)}
             labelFormatter={(age) => `Age ${age}`}
             contentStyle={{
               backgroundColor: "var(--card)",
@@ -226,18 +298,49 @@ export function RetirementIncomeTimeline({
               fill: "var(--muted-foreground)",
             }}
           />
-          {activeKeys.map(({ key, color }) => (
+          {/* FEAT-008: Vertical reference lines for key ages */}
+          {uniqueReferenceLines.map(({ age, label }) => (
+            <ReferenceLine
+              key={`ref-${age}`}
+              x={age}
+              stroke="var(--muted-foreground)"
+              strokeDasharray="3 3"
+              strokeOpacity={0.5}
+              label={{
+                value: label,
+                position: "top",
+                fontSize: 10,
+                fill: "var(--muted-foreground)",
+              }}
+            />
+          ))}
+          {/* Income sources — stacked, BUG-016: stepAfter for discrete annual data */}
+          {activeIncomeKeys.map(({ key, color }) => (
             <Area
               key={key}
-              type="monotone"
+              type="stepAfter"
               dataKey={key}
               stackId="income"
               stroke={color}
               fill={color}
-              fillOpacity={key === "Shortfall" ? 0.3 : 0.6}
-              strokeWidth={key === "Shortfall" ? 2 : 1}
+              fillOpacity={0.6}
+              strokeWidth={1}
             />
           ))}
+          {/* BUG-017: Shortfall shown separately (not in income stack) */}
+          {hasShortfall && (
+            <Area
+              key="Shortfall"
+              type="stepAfter"
+              dataKey="Shortfall"
+              stackId="shortfall"
+              stroke={COLORS[COLORS.length - 1]}
+              fill={COLORS[COLORS.length - 1]}
+              fillOpacity={0.2}
+              strokeWidth={2}
+              strokeDasharray="4 2"
+            />
+          )}
         </AreaChart>
       </ResponsiveContainer>
     </div>

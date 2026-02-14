@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useData } from "@/context/data-context";
+import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { formatCurrency } from "@/lib/format";
@@ -21,7 +21,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 
 export default function AccountsPage() {
-  const { household } = useData();
+  const { household } = useScenarioData();
   const { persons, accounts } = household;
   const { selectedView } = usePersonView();
 

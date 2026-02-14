@@ -128,6 +128,7 @@ describe("analyzeSalaryTaper", () => {
       accounts: [],
       adjustedGross: 110000,
       allAccounts: [],
+      effectivePensionAllowance: 60000,
     };
 
     const recs = analyzeSalaryTaper(ctx);
@@ -145,6 +146,7 @@ describe("analyzeSalaryTaper", () => {
       accounts: [],
       adjustedGross: 77000,
       allAccounts: [],
+      effectivePensionAllowance: 60000,
     };
 
     expect(analyzeSalaryTaper(ctx)).toHaveLength(0);
@@ -158,6 +160,7 @@ describe("analyzeSalaryTaper", () => {
       accounts: [],
       adjustedGross: 197000,
       allAccounts: [],
+      effectivePensionAllowance: 60000,
     };
 
     expect(analyzeSalaryTaper(ctx)).toHaveLength(0);
@@ -173,6 +176,7 @@ describe("analyzeISAUsage", () => {
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
+      effectivePensionAllowance: 60000,
     };
 
     const recs = analyzeISAUsage(ctx);
@@ -188,6 +192,7 @@ describe("analyzeISAUsage", () => {
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
+      effectivePensionAllowance: 60000,
     };
 
     const recs = analyzeISAUsage(ctx);
@@ -204,6 +209,7 @@ describe("analyzeISAUsage", () => {
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
+      effectivePensionAllowance: 60000,
     };
 
     expect(analyzeISAUsage(ctx)).toHaveLength(0);
@@ -219,6 +225,7 @@ describe("analyzePensionHeadroom", () => {
       accounts: [],
       adjustedGross: 80000,
       allAccounts: [],
+      effectivePensionAllowance: 60000,
     };
 
     const recs = analyzePensionHeadroom(ctx);
@@ -234,6 +241,7 @@ describe("analyzePensionHeadroom", () => {
       accounts: [],
       adjustedGross: 60000,
       allAccounts: [],
+      effectivePensionAllowance: 60000,
     };
 
     expect(analyzePensionHeadroom(ctx)).toHaveLength(0);
@@ -260,6 +268,7 @@ describe("analyzeGIAOverweight", () => {
       accounts: [giaAccount],
       adjustedGross: 60000,
       allAccounts: [giaAccount, isaAccount],
+      effectivePensionAllowance: 60000,
     };
 
     const recs = analyzeGIAOverweight(ctx);
@@ -286,6 +295,7 @@ describe("analyzeGIAOverweight", () => {
       accounts: [giaAccount],
       adjustedGross: 60000,
       allAccounts: [giaAccount, isaAccount],
+      effectivePensionAllowance: 60000,
     };
 
     expect(analyzeGIAOverweight(ctx)).toHaveLength(0);
@@ -434,11 +444,12 @@ describe("analyzeBedAndISA", () => {
       accounts: [smallGainAccount],
       adjustedGross: 60000,
       allAccounts: [smallGainAccount],
+      effectivePensionAllowance: 60000,
     };
 
     // Unrealised gain: 10300 - 10000 = 300, within CGT allowance
-
-    const recs = analyzeBedAndISA(ctx);
+    // ISA remaining: 20000 - 5000 = 15000
+    const recs = analyzeBedAndISA(ctx, 15000);
     expect(recs).toHaveLength(1);
     expect(recs[0].id).toContain("bed-isa-free");
     expect(recs[0].priority).toBe("high");
@@ -459,9 +470,10 @@ describe("analyzeBedAndISA", () => {
       accounts: [emptyGia],
       adjustedGross: 60000,
       allAccounts: [emptyGia],
+      effectivePensionAllowance: 60000,
     };
 
-    expect(analyzeBedAndISA(ctx)).toHaveLength(0);
+    expect(analyzeBedAndISA(ctx, 15000)).toHaveLength(0);
   });
 
   it("returns nothing when ISA fully used", () => {
@@ -479,9 +491,11 @@ describe("analyzeBedAndISA", () => {
       accounts: [giaAccount],
       adjustedGross: 60000,
       allAccounts: [giaAccount],
+      effectivePensionAllowance: 60000,
     };
 
-    expect(analyzeBedAndISA(ctx)).toHaveLength(0);
+    // ISA fully used: 20000 - 20000 = 0 remaining
+    expect(analyzeBedAndISA(ctx, 0)).toHaveLength(0);
   });
 });
 
