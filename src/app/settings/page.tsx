@@ -29,6 +29,7 @@ import { FundsTab } from "./components/funds-tab";
 import { PlanningTab } from "./components/planning-tab";
 import { IhtTab } from "./components/iht-tab";
 import { TransactionsTab } from "./components/transactions-tab";
+import { SettingsSummaryBar } from "./components/settings-summary-bar";
 
 // ============================================================
 // Settings Page — Thin Orchestrator
@@ -160,6 +161,8 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      <SettingsSummaryBar household={household} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full flex-wrap h-auto gap-1">

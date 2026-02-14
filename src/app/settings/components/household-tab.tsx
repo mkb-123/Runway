@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -27,6 +33,7 @@ import type {
   HouseholdData,
 } from "@/types";
 import { clone, setField, renderField } from "./field-helpers";
+import { FieldWarning } from "./field-warning";
 
 const STUDENT_LOAN_LABELS: Record<StudentLoanPlan, string> = {
   none: "None",
@@ -42,6 +49,15 @@ const PENSION_METHOD_LABELS: Record<string, string> = {
   net_pay: "Net Pay",
   relief_at_source: "Relief at Source",
 };
+
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <CollapsibleTrigger className="flex w-full items-center justify-between py-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors">
+      {title}
+      <ChevronDown className="size-4 transition-transform [[data-state=open]_&]:rotate-180" />
+    </CollapsibleTrigger>
+  );
+}
 
 interface HouseholdTabProps {
   household: HouseholdData;
@@ -214,337 +230,446 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                 )}
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Personal Details */}
-              <div>
-                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                  Personal Details
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {renderField(
-                    "Name",
-                    <Input
-                      value={person.name}
-                      onChange={(e) => updatePerson(pIdx, "name", e.target.value)}
-                      placeholder="Full name"
-                    />
-                  )}
-                  {renderField(
-                    "Date of Birth",
-                    <Input
-                      type="date"
-                      value={person.dateOfBirth}
-                      onChange={(e) => updatePerson(pIdx, "dateOfBirth", e.target.value)}
-                    />
-                  )}
-                  {renderField(
-                    "Pension Access Age",
-                    <Input
-                      type="number"
-                      value={person.pensionAccessAge}
-                      onChange={(e) =>
-                        updatePerson(pIdx, "pensionAccessAge", Number(e.target.value))
-                      }
-                    />,
-                    "Earliest age you can draw private pension (currently 57)"
-                  )}
-                  {renderField(
-                    "State Retirement Age",
-                    <Input
-                      type="number"
-                      value={person.stateRetirementAge}
-                      onChange={(e) =>
-                        updatePerson(pIdx, "stateRetirementAge", Number(e.target.value))
-                      }
-                    />,
-                    "Check yours at gov.uk/state-pension-age"
-                  )}
-                  {renderField(
-                    "NI Qualifying Years",
-                    <Input
-                      type="number"
-                      value={person.niQualifyingYears}
-                      onChange={(e) =>
-                        updatePerson(pIdx, "niQualifyingYears", Number(e.target.value))
-                      }
-                    />,
-                    "Need 35 years for full state pension. Check at gov.uk/check-state-pension"
-                  )}
-                  {renderField(
-                    "Student Loan Plan",
-                    <Select
-                      value={person.studentLoanPlan}
-                      onValueChange={(val) => updatePerson(pIdx, "studentLoanPlan", val)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(STUDENT_LOAN_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              </div>
-
-              {/* Income & Pension */}
-              {income && (
-                <div>
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                    Income & Pension
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <CardContent className="space-y-2">
+              {/* Personal Details — always open */}
+              <Collapsible defaultOpen>
+                <SectionHeader title="Personal Details" />
+                <CollapsibleContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2 pb-4">
                     {renderField(
-                      "Gross Salary",
+                      "Name",
                       <Input
-                        type="number"
-                        step="0.01"
-                        value={income.grossSalary}
-                        onChange={(e) =>
-                          updateIncome(incomeIdx, "grossSalary", Number(e.target.value))
-                        }
-                        placeholder="0.00"
-                      />,
-                      "Annual salary before tax and pension deductions"
+                        value={person.name}
+                        onChange={(e) => updatePerson(pIdx, "name", e.target.value)}
+                        placeholder="Full name"
+                      />
                     )}
                     {renderField(
-                      "Employer Pension Contribution",
+                      "Date of Birth",
                       <Input
-                        type="number"
-                        step="0.01"
-                        value={income.employerPensionContribution}
-                        onChange={(e) =>
-                          updateIncome(
-                            incomeIdx,
-                            "employerPensionContribution",
-                            Number(e.target.value)
-                          )
-                        }
-                        placeholder="0.00"
-                      />,
-                      "Annual amount your employer puts into your pension"
+                        type="date"
+                        value={person.dateOfBirth}
+                        onChange={(e) => updatePerson(pIdx, "dateOfBirth", e.target.value)}
+                      />
                     )}
                     {renderField(
-                      "Employee Pension Contribution",
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={income.employeePensionContribution}
-                        onChange={(e) =>
-                          updateIncome(
-                            incomeIdx,
-                            "employeePensionContribution",
-                            Number(e.target.value)
-                          )
-                        }
-                        placeholder="0.00"
-                      />,
-                      "Annual amount you contribute to your pension"
+                      "Pension Access Age",
+                      <>
+                        <Input
+                          type="number"
+                          value={person.pensionAccessAge}
+                          onChange={(e) =>
+                            updatePerson(pIdx, "pensionAccessAge", Number(e.target.value))
+                          }
+                        />
+                        <FieldWarning
+                          value={person.pensionAccessAge}
+                          min={50}
+                          max={75}
+                          label="pension access age"
+                        />
+                      </>,
+                      "Earliest age you can draw private pension (currently 57)"
                     )}
                     {renderField(
-                      "Pension Method",
+                      "State Retirement Age",
+                      <>
+                        <Input
+                          type="number"
+                          value={person.stateRetirementAge}
+                          onChange={(e) =>
+                            updatePerson(pIdx, "stateRetirementAge", Number(e.target.value))
+                          }
+                        />
+                        <FieldWarning
+                          value={person.stateRetirementAge}
+                          min={60}
+                          max={75}
+                          label="state retirement age"
+                        />
+                      </>,
+                      "Check yours at gov.uk/state-pension-age"
+                    )}
+                    {renderField(
+                      "NI Qualifying Years",
+                      <>
+                        <Input
+                          type="number"
+                          value={person.niQualifyingYears}
+                          onChange={(e) =>
+                            updatePerson(pIdx, "niQualifyingYears", Number(e.target.value))
+                          }
+                        />
+                        <FieldWarning
+                          value={person.niQualifyingYears}
+                          min={0}
+                          max={50}
+                          label="NI qualifying years"
+                        />
+                      </>,
+                      "Need 35 years for full state pension. Check at gov.uk/check-state-pension"
+                    )}
+                    {renderField(
+                      "Student Loan Plan",
                       <Select
-                        value={income.pensionContributionMethod}
-                        onValueChange={(val) =>
-                          updateIncome(incomeIdx, "pensionContributionMethod", val)
-                        }
+                        value={person.studentLoanPlan}
+                        onValueChange={(val) => updatePerson(pIdx, "studentLoanPlan", val)}
                       >
                         <SelectTrigger className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(PENSION_METHOD_LABELS).map(([value, label]) => (
+                          {Object.entries(STUDENT_LOAN_LABELS).map(([value, label]) => (
                             <SelectItem key={value} value={value}>
                               {label}
                             </SelectItem>
                           ))}
                         </SelectContent>
-                      </Select>,
-                      "Salary sacrifice is usually most tax-efficient"
+                      </Select>
                     )}
                   </div>
-                </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Income & Pension */}
+              {income && (
+                <Collapsible defaultOpen>
+                  <SectionHeader title="Income & Pension" />
+                  <CollapsibleContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2 pb-4">
+                      {renderField(
+                        "Gross Salary",
+                        <>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={income.grossSalary}
+                            onChange={(e) =>
+                              updateIncome(incomeIdx, "grossSalary", Number(e.target.value))
+                            }
+                            placeholder="0.00"
+                          />
+                          <FieldWarning
+                            value={income.grossSalary}
+                            min={0}
+                            max={500000}
+                            label="gross salary"
+                            isCurrency
+                          />
+                        </>,
+                        "Annual salary before tax and pension deductions"
+                      )}
+                      {renderField(
+                        "Employer Pension Contribution",
+                        <>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={income.employerPensionContribution}
+                            onChange={(e) =>
+                              updateIncome(
+                                incomeIdx,
+                                "employerPensionContribution",
+                                Number(e.target.value)
+                              )
+                            }
+                            placeholder="0.00"
+                          />
+                          <FieldWarning
+                            value={income.employerPensionContribution}
+                            min={0}
+                            max={60000}
+                            label="employer pension contribution"
+                            isCurrency
+                          />
+                        </>,
+                        "Annual amount your employer puts into your pension"
+                      )}
+                      {renderField(
+                        "Employee Pension Contribution",
+                        <>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={income.employeePensionContribution}
+                            onChange={(e) =>
+                              updateIncome(
+                                incomeIdx,
+                                "employeePensionContribution",
+                                Number(e.target.value)
+                              )
+                            }
+                            placeholder="0.00"
+                          />
+                          <FieldWarning
+                            value={income.employeePensionContribution}
+                            min={0}
+                            max={60000}
+                            label="employee pension contribution"
+                            isCurrency
+                          />
+                        </>,
+                        "Annual amount you contribute to your pension"
+                      )}
+                      {renderField(
+                        "Pension Method",
+                        <Select
+                          value={income.pensionContributionMethod}
+                          onValueChange={(val) =>
+                            updateIncome(incomeIdx, "pensionContributionMethod", val)
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(PENSION_METHOD_LABELS).map(([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>,
+                        "Salary sacrifice is usually most tax-efficient"
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
 
               {/* Bonus */}
               {bonus && (
-                <div>
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                    Bonus
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {renderField(
-                      "Cash Bonus (Annual)",
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={bonus.cashBonusAnnual}
-                        onChange={(e) =>
-                          updateBonus(bonusIdx, "cashBonusAnnual", Number(e.target.value))
-                        }
-                        placeholder="0.00"
-                      />,
-                      "Expected annual cash bonus before tax"
-                    )}
-                  </div>
+                <Collapsible>
+                  <SectionHeader title="Bonus" />
+                  <CollapsibleContent>
+                    <div className="pt-2 pb-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {renderField(
+                          "Cash Bonus (Annual)",
+                          <>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={bonus.cashBonusAnnual}
+                              onChange={(e) =>
+                                updateBonus(bonusIdx, "cashBonusAnnual", Number(e.target.value))
+                              }
+                              placeholder="0.00"
+                            />
+                            <FieldWarning
+                              value={bonus.cashBonusAnnual}
+                              min={0}
+                              max={500000}
+                              label="annual bonus"
+                              isCurrency
+                            />
+                          </>,
+                          "Expected annual cash bonus before tax"
+                        )}
+                      </div>
 
-                  <div className="mt-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h5 className="text-sm font-medium">Deferred Tranches</h5>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addTranche(bonusIdx)}
-                      >
-                        + Add Tranche
-                      </Button>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h5 className="text-sm font-medium">Deferred Tranches</h5>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => addTranche(bonusIdx)}
+                          >
+                            + Add Tranche
+                          </Button>
+                        </div>
+                        {bonus.deferredTranches.length === 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            No deferred tranches.
+                          </p>
+                        )}
+                        {bonus.deferredTranches.map((tranche, tIdx) => (
+                          <Card key={`${person.id}-tranche-${tIdx}`} className="border-dashed">
+                            <CardContent className="pt-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {renderField(
+                                  "Grant Date",
+                                  <Input
+                                    type="date"
+                                    value={tranche.grantDate}
+                                    onChange={(e) =>
+                                      updateTranche(bonusIdx, tIdx, "grantDate", e.target.value)
+                                    }
+                                  />
+                                )}
+                                {renderField(
+                                  "Vesting Date",
+                                  <Input
+                                    type="date"
+                                    value={tranche.vestingDate}
+                                    onChange={(e) =>
+                                      updateTranche(bonusIdx, tIdx, "vestingDate", e.target.value)
+                                    }
+                                  />
+                                )}
+                                {renderField(
+                                  "Amount",
+                                  <>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={tranche.amount}
+                                      onChange={(e) =>
+                                        updateTranche(
+                                          bonusIdx,
+                                          tIdx,
+                                          "amount",
+                                          Number(e.target.value)
+                                        )
+                                      }
+                                      placeholder="0.00"
+                                    />
+                                    <FieldWarning
+                                      value={tranche.amount}
+                                      min={0}
+                                      max={1000000}
+                                      label="tranche amount"
+                                      isCurrency
+                                    />
+                                  </>
+                                )}
+                                {renderField(
+                                  "Est. Annual Return (%)",
+                                  <>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={
+                                        Math.round(tranche.estimatedAnnualReturn * 100 * 100) / 100
+                                      }
+                                      onChange={(e) =>
+                                        updateTranche(
+                                          bonusIdx,
+                                          tIdx,
+                                          "estimatedAnnualReturn",
+                                          Number(e.target.value) / 100
+                                        )
+                                      }
+                                      placeholder="8"
+                                    />
+                                    <FieldWarning
+                                      value={Math.round(tranche.estimatedAnnualReturn * 100 * 100) / 100}
+                                      min={-10}
+                                      max={30}
+                                      label="annual return"
+                                      suffix="%"
+                                    />
+                                  </>
+                                )}
+                              </div>
+                              <div className="mt-3 flex justify-end">
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => removeTranche(bonusIdx, tIdx)}
+                                >
+                                  Remove Tranche
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
                     </div>
-                    {bonus.deferredTranches.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        No deferred tranches.
-                      </p>
-                    )}
-                    {bonus.deferredTranches.map((tranche, tIdx) => (
-                      <Card key={`${person.id}-tranche-${tIdx}`} className="border-dashed">
-                        <CardContent className="pt-4">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {renderField(
-                              "Grant Date",
-                              <Input
-                                type="date"
-                                value={tranche.grantDate}
-                                onChange={(e) =>
-                                  updateTranche(bonusIdx, tIdx, "grantDate", e.target.value)
-                                }
-                              />
-                            )}
-                            {renderField(
-                              "Vesting Date",
-                              <Input
-                                type="date"
-                                value={tranche.vestingDate}
-                                onChange={(e) =>
-                                  updateTranche(bonusIdx, tIdx, "vestingDate", e.target.value)
-                                }
-                              />
-                            )}
-                            {renderField(
-                              "Amount",
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={tranche.amount}
-                                onChange={(e) =>
-                                  updateTranche(
-                                    bonusIdx,
-                                    tIdx,
-                                    "amount",
-                                    Number(e.target.value)
-                                  )
-                                }
-                                placeholder="0.00"
-                              />
-                            )}
-                            {renderField(
-                              "Est. Annual Return (%)",
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={
-                                  Math.round(tranche.estimatedAnnualReturn * 100 * 100) / 100
-                                }
-                                onChange={(e) =>
-                                  updateTranche(
-                                    bonusIdx,
-                                    tIdx,
-                                    "estimatedAnnualReturn",
-                                    Number(e.target.value) / 100
-                                  )
-                                }
-                                placeholder="8"
-                              />
-                            )}
-                          </div>
-                          <div className="mt-3 flex justify-end">
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => removeTranche(bonusIdx, tIdx)}
-                            >
-                              Remove Tranche
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
 
               {/* Annual Contributions */}
               {contrib && (
-                <div>
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                    Annual Contributions
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {renderField(
-                      "ISA Contribution",
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={contrib.isaContribution}
-                        onChange={(e) =>
-                          updateContribution(
-                            contribIdx,
-                            "isaContribution",
-                            Number(e.target.value)
-                          )
-                        }
-                        placeholder="0.00"
-                      />,
-                      "Annual ISA allowance is £20,000 per person"
-                    )}
-                    {renderField(
-                      "Pension Contribution",
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={contrib.pensionContribution}
-                        onChange={(e) =>
-                          updateContribution(
-                            contribIdx,
-                            "pensionContribution",
-                            Number(e.target.value)
-                          )
-                        }
-                        placeholder="0.00"
-                      />,
-                      "Additional pension contributions (annual allowance £60,000)"
-                    )}
-                    {renderField(
-                      "GIA Contribution",
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={contrib.giaContribution}
-                        onChange={(e) =>
-                          updateContribution(
-                            contribIdx,
-                            "giaContribution",
-                            Number(e.target.value)
-                          )
-                        }
-                        placeholder="0.00"
-                      />,
-                      "General Investment Account — no tax wrapper, subject to CGT"
-                    )}
-                  </div>
-                </div>
+                <Collapsible defaultOpen>
+                  <SectionHeader title="Annual Contributions" />
+                  <CollapsibleContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2 pb-4">
+                      {renderField(
+                        "ISA Contribution",
+                        <>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={contrib.isaContribution}
+                            onChange={(e) =>
+                              updateContribution(
+                                contribIdx,
+                                "isaContribution",
+                                Number(e.target.value)
+                              )
+                            }
+                            placeholder="0.00"
+                          />
+                          <FieldWarning
+                            value={contrib.isaContribution}
+                            min={0}
+                            max={20000}
+                            label="ISA contribution"
+                            isCurrency
+                            maxLabel="the £20,000 annual ISA allowance"
+                          />
+                        </>,
+                        "Annual ISA allowance is £20,000 per person"
+                      )}
+                      {renderField(
+                        "Pension Contribution",
+                        <>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={contrib.pensionContribution}
+                            onChange={(e) =>
+                              updateContribution(
+                                contribIdx,
+                                "pensionContribution",
+                                Number(e.target.value)
+                              )
+                            }
+                            placeholder="0.00"
+                          />
+                          <FieldWarning
+                            value={contrib.pensionContribution}
+                            min={0}
+                            max={60000}
+                            label="pension contribution"
+                            isCurrency
+                            maxLabel="the £60,000 annual allowance"
+                          />
+                        </>,
+                        "Additional pension contributions (annual allowance £60,000)"
+                      )}
+                      {renderField(
+                        "GIA Contribution",
+                        <>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={contrib.giaContribution}
+                            onChange={(e) =>
+                              updateContribution(
+                                contribIdx,
+                                "giaContribution",
+                                Number(e.target.value)
+                              )
+                            }
+                            placeholder="0.00"
+                          />
+                          <FieldWarning
+                            value={contrib.giaContribution}
+                            min={0}
+                            max={500000}
+                            label="GIA contribution"
+                            isCurrency
+                          />
+                        </>,
+                        "General Investment Account — no tax wrapper, subject to CGT"
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
             </CardContent>
           </Card>
