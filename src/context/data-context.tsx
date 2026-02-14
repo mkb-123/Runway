@@ -4,7 +4,7 @@
 // Data Context - Client-side state management with localStorage persistence
 // ============================================================
 // Replaces static JSON imports with editable, localStorage-backed state.
-// Provides the same computed helpers as lib/data.ts but operating on live state.
+// Provides computed helpers operating on live state.
 
 import {
   createContext,
