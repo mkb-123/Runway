@@ -185,7 +185,7 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
   function addContribution(personId: string, template?: { label: string; target: ContributionTarget; amount: number; frequency: ContributionFrequency }) {
     const updated = clone(household);
     updated.contributions.push({
-      id: `contrib-${Date.now()}`,
+      id: `contrib-${crypto.randomUUID()}`,
       personId,
       label: template?.label ?? "",
       target: template?.target ?? ("isa" as ContributionTarget),
@@ -220,7 +220,6 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
   // Render
   // ----------------------------------------------------------
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- component, not conditional
   const [selectedPersonIdx, setSelectedPersonIdx] = useState(0);
 
   // Clamp index if persons list shrinks

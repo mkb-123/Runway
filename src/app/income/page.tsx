@@ -18,7 +18,7 @@ import {
   projectDeferredBonusValue,
 } from "@/lib/projections";
 import type { DeferredBonusTranche } from "@/types";
-import { getPersonContributionTotals, annualiseContribution, annualiseOutgoing } from "@/types";
+import { getPersonContributionTotals, annualiseOutgoing } from "@/types";
 import {
   Table,
   TableHeader,

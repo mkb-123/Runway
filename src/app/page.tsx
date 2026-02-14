@@ -4,9 +4,6 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Settings,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   X,
   Lightbulb,
   Printer,
@@ -25,11 +22,9 @@ import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { CollapsibleSection } from "@/components/collapsible-section";
-import { EmptyState } from "@/components/empty-state";
 import { projectScenarios } from "@/lib/projections";
 import {
   calculateRetirementCountdown,
-  calculateRequiredPot,
   calculateAdjustedRequiredPot,
   calculateProRataStatePension,
 } from "@/lib/projections";

@@ -9,7 +9,7 @@
 // - Smart presets (avoid 60% trap, bonus deployment)
 // - Bottom sheet on mobile, side panel on desktop
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   FlaskConical,
   RotateCcw,
@@ -25,7 +25,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
   SheetContent,
@@ -296,15 +295,19 @@ export function ScenarioPanel() {
   >({});
   const [marketShock, setMarketShock] = useState<string>("");
 
-  // Reset form state when panel closes
-  useEffect(() => {
-    if (!open && !isScenarioMode) {
-      setPensionOverrides({});
-      setIncomeOverrides({});
-      setContributionOverrides({});
-      setMarketShock("");
-    }
-  }, [open, isScenarioMode]);
+  // Reset form state when panel closes (if not in scenario mode)
+  const handleOpenChange = useCallback(
+    (newOpen: boolean) => {
+      setOpen(newOpen);
+      if (!newOpen && !isScenarioMode) {
+        setPensionOverrides({});
+        setIncomeOverrides({});
+        setContributionOverrides({});
+        setMarketShock("");
+      }
+    },
+    [isScenarioMode]
+  );
 
   // Live impact preview
   const impactByPerson = useMemo(
@@ -416,7 +419,7 @@ export function ScenarioPanel() {
   }, [impactByPerson]);
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger asChild>
         <Button
           variant={isScenarioMode ? "default" : "outline"}

@@ -78,7 +78,6 @@ export function AccountsTab({ household, updateHousehold }: AccountsTabProps) {
     .map((a, idx) => ({ account: a, originalIndex: idx }))
     .filter(({ account }) => !personIds.has(account.personId));
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- component, not conditional
   const [selectedPersonIdx, setSelectedPersonIdx] = useState(0);
   const clampedIdx = Math.min(selectedPersonIdx, Math.max(0, household.persons.length - 1));
 
