@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { useData } from "@/context/data-context";
+import { usePersonView } from "@/context/person-view-context";
+import { PersonToggle } from "@/components/person-toggle";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import {
   ASSET_CLASS_LABELS,
@@ -44,7 +46,13 @@ interface FundGroup {
 
 export default function HoldingsPage() {
   const { household, getPersonById, getFundById } = useData();
-  const { accounts, funds } = household;
+  const { selectedView } = usePersonView();
+  const { funds } = household;
+
+  const accounts = useMemo(() => {
+    if (selectedView === "household") return household.accounts;
+    return household.accounts.filter((a) => a.personId === selectedView);
+  }, [household.accounts, selectedView]);
 
   // Build a map of fund ID -> all holdings across accounts
   const { fundGroups, grandTotalInvested, grandTotalCurrent, grandTotalGainLoss } =
@@ -117,11 +125,14 @@ export default function HoldingsPage() {
 
   return (
     <div className="space-y-8 p-4 md:p-8">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Fund Holdings</h1>
-        <p className="text-muted-foreground">
-          Detailed view of all fund holdings across accounts.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Fund Holdings</h1>
+          <p className="text-muted-foreground">
+            Detailed view of all fund holdings across accounts.
+          </p>
+        </div>
+        <PersonToggle />
       </div>
 
       {/* Summary cards */}

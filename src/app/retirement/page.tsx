@@ -13,6 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useScenarioData } from "@/context/use-scenario-data";
+import { usePersonView } from "@/context/person-view-context";
+import { PersonToggle } from "@/components/person-toggle";
 import { getAccountTaxWrapper } from "@/types";
 import {
   formatCurrency,
@@ -37,11 +39,35 @@ import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 export default function RetirementPage() {
   // Scenario-aware data
   const scenarioData = useScenarioData();
+  const { selectedView } = usePersonView();
   const household = scenarioData.household;
-  const currentPot = scenarioData.getTotalNetWorth();
 
-  const { retirement, annualContributions, accounts, income, persons } =
-    household;
+  const accounts = useMemo(() => {
+    if (selectedView === "household") return household.accounts;
+    return household.accounts.filter((a) => a.personId === selectedView);
+  }, [household.accounts, selectedView]);
+
+  const persons = useMemo(() => {
+    if (selectedView === "household") return household.persons;
+    return household.persons.filter((p) => p.id === selectedView);
+  }, [household.persons, selectedView]);
+
+  const income = useMemo(() => {
+    if (selectedView === "household") return household.income;
+    return household.income.filter((i) => i.personId === selectedView);
+  }, [household.income, selectedView]);
+
+  const annualContributions = useMemo(() => {
+    if (selectedView === "household") return household.annualContributions;
+    return household.annualContributions.filter((c) => c.personId === selectedView);
+  }, [household.annualContributions, selectedView]);
+
+  const currentPot = useMemo(
+    () => accounts.reduce((sum, a) => sum + a.currentValue, 0),
+    [accounts]
+  );
+
+  const { retirement } = household;
 
   // Required pot
   const requiredPot = useMemo(
@@ -200,13 +226,16 @@ export default function RetirementPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Retirement Planning
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Track your progress toward financial independence
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Retirement Planning
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Track your progress toward financial independence
+          </p>
+        </div>
+        <PersonToggle />
       </div>
 
       {/* Summary Cards */}

@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
+import { usePersonView } from "@/context/person-view-context";
+import { PersonToggle } from "@/components/person-toggle";
 import { formatCurrency, formatPercent, roundPence } from "@/lib/format";
 import {
   getAccountTaxWrapper,
@@ -10,7 +12,7 @@ import {
   ASSET_CLASS_LABELS,
   REGION_LABELS,
 } from "@/types";
-import type { AssetClass, Region } from "@/types";
+import type { AssetClass, Region, TaxWrapper } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AllocationPie } from "@/components/charts/allocation-pie";
@@ -18,12 +20,19 @@ import { AllocationBar } from "@/components/charts/allocation-bar";
 
 export default function AllocationPage() {
   const { getFundById } = useData();
+  const { selectedView } = usePersonView();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
-  const getNetWorthByWrapper = scenarioData.getNetWorthByWrapper;
-  const getTotalNetWorth = scenarioData.getTotalNetWorth;
 
-  const totalNetWorth = useMemo(() => getTotalNetWorth(), [getTotalNetWorth]);
+  const filteredAccounts = useMemo(() => {
+    if (selectedView === "household") return household.accounts;
+    return household.accounts.filter((a) => a.personId === selectedView);
+  }, [household.accounts, selectedView]);
+
+  const totalNetWorth = useMemo(
+    () => filteredAccounts.reduce((sum, a) => sum + a.currentValue, 0),
+    [filteredAccounts]
+  );
 
   const allocations = useMemo(() => {
     // Maps for accumulation
@@ -32,7 +41,7 @@ export default function AllocationPage() {
     const byFund = new Map<string, { name: string; value: number }>();
     const byProvider = new Map<string, number>();
 
-    for (const account of household.accounts) {
+    for (const account of filteredAccounts) {
       const wrapper = getAccountTaxWrapper(account.type);
 
       // Accumulate by provider
@@ -114,9 +123,15 @@ export default function AllocationPage() {
       }))
       .sort((a, b) => b.value - a.value);
 
-    const wrapperData = getNetWorthByWrapper().map((w) => ({
-      name: TAX_WRAPPER_LABELS[w.wrapper],
-      value: w.value,
+    // Wrapper data from filtered accounts
+    const wrapperTotals = new Map<TaxWrapper, number>();
+    for (const account of filteredAccounts) {
+      const wrapper = getAccountTaxWrapper(account.type);
+      wrapperTotals.set(wrapper, (wrapperTotals.get(wrapper) ?? 0) + account.currentValue);
+    }
+    const wrapperData = Array.from(wrapperTotals.entries()).map(([wrapper, value]) => ({
+      name: TAX_WRAPPER_LABELS[wrapper],
+      value: roundPence(value),
     }));
 
     const providerData = Array.from(byProvider.entries())
@@ -132,18 +147,12 @@ export default function AllocationPage() {
     );
 
     // Wrapper efficiency: pension + ISA vs GIA
-    const wrapperByType = getNetWorthByWrapper();
-    const taxAdvantaged = wrapperByType
-      .filter((w) => w.wrapper === "pension" || w.wrapper === "isa")
-      .reduce((sum, w) => sum + w.value, 0);
-    const taxExposed = wrapperByType
-      .filter(
-        (w) =>
-          w.wrapper === "gia" ||
-          w.wrapper === "cash" ||
-          w.wrapper === "premium_bonds",
-      )
-      .reduce((sum, w) => sum + w.value, 0);
+    const taxAdvantaged = Array.from(wrapperTotals.entries())
+      .filter(([w]) => w === "pension" || w === "isa")
+      .reduce((sum, [, v]) => sum + v, 0);
+    const taxExposed = Array.from(wrapperTotals.entries())
+      .filter(([w]) => w === "gia" || w === "cash" || w === "premium_bonds")
+      .reduce((sum, [, v]) => sum + v, 0);
 
     return {
       assetClassData,
@@ -155,7 +164,7 @@ export default function AllocationPage() {
       taxAdvantaged,
       taxExposed,
     };
-  }, [household, getFundById, getNetWorthByWrapper, totalNetWorth]);
+  }, [filteredAccounts, getFundById, totalNetWorth]);
 
   const {
     assetClassData,
@@ -173,14 +182,17 @@ export default function AllocationPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Investment Allocation
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Portfolio distribution across asset classes, regions, funds, wrappers,
-          and providers.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Investment Allocation
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Portfolio distribution across asset classes, regions, funds, wrappers,
+            and providers.
+          </p>
+        </div>
+        <PersonToggle />
       </div>
 
       {/* Row 1: Asset Class + Region */}

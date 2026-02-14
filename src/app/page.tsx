@@ -43,6 +43,7 @@ import type { TaxWrapper, HeroMetricType } from "@/types";
 import { NetWorthTrajectoryChart } from "@/components/charts/net-worth-trajectory";
 import { NetWorthHistoryChart } from "@/components/charts/net-worth-history";
 import { ByPersonChart } from "@/components/charts/by-person-chart";
+import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
 
 // ============================================================
 // Hero Metric — one of 3 configurable slots above the fold
@@ -582,19 +583,11 @@ export default function Home() {
 
         {/* COLLAPSIBLE SECTIONS — progressive disclosure */}
         <DashboardSection title="Net Worth by Wrapper" summary={wrapperSummary} storageKey="wrappers">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {wrapperData.map((w) => (
-              <Card key={w.wrapper}>
-                <CardContent className="pt-4 pb-4">
-                  <p className="text-xs font-medium text-muted-foreground">{w.label}</p>
-                  <p className="text-lg font-bold tracking-tight tabular-nums">
-                    {formatCurrencyCompact(w.value)}
-                  </p>
-                  <p className="text-xs text-muted-foreground tabular-nums">{formatPercent(w.percent)}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <Card>
+            <CardContent className="pt-6">
+              <WrapperSplitChart data={byWrapper} />
+            </CardContent>
+          </Card>
         </DashboardSection>
 
         <DashboardSection
