@@ -44,6 +44,7 @@ This project uses a **Finance Agent Team** for design and architecture decisions
 | Financial Advisor | `.claude/agents/financial-advisor.md` | Client needs, regulatory context, what matters to real users |
 | Devil's Advocate | `.claude/agents/devils-advocate.md` | Challenges assumptions, identifies risks, stress-tests ideas |
 | HNW Customer (James) | `.claude/agents/hnw-customer.md` | Real user perspective, retirement planning, tax optimisation, couple's finances |
+| HNW Customer (Priya) | `.claude/agents/hnw-customer-priya.md` | Busy family perspective, cash flow under school fees, bonus tranches, variable household income |
 
 ### Decision Process
 
