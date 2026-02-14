@@ -54,9 +54,10 @@ export const PersonSchema = z.object({
   name: z.string().min(1),
   relationship: RelationshipSchema,
   dateOfBirth: z.string(),
+  plannedRetirementAge: z.number().int().min(0).max(120).default(60),
   pensionAccessAge: z.number().int().min(0).max(120),
   stateRetirementAge: z.number().int().min(0).max(120),
-  niQualifyingYears: z.number().int().min(0).max(100),
+  niQualifyingYears: z.number().int().min(0).max(100).default(35),
   studentLoanPlan: StudentLoanPlanSchema,
 });
 
@@ -117,6 +118,7 @@ export const RetirementConfigSchema = z.object({
 export const EmergencyFundConfigSchema = z.object({
   monthlyEssentialExpenses: z.number().min(0),
   targetMonths: z.number().int().min(0),
+  monthlyLifestyleSpending: z.number().min(0).default(0),
 });
 
 // --- Committed Outgoings ---

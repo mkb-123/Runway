@@ -35,11 +35,61 @@ export default function ExportPage() {
     downloadWorkbook(wb, "net-worth-snapshot.xlsx");
   }
 
+  function buildIFASummaryRows() {
+    const rows: Record<string, string | number>[] = [];
+
+    for (const person of household.persons) {
+      rows.push({ Section: "Household", Item: person.name, Detail: person.relationship, Value: "" });
+    }
+
+    for (const account of household.accounts) {
+      rows.push({
+        Section: "Accounts",
+        Item: account.name,
+        Detail: `${getPersonName(account.personId)} — ${ACCOUNT_TYPE_LABELS[account.type]}`,
+        Value: account.currentValue,
+      });
+    }
+
+    for (const inc of household.income) {
+      rows.push({
+        Section: "Income",
+        Item: `${getPersonName(inc.personId)} Gross Salary`,
+        Detail: "",
+        Value: inc.grossSalary,
+      });
+    }
+
+    rows.push({
+      Section: "Retirement",
+      Item: "Target Annual Income",
+      Detail: `${(household.retirement.withdrawalRate * 100).toFixed(1)}% SWR`,
+      Value: household.retirement.targetAnnualIncome,
+    });
+
+    const totalNW = household.accounts.reduce((s, a) => s + a.currentValue, 0);
+    rows.push({ Section: "Summary", Item: "Total Net Worth", Detail: "", Value: totalNW });
+
+    return rows;
+  }
+
+  function exportIFASummary() {
+    const ws = XLSX.utils.json_to_sheet(buildIFASummaryRows());
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "IFA Summary");
+    downloadWorkbook(wb, `ifa-summary-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
   const exportItems = [
     {
       title: "Net Worth Snapshot",
       description: "Export all accounts with their current values, grouped by person. Includes account name, provider, type, and current value.",
       action: exportNetWorth,
+    },
+    {
+      title: "IFA Summary",
+      description: "One-page financial summary for your adviser: household, accounts, income, retirement targets, and net worth.",
+      action: exportIFASummary,
     },
   ];
 

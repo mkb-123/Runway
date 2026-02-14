@@ -44,8 +44,9 @@ export function AccountsTab({ household, updateHousehold }: AccountsTabProps) {
 
   function addAccount() {
     const updated = clone(household);
-    const defaultPersonId =
-      updated.persons.length > 0 ? updated.persons[0].id : "";
+    // Assign to the currently viewed person, not always the first
+    const targetPerson = updated.persons[clampedIdx] ?? updated.persons[0];
+    const defaultPersonId = targetPerson?.id ?? "";
     updated.accounts.push({
       id: `acc-${Date.now()}`,
       personId: defaultPersonId,

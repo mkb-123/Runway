@@ -5,9 +5,10 @@
       "name": "Alex Thompson",
       "relationship": "self",
       "dateOfBirth": "1990-06-15",
+      "plannedRetirementAge": 58,
       "pensionAccessAge": 57,
       "stateRetirementAge": 67,
-      "niQualifyingYears": 12,
+      "niQualifyingYears": 35,
       "studentLoanPlan": "plan2"
     },
     {
@@ -15,9 +16,10 @@
       "name": "Jordan Thompson",
       "relationship": "spouse",
       "dateOfBirth": "1992-03-22",
+      "plannedRetirementAge": 60,
       "pensionAccessAge": 57,
       "stateRetirementAge": 67,
-      "niQualifyingYears": 8,
+      "niQualifyingYears": 35,
       "studentLoanPlan": "none"
     }
   ],
@@ -226,7 +228,8 @@
   },
   "emergencyFund": {
     "monthlyEssentialExpenses": 3500,
-    "targetMonths": 6
+    "targetMonths": 6,
+    "monthlyLifestyleSpending": 2800
   },
   "iht": {
     "estimatedPropertyValue": 450000,

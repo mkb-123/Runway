@@ -36,6 +36,8 @@ import {
 } from "@/components/charts/cash-flow-waterfall";
 import { EffectiveTaxRateChart } from "@/components/charts/effective-tax-rate-chart";
 import { TaxBandChart } from "@/components/charts/tax-band-chart";
+import { CashFlowTimeline } from "@/components/charts/cash-flow-timeline";
+import { generateCashFlowTimeline } from "@/lib/cash-flow";
 import type { TaxBandDataItem } from "@/components/charts/tax-band-chart";
 
 // --- Helper: projected value at vesting (delegates to lib function) ---
@@ -70,7 +72,7 @@ export default function IncomePage() {
   const { selectedView } = usePersonView();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
-  const { persons: allPersons, income: allIncome, bonusStructures: allBonusStructures, contributions: allContributions, committedOutgoings } = household;
+  const { persons: allPersons, income: allIncome, bonusStructures: allBonusStructures, contributions: allContributions, committedOutgoings, emergencyFund } = household;
 
   const persons = useMemo(() => {
     if (selectedView === "household") return allPersons;
@@ -167,6 +169,8 @@ export default function IncomePage() {
     // GIA overflow is whatever is directed to GIA from what remains
     const giaOverflow = combinedGIA;
 
+    const annualLifestyle = emergencyFund.monthlyLifestyleSpending * 12;
+
     const wfData: WaterfallDataPoint[] = [
       { name: "Gross Income", value: combinedGross, type: "income" },
       { name: "Income Tax", value: combinedTax, type: "deduction" },
@@ -178,7 +182,10 @@ export default function IncomePage() {
       { name: "Take-Home Pay", value: combinedTakeHome, type: "subtotal" },
       { name: "ISA Contributions", value: combinedISA, type: "deduction" },
       { name: "Committed Outgoings", value: committedOutgoings.reduce((s, o) => s + annualiseOutgoing(o.amount, o.frequency), 0), type: "deduction" },
-      { name: "GIA Overflow", value: giaOverflow, type: "subtotal" },
+      ...(annualLifestyle > 0
+        ? [{ name: "Lifestyle Spending", value: annualLifestyle, type: "deduction" as const }]
+        : []),
+      { name: "Discretionary", value: giaOverflow, type: "subtotal" },
     ];
 
     // Tax Efficiency Score (via lib function)
@@ -195,7 +202,7 @@ export default function IncomePage() {
       taxAdvantagedSavings: taxAdvSavings,
       taxEfficiencyScore: taxEffScore,
     };
-  }, [personAnalysis, committedOutgoings]);
+  }, [personAnalysis, committedOutgoings, emergencyFund.monthlyLifestyleSpending]);
 
   return (
     <div className="space-y-8 p-4 md:p-8">
@@ -604,6 +611,21 @@ export default function IncomePage() {
         <Card>
           <CardContent className="pt-6">
             <CashFlowWaterfall data={waterfallData} />
+          </CardContent>
+        </Card>
+      </section>
+      </CollapsibleSection>
+
+      {/* Cash Flow Timeline */}
+      <CollapsibleSection title="Cash Flow Timeline" summary="Monthly income vs outgoings over 24 months" storageKey="income-cashflow-timeline">
+      <section className="space-y-4">
+        <p className="text-muted-foreground">
+          Monthly income (salary, bonuses, deferred vesting) vs total outgoings over the next 24 months.
+          Shows seasonal crunches when school fees, insurance, and bonuses collide.
+        </p>
+        <Card>
+          <CardContent className="pt-6">
+            <CashFlowTimeline data={generateCashFlowTimeline(household)} />
           </CardContent>
         </Card>
       </section>

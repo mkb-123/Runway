@@ -15,25 +15,20 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import type { HouseholdData, PersonIncome, RetirementConfig, Contribution } from "@/types";
+import type { HouseholdData } from "@/types";
+import {
+  applyScenarioOverrides,
+  type ScenarioOverrides,
+  type ContributionOverride,
+} from "@/lib/scenario";
 
-// --- Scenario overrides ---
+// Re-export for consumers
+export type { ScenarioOverrides, ContributionOverride };
 
-export interface ContributionOverride {
-  personId: string;
-  isaContribution?: number;
-  pensionContribution?: number;
-  giaContribution?: number;
-}
-
-export interface ScenarioOverrides {
-  income?: Partial<PersonIncome>[];
-  contributionOverrides?: ContributionOverride[];
-  retirement?: Partial<RetirementConfig>;
-  /** Override specific account values by ID */
-  accountValues?: Record<string, number>;
-  /** Apply a percentage shock to all account values (e.g. -0.30 for a 30% crash) */
-  marketShockPercent?: number;
+export interface SavedScenario {
+  name: string;
+  overrides: ScenarioOverrides;
+  savedAt: string; // ISO date
 }
 
 export interface ScenarioContextValue {
@@ -43,16 +38,40 @@ export interface ScenarioContextValue {
   enableScenario: (label: string, overrides: ScenarioOverrides) => void;
   updateOverrides: (overrides: Partial<ScenarioOverrides>) => void;
   disableScenario: () => void;
-  /** Apply overrides to household data to produce scenario-adjusted data */
   applyOverrides: (household: HouseholdData) => HouseholdData;
+  savedScenarios: SavedScenario[];
+  saveScenario: (name: string) => void;
+  loadScenario: (name: string) => void;
+  deleteScenario: (name: string) => void;
 }
 
 const ScenarioContext = createContext<ScenarioContextValue | null>(null);
+
+const LS_KEY_SCENARIOS = "nw-saved-scenarios";
+
+function loadSavedScenarios(): SavedScenario[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LS_KEY_SCENARIOS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistSavedScenarios(scenarios: SavedScenario[]) {
+  try {
+    localStorage.setItem(LS_KEY_SCENARIOS, JSON.stringify(scenarios));
+  } catch {
+    // ignore
+  }
+}
 
 export function ScenarioProvider({ children }: { children: ReactNode }) {
   const [isScenarioMode, setIsScenarioMode] = useState(false);
   const [scenarioLabel, setScenarioLabel] = useState("");
   const [overrides, setOverrides] = useState<ScenarioOverrides>({});
+  const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>(loadSavedScenarios);
 
   const enableScenario = useCallback(
     (label: string, newOverrides: ScenarioOverrides) => {
@@ -76,79 +95,36 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
     setOverrides({});
   }, []);
 
+  const saveScenario = useCallback((name: string) => {
+    setSavedScenarios((prev) => {
+      const updated = prev.filter((s) => s.name !== name);
+      updated.push({ name, overrides, savedAt: new Date().toISOString() });
+      persistSavedScenarios(updated);
+      return updated;
+    });
+  }, [overrides]);
+
+  const loadScenario = useCallback((name: string) => {
+    const found = savedScenarios.find((s) => s.name === name);
+    if (found) {
+      setIsScenarioMode(true);
+      setScenarioLabel(found.name);
+      setOverrides(found.overrides);
+    }
+  }, [savedScenarios]);
+
+  const deleteScenario = useCallback((name: string) => {
+    setSavedScenarios((prev) => {
+      const updated = prev.filter((s) => s.name !== name);
+      persistSavedScenarios(updated);
+      return updated;
+    });
+  }, []);
+
   const applyOverrides = useCallback(
     (household: HouseholdData): HouseholdData => {
       if (!isScenarioMode) return household;
-
-      const result = { ...household };
-
-      // Override income
-      if (overrides.income && overrides.income.length > 0) {
-        result.income = household.income.map((inc) => {
-          const override = overrides.income?.find(
-            (o) => o.personId === inc.personId
-          );
-          if (override) {
-            return { ...inc, ...override } as PersonIncome;
-          }
-          return inc;
-        });
-      }
-
-      // Override contributions — replace per-person contributions with overrides
-      if (
-        overrides.contributionOverrides &&
-        overrides.contributionOverrides.length > 0
-      ) {
-        // Keep contributions for persons not being overridden
-        const overriddenPersonIds = new Set(overrides.contributionOverrides.map((o) => o.personId));
-        const kept = household.contributions.filter((c) => !overriddenPersonIds.has(c.personId));
-
-        // Create synthetic contributions from overrides
-        const synthetic: Contribution[] = [];
-        for (const ov of overrides.contributionOverrides) {
-          if (ov.isaContribution !== undefined && ov.isaContribution > 0) {
-            synthetic.push({ id: `scenario-isa-${ov.personId}`, personId: ov.personId, label: "ISA (scenario)", target: "isa", amount: ov.isaContribution, frequency: "annually" });
-          }
-          if (ov.pensionContribution !== undefined && ov.pensionContribution > 0) {
-            synthetic.push({ id: `scenario-pension-${ov.personId}`, personId: ov.personId, label: "Pension (scenario)", target: "pension", amount: ov.pensionContribution, frequency: "annually" });
-          }
-          if (ov.giaContribution !== undefined && ov.giaContribution > 0) {
-            synthetic.push({ id: `scenario-gia-${ov.personId}`, personId: ov.personId, label: "GIA (scenario)", target: "gia", amount: ov.giaContribution, frequency: "annually" });
-          }
-        }
-
-        result.contributions = [...kept, ...synthetic];
-      }
-
-      // Override retirement config
-      if (overrides.retirement) {
-        result.retirement = { ...household.retirement, ...overrides.retirement };
-      }
-
-      // Override account values (specific accounts or market shock)
-      if (overrides.accountValues || overrides.marketShockPercent !== undefined) {
-        result.accounts = household.accounts.map((acc) => {
-          let value = acc.currentValue;
-
-          // Apply market shock first
-          if (overrides.marketShockPercent !== undefined) {
-            value = value * (1 + overrides.marketShockPercent);
-          }
-
-          // Then apply specific account overrides
-          if (overrides.accountValues?.[acc.id] !== undefined) {
-            value = overrides.accountValues[acc.id];
-          }
-
-          if (value !== acc.currentValue) {
-            return { ...acc, currentValue: Math.max(0, value) };
-          }
-          return acc;
-        });
-      }
-
-      return result;
+      return applyScenarioOverrides(household, overrides);
     },
     [isScenarioMode, overrides]
   );
@@ -162,6 +138,10 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
       updateOverrides,
       disableScenario,
       applyOverrides,
+      savedScenarios,
+      saveScenario,
+      loadScenario,
+      deleteScenario,
     }),
     [
       isScenarioMode,
@@ -171,6 +151,10 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
       updateOverrides,
       disableScenario,
       applyOverrides,
+      savedScenarios,
+      saveScenario,
+      loadScenario,
+      deleteScenario,
     ]
   );
 

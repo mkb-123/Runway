@@ -24,6 +24,7 @@ import {
 } from "@/lib/format";
 import {
   calculateRequiredPot,
+  calculateAdjustedRequiredPot,
   calculateRetirementCountdown,
   calculateCoastFIRE,
   calculateRequiredSavings,
@@ -72,14 +73,22 @@ export default function RetirementPage() {
 
   const { retirement } = household;
 
-  // Required pot
+  // Household total state pension
+  const totalStatePensionAnnual = useMemo(
+    () => persons.reduce((sum, p) => sum + calculateProRataStatePension(p.niQualifyingYears ?? 0), 0),
+    [persons]
+  );
+
+  // Required pot (adjusted for state pension if enabled)
   const requiredPot = useMemo(
     () =>
-      calculateRequiredPot(
+      calculateAdjustedRequiredPot(
         retirement.targetAnnualIncome,
-        retirement.withdrawalRate
+        retirement.withdrawalRate,
+        retirement.includeStatePension,
+        totalStatePensionAnnual
       ),
-    [retirement.targetAnnualIncome, retirement.withdrawalRate]
+    [retirement.targetAnnualIncome, retirement.withdrawalRate, retirement.includeStatePension, totalStatePensionAnnual]
   );
 
   // Progress
@@ -130,6 +139,7 @@ export default function RetirementPage() {
   const currentAge = primaryPerson
     ? calculateAge(primaryPerson.dateOfBirth)
     : 35;
+  const plannedRetirementAge = primaryPerson?.plannedRetirementAge ?? 60;
   const pensionAccessAge = primaryPerson?.pensionAccessAge ?? 57;
 
   // Coast FIRE: use the middle scenario rate
@@ -159,16 +169,15 @@ export default function RetirementPage() {
   }, [requiredPot, currentPot, midRate]);
 
   // Pension Bridge Analysis
-  const earlyRetirementAge = currentAge + 10;
   const bridgeResult = useMemo(
     () =>
       calculatePensionBridge(
-        earlyRetirementAge,
+        plannedRetirementAge,
         pensionAccessAge,
         retirement.targetAnnualIncome,
         accessibleWealth
       ),
-    [earlyRetirementAge, pensionAccessAge, retirement.targetAnnualIncome, accessibleWealth]
+    [plannedRetirementAge, pensionAccessAge, retirement.targetAnnualIncome, accessibleWealth]
   );
 
   // Max bar width calculation for stacked bar
@@ -266,7 +275,9 @@ export default function RetirementPage() {
           <CardContent>
             <p className="text-2xl font-bold">{formatCurrency(requiredPot)}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Income / withdrawal rate
+              {retirement.includeStatePension && totalStatePensionAnnual > 0
+                ? `After ${formatCurrency(totalStatePensionAnnual)}/yr state pension`
+                : "Income / withdrawal rate"}
             </p>
           </CardContent>
         </Card>
@@ -372,7 +383,7 @@ export default function RetirementPage() {
           <RetirementIncomeTimeline
             persons={personRetirementInputs}
             targetAnnualIncome={retirement.targetAnnualIncome}
-            retirementAge={earlyRetirementAge}
+            retirementAge={plannedRetirementAge}
             growthRate={midRate}
           />
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -429,7 +440,7 @@ export default function RetirementPage() {
           <RetirementDrawdownChart
             startingPot={requiredPot}
             annualSpend={retirement.targetAnnualIncome}
-            retirementAge={earlyRetirementAge}
+            retirementAge={plannedRetirementAge}
             scenarioRates={retirement.scenarioRates}
             statePensionAge={primaryPerson?.stateRetirementAge ?? 67}
             statePensionAnnual={primaryStatePensionAnnual}
@@ -517,7 +528,7 @@ export default function RetirementPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <p className="text-sm text-muted-foreground">
-            If you retire at age {earlyRetirementAge}, can your accessible
+            If you retire at age {plannedRetirementAge}, can your accessible
             (non-pension) wealth bridge the gap until pension access at age{" "}
             {pensionAccessAge}?
           </p>
@@ -573,7 +584,7 @@ export default function RetirementPage() {
                   {formatCurrency(bridgeResult.bridgePotRequired)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {pensionAccessAge - earlyRetirementAge} years x{" "}
+                  {pensionAccessAge - plannedRetirementAge} years x{" "}
                   {formatCurrencyCompact(retirement.targetAnnualIncome)}/yr
                 </p>
               </CardContent>

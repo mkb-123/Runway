@@ -18,6 +18,7 @@ import type { ReactNode } from "react";
 import type {
   HouseholdData,
   SnapshotsData,
+  NetWorthSnapshot,
   Person,
   Account,
   AccountType,
@@ -30,6 +31,7 @@ import {
   HouseholdDataSchema,
   SnapshotsDataSchema,
 } from "@/lib/schemas";
+import { migrateHouseholdData } from "@/lib/migration";
 
 import householdJson from "../../data/household.json";
 import snapshotsJson from "../../data/snapshots.json";
@@ -52,7 +54,7 @@ const emptyHousehold: HouseholdData = {
     includeStatePension: true,
     scenarioRates: [0.05, 0.07, 0.09],
   },
-  emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+  emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6, monthlyLifestyleSpending: 0 },
   iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
   committedOutgoings: [],
   dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
@@ -91,12 +93,18 @@ const DataContext = createContext<DataContextValue | null>(null);
 
 // --- Safe localStorage helpers ---
 
-function loadFromLocalStorage<T>(key: string, schema: z.ZodType<T>): T | null {
+function loadFromLocalStorage<T>(key: string, schema: z.ZodType<T>, migrate?: (raw: Record<string, unknown>) => Record<string, unknown>): T | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(key);
     if (raw === null) return null;
-    const parsed = JSON.parse(raw);
+    let parsed = JSON.parse(raw);
+
+    // Apply migration before validation to handle schema changes
+    if (migrate && typeof parsed === "object" && parsed !== null) {
+      parsed = migrate(parsed as Record<string, unknown>);
+    }
+
     const result = schema.safeParse(parsed);
     if (result.success) {
       return result.data;
@@ -126,6 +134,44 @@ function removeFromLocalStorage(key: string): void {
   }
 }
 
+// --- Auto-snapshot helper ---
+
+function createAutoSnapshot(household: HouseholdData, date: Date): NetWorthSnapshot {
+  const isoDate = date.toISOString().slice(0, 10);
+  const totalNetWorth = roundPence(household.accounts.reduce((sum, a) => sum + a.currentValue, 0));
+
+  const byPersonMap = new Map<string, number>();
+  const byTypeMap = new Map<AccountType, number>();
+  const byWrapperMap = new Map<TaxWrapper, number>();
+
+  for (const account of household.accounts) {
+    byPersonMap.set(account.personId, (byPersonMap.get(account.personId) ?? 0) + account.currentValue);
+    byTypeMap.set(account.type, (byTypeMap.get(account.type) ?? 0) + account.currentValue);
+    const wrapper = getAccountTaxWrapper(account.type);
+    byWrapperMap.set(wrapper, (byWrapperMap.get(wrapper) ?? 0) + account.currentValue);
+  }
+
+  const getPersonName = (id: string) => household.persons.find((p) => p.id === id)?.name ?? id;
+
+  return {
+    date: isoDate,
+    totalNetWorth,
+    byPerson: Array.from(byPersonMap.entries()).map(([personId, value]) => ({
+      personId,
+      name: getPersonName(personId),
+      value: roundPence(value),
+    })),
+    byType: Array.from(byTypeMap.entries()).map(([type, value]) => ({
+      type,
+      value: roundPence(value),
+    })),
+    byWrapper: Array.from(byWrapperMap.entries()).map(([wrapper, value]) => ({
+      wrapper,
+      value: roundPence(value),
+    })),
+  };
+}
+
 // --- Provider component ---
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -136,12 +182,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Hydrate from localStorage on mount (client only)
   useEffect(() => {
-    const storedHousehold = loadFromLocalStorage(LS_KEY_HOUSEHOLD, HouseholdDataSchema);
+    const storedHousehold = loadFromLocalStorage(LS_KEY_HOUSEHOLD, HouseholdDataSchema, migrateHouseholdData);
     const storedSnapshots = loadFromLocalStorage(LS_KEY_SNAPSHOTS, SnapshotsDataSchema);
+
+    const hydratedHousehold = storedHousehold ?? defaultHousehold;
+    const hydratedSnapshots = storedSnapshots ?? defaultSnapshots;
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard Next.js hydration pattern: must read localStorage in effect (unavailable during SSR) and sync into state
     if (storedHousehold) setHousehold(storedHousehold);
     if (storedSnapshots) setSnapshots(storedSnapshots);
+
+    // Auto-snapshot: create a snapshot if it's a new month and there are accounts
+    if (hydratedHousehold.accounts.length > 0) {
+      const now = new Date();
+      const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const hasThisMonth = hydratedSnapshots.snapshots.some((s) => s.date.startsWith(thisMonth));
+
+      if (!hasThisMonth) {
+        const snapshot = createAutoSnapshot(hydratedHousehold, now);
+        const updatedSnapshots = { snapshots: [...hydratedSnapshots.snapshots, snapshot] };
+        setSnapshots(updatedSnapshots);
+        saveToLocalStorage(LS_KEY_SNAPSHOTS, updatedSnapshots);
+      }
+    }
 
     setIsHydrated(true);
   }, []);

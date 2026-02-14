@@ -245,6 +245,31 @@ export function calculateRequiredPot(annualIncome: number, rate: number): number
   return roundPence(annualIncome / rate);
 }
 
+/**
+ * Calculate the required pot adjusted for state pension income.
+ *
+ * When includeStatePension is true, the required pot is reduced by
+ * the capitalised value of the household's combined state pension income.
+ * E.g. if target is £60k, state pension covers £11.5k, and SWR is 4%,
+ * the required pot is (£60k - £11.5k) / 0.04 = £1,212,500 instead of £1,500,000.
+ *
+ * @param targetAnnualIncome - Desired annual retirement income
+ * @param withdrawalRate - Safe withdrawal rate as a decimal
+ * @param includeStatePension - Whether to offset by state pension
+ * @param totalStatePensionAnnual - Combined household state pension income
+ */
+export function calculateAdjustedRequiredPot(
+  targetAnnualIncome: number,
+  withdrawalRate: number,
+  includeStatePension: boolean,
+  totalStatePensionAnnual: number
+): number {
+  const incomeFromPortfolio = includeStatePension
+    ? Math.max(0, targetAnnualIncome - totalStatePensionAnnual)
+    : targetAnnualIncome;
+  return calculateRequiredPot(incomeFromPortfolio, withdrawalRate);
+}
+
 // --- State Pension ---
 
 /**

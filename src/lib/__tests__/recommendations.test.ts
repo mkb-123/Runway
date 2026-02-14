@@ -27,9 +27,10 @@ function makePerson(overrides: Partial<Person> = {}): Person {
     name: "Alice",
     relationship: "self",
     dateOfBirth: "1990-01-01",
+    plannedRetirementAge: 60,
     pensionAccessAge: 57,
     stateRetirementAge: 67,
-    niQualifyingYears: 12,
+    niQualifyingYears: 35,
     studentLoanPlan: "none",
     ...overrides,
   };

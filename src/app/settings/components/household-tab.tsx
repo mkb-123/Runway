@@ -39,7 +39,9 @@ import type {
 import {
   CONTRIBUTION_TARGET_LABELS,
   CONTRIBUTION_FREQUENCY_LABELS,
+  annualiseContribution,
 } from "@/types";
+import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { clone, setField, renderField } from "./field-helpers";
 import { FieldWarning } from "./field-warning";
 
@@ -90,9 +92,10 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
       name: "",
       relationship: "spouse",
       dateOfBirth: "1990-01-01",
+      plannedRetirementAge: 60,
       pensionAccessAge: 57,
       stateRetirementAge: 67,
-      niQualifyingYears: 0,
+      niQualifyingYears: 35,
       studentLoanPlan: "none",
     };
     updated.persons.push(newPerson);
@@ -179,15 +182,15 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
   // Contribution helpers
   // ----------------------------------------------------------
 
-  function addContribution(personId: string) {
+  function addContribution(personId: string, template?: { label: string; target: ContributionTarget; amount: number; frequency: ContributionFrequency }) {
     const updated = clone(household);
     updated.contributions.push({
       id: `contrib-${Date.now()}`,
       personId,
-      label: "",
-      target: "isa" as ContributionTarget,
-      amount: 0,
-      frequency: "monthly" as ContributionFrequency,
+      label: template?.label ?? "",
+      target: template?.target ?? ("isa" as ContributionTarget),
+      amount: template?.amount ?? 0,
+      frequency: template?.frequency ?? ("monthly" as ContributionFrequency),
     });
     updateHousehold(updated);
   }
@@ -357,23 +360,23 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                       "Check yours at gov.uk/state-pension-age"
                     )}
                     {renderField(
-                      "NI Qualifying Years",
+                      "Planned Retirement Age",
                       <>
                         <Input
                           type="number"
-                          value={person.niQualifyingYears}
+                          value={person.plannedRetirementAge}
                           onChange={(e) =>
-                            updatePerson(pIdx, "niQualifyingYears", Number(e.target.value))
+                            updatePerson(pIdx, "plannedRetirementAge", Number(e.target.value))
                           }
                         />
                         <FieldWarning
-                          value={person.niQualifyingYears}
-                          min={0}
-                          max={50}
-                          label="NI qualifying years"
+                          value={person.plannedRetirementAge}
+                          min={40}
+                          max={80}
+                          label="planned retirement age"
                         />
                       </>,
-                      "Need 35 years for full state pension. Check at gov.uk/check-state-pension"
+                      "When you plan to stop working"
                     )}
                     {renderField(
                       "Student Loan Plan",
@@ -660,7 +663,7 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                     {personContributions.map((contrib) => (
                       <Card key={contrib.id} className="border-dashed">
                         <CardContent className="pt-4">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {renderField(
                               "Label",
                               <Input
@@ -754,13 +757,51 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                         </CardContent>
                       </Card>
                     ))}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addContribution(person.id)}
-                    >
-                      + Add Contribution
-                    </Button>
+                    {/* Aggregate ISA allowance warning */}
+                    {(() => {
+                      const totalISA = personContributions
+                        .filter((c) => c.target === "isa")
+                        .reduce((s, c) => s + annualiseContribution(c.amount, c.frequency), 0);
+                      const allowance = UK_TAX_CONSTANTS.isaAnnualAllowance;
+                      if (totalISA > allowance) {
+                        return (
+                          <p className="flex items-center gap-1 text-xs text-amber-600">
+                            <span className="font-medium">ISA warning:</span> {person.name}&apos;s total ISA contributions ({"\u00A3"}{Math.round(totalISA).toLocaleString()}/yr) exceed the {"\u00A3"}{allowance.toLocaleString()} annual allowance
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addContribution(person.id)}
+                      >
+                        + Custom
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => addContribution(person.id, { label: "Monthly ISA", target: "isa", amount: 1666, frequency: "monthly" })}
+                      >
+                        Monthly ISA
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => addContribution(person.id, { label: "Annual ISA", target: "isa", amount: 20000, frequency: "annually" })}
+                      >
+                        Annual ISA
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => addContribution(person.id, { label: "Annual SIPP top-up", target: "pension", amount: 10000, frequency: "annually" })}
+                      >
+                        SIPP Top-up
+                      </Button>
+                    </div>
                   </div>
                 </CollapsibleContent>
               </Collapsible>
