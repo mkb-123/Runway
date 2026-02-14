@@ -41,7 +41,7 @@ import { getPersonContributionTotals, getAccountTaxWrapper } from "@/types";
 import type { TaxWrapper } from "@/types";
 
 export default function TaxPlanningPage() {
-  const { getAccountsForPerson } = useData();
+  useData(); // keep context provider mounted
   const { selectedView } = usePersonView();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
@@ -79,7 +79,7 @@ export default function TaxPlanningPage() {
       persons.map((person) => {
         const personIncome = income.find((i) => i.personId === person.id);
         const personContributions = getPersonContributionTotals(contributions, person.id);
-        const personAccounts = getAccountsForPerson(person.id);
+        const personAccounts = household.accounts.filter((a) => a.personId === person.id);
         const personGiaAccounts = personAccounts.filter((a) => a.type === "gia");
 
         // GIA value
@@ -184,7 +184,7 @@ export default function TaxPlanningPage() {
           baseTotalUnrealisedGain,
         };
       }),
-    [persons, income, contributions, getAccountsForPerson, isaAllowance, pensionAllowance, cgtAnnualExempt, baseIncomeLookup, baseHousehold.contributions, baseHousehold.accounts]
+    [persons, income, contributions, household.accounts, isaAllowance, pensionAllowance, cgtAnnualExempt, baseIncomeLookup, baseHousehold.contributions, baseHousehold.accounts]
   );
 
   // Pension modelling scenarios
@@ -471,42 +471,46 @@ export default function TaxPlanningPage() {
                     </div>
 
                     <div className="mb-3 grid grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-muted-foreground text-sm">
-                          Current Pension Contributions
-                        </p>
-                        <p className="font-semibold">
-                          {formatCurrency(
-                            (personIncome?.employeePensionContribution ?? 0) +
-                              (personIncome?.employerPensionContribution ?? 0)
-                          )}
-                          <span className="text-muted-foreground text-xs">
-                            {" "}
-                            /yr (employee + employer)
-                          </span>
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-sm">
-                          Pension Allowance Used
-                        </p>
-                        <p className="font-semibold">
-                          {formatCurrency(
-                            personContributions.pensionContribution
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-sm">
-                          Remaining Allowance
-                        </p>
-                        <p className="font-semibold">
-                          {formatCurrency(
-                            pensionAllowance -
-                              personContributions.pensionContribution
-                          )}
-                        </p>
-                      </div>
+                      {(() => {
+                        const totalPensionUsed =
+                          (personIncome?.employeePensionContribution ?? 0) +
+                          (personIncome?.employerPensionContribution ?? 0) +
+                          personContributions.pensionContribution;
+                        return (
+                          <>
+                            <div>
+                              <p className="text-muted-foreground text-sm">
+                                Current Pension Contributions
+                              </p>
+                              <p className="font-semibold">
+                                {formatCurrency(totalPensionUsed)}
+                                <span className="text-muted-foreground text-xs">
+                                  {" "}
+                                  /yr (employee + employer + discretionary)
+                                </span>
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-sm">
+                                Pension Allowance Used
+                              </p>
+                              <p className="font-semibold">
+                                {formatCurrency(totalPensionUsed)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-sm">
+                                Remaining Allowance
+                              </p>
+                              <p className="font-semibold">
+                                {formatCurrency(
+                                  pensionAllowance - totalPensionUsed
+                                )}
+                              </p>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
 
                     <div className="overflow-x-auto">

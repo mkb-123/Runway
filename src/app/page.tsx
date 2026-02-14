@@ -381,10 +381,15 @@ export default function Home() {
   // --- Retirement countdown ---
   const { retirementCountdownYears, retirementCountdownMonths } = useMemo(() => {
     const { retirement, contributions } = household;
-    const totalAnnual = contributions.reduce(
+    // Include ALL contributions: discretionary + employment pension
+    const discretionaryAnnual = contributions.reduce(
       (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
       0
     );
+    const employmentPension = household.income.reduce(
+      (sum, i) => sum + i.employeePensionContribution + i.employerPensionContribution, 0
+    );
+    const totalAnnual = discretionaryAnnual + employmentPension;
     const requiredPot = calculateAdjustedRequiredPot(
       retirement.targetAnnualIncome, retirement.withdrawalRate,
       retirement.includeStatePension, totalStatePensionAnnual
@@ -396,12 +401,15 @@ export default function Home() {
 
   // --- Savings rate + FIRE progress ---
   const savingsRate = useMemo(() => {
-    const totalContrib = household.contributions.reduce(
-      (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
-      0
+    const discretionary = household.contributions.reduce(
+      (sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0
     );
-    const income = household.income.reduce((sum, i) => sum + i.grossSalary, 0);
-    return income > 0 ? (totalContrib / income) * 100 : 0;
+    const employmentPension = household.income.reduce(
+      (sum, i) => sum + i.employeePensionContribution + i.employerPensionContribution, 0
+    );
+    const totalContrib = discretionary + employmentPension;
+    const inc = household.income.reduce((sum, i) => sum + i.grossSalary, 0);
+    return inc > 0 ? (totalContrib / inc) * 100 : 0;
   }, [household]);
 
   const fireProgress = useMemo(() => {
@@ -414,9 +422,13 @@ export default function Home() {
 
   // --- Base metrics for what-if comparison ---
   const baseSavingsRate = useMemo(() => {
-    const totalContrib = baseHousehold.contributions.reduce(
+    const discretionary = baseHousehold.contributions.reduce(
       (sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0
     );
+    const employmentPension = baseHousehold.income.reduce(
+      (sum, i) => sum + i.employeePensionContribution + i.employerPensionContribution, 0
+    );
+    const totalContrib = discretionary + employmentPension;
     const inc = baseHousehold.income.reduce((sum, i) => sum + i.grossSalary, 0);
     return inc > 0 ? (totalContrib / inc) * 100 : 0;
   }, [baseHousehold]);
@@ -436,7 +448,11 @@ export default function Home() {
 
   const { baseRetCountdownYears, baseRetCountdownMonths } = useMemo(() => {
     const { retirement, contributions: baseContribs } = baseHousehold;
-    const totalAnnual = baseContribs.reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+    const discretionary = baseContribs.reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+    const empPension = baseHousehold.income.reduce(
+      (sum, i) => sum + i.employeePensionContribution + i.employerPensionContribution, 0
+    );
+    const totalAnnual = discretionary + empPension;
     const requiredPot = calculateAdjustedRequiredPot(
       retirement.targetAnnualIncome, retirement.withdrawalRate,
       retirement.includeStatePension, baseStatePensionAnnual

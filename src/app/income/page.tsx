@@ -102,7 +102,8 @@ export default function IncomePage() {
   const personAnalysis = useMemo(
     () =>
       persons.map((person) => {
-        const personIncome = income.find((i) => i.personId === person.id)!;
+        const personIncome = income.find((i) => i.personId === person.id);
+        if (!personIncome) return null;
         const bonus = bonusStructures.find((b) => b.personId === person.id);
         const contribTotals = getPersonContributionTotals(contributions, person.id);
 
@@ -142,7 +143,7 @@ export default function IncomePage() {
           studentLoan,
           takeHome,
         };
-      }),
+      }).filter((p): p is NonNullable<typeof p> => p !== null),
     [persons, income, bonusStructures, contributions]
   );
 

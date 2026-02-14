@@ -212,7 +212,8 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
 
     // Tapered allowance
     const grossSalary = inc?.grossSalary ?? 0;
-    const tapered = calculateTaperedAnnualAllowance(grossSalary, totalPensionUsed);
+    const adjustedIncome = grossSalary + (inc?.employerPensionContribution ?? 0);
+    const effectiveAllowance = calculateTaperedAnnualAllowance(grossSalary, adjustedIncome);
 
     pensionRows.push(
       { Person: person.name, Item: "Employee Pension", "Value (£)": curr(employeePension) },
@@ -220,9 +221,9 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
       { Person: "", Item: "Discretionary Pension", "Value (£)": curr(discretionary.pensionContribution) },
       { Person: "", Item: "TOTAL Pension Used", "Value (£)": curr(totalPensionUsed) },
       { Person: "", Item: "Standard Annual Allowance", "Value (£)": curr(pensionAllowance) },
-      { Person: "", Item: "Tapered Annual Allowance", "Value (£)": curr(tapered.taperedAllowance) },
-      { Person: "", Item: "Effective Allowance", "Value (£)": curr(tapered.taperedAllowance) },
-      { Person: "", Item: "Remaining Headroom", "Value (£)": curr(Math.max(0, tapered.taperedAllowance - totalPensionUsed)) },
+      { Person: "", Item: "Tapered Annual Allowance", "Value (£)": curr(effectiveAllowance) },
+      { Person: "", Item: "Effective Allowance", "Value (£)": curr(effectiveAllowance) },
+      { Person: "", Item: "Remaining Headroom", "Value (£)": curr(Math.max(0, effectiveAllowance - totalPensionUsed)) },
       { Person: "", Item: "", "Value (£)": "" },
       { Person: "", Item: "ISA Used", "Value (£)": curr(discretionary.isaContribution) },
       { Person: "", Item: "ISA Allowance", "Value (£)": curr(isaAllowance) },
@@ -260,13 +261,19 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
   const midRate = retirement.scenarioRates[Math.floor(retirement.scenarioRates.length / 2)] ?? 0.07;
   const countdown = calculateRetirementCountdown(grandTotal, totalAnnualContribs, requiredPot, midRate);
 
+  const accessibleWealth = household.accounts
+    .filter((a) => getAccountTaxWrapper(a.type) !== "pension")
+    .reduce((sum, a) => sum + a.currentValue, 0);
   const bridge = calculatePensionBridge(
-    household.accounts.map((a) => ({ value: a.currentValue, wrapper: getAccountTaxWrapper(a.type) })),
     retAge,
-    pensionAccessAge
+    pensionAccessAge,
+    retirement.targetAnnualIncome,
+    accessibleWealth
   );
 
-  const coastFire = calculateCoastFIRE(requiredPot, retAge - currentAge, midRate);
+  const coastFireReached = calculateCoastFIRE(grandTotal, requiredPot, retAge, currentAge, midRate);
+  const yearsToRetire = Math.max(0, retAge - currentAge);
+  const coastFireNumber = yearsToRetire > 0 ? requiredPot / Math.pow(1 + midRate, yearsToRetire) : requiredPot;
   const grossIncome = household.income.reduce((s, i) => s + i.grossSalary, 0);
   const savingsRate = grossIncome > 0 ? (totalAnnualContribs / grossIncome) * 100 : 0;
 
@@ -287,16 +294,16 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
     { Item: "Pension Access Age", "Value": pensionAccessAge },
     { Item: "", "Value": "" },
     { Item: "Savings Rate", "Value": `${savingsRate.toFixed(1)}%` },
-    { Item: "Coast FIRE Number", "Value": curr(coastFire) },
-    { Item: "Coast FIRE Reached?", "Value": grandTotal >= coastFire ? "Yes" : "No" },
+    { Item: "Coast FIRE Number", "Value": curr(coastFireNumber) },
+    { Item: "Coast FIRE Reached?", "Value": coastFireReached ? "Yes" : "No" },
     { Item: "", "Value": "" },
     { Item: "--- Pension Bridge ---", "Value": "" },
     { Item: "Bridge Needed?", "Value": retAge < pensionAccessAge ? "Yes" : "No" },
     { Item: "Years to Bridge", "Value": Math.max(0, pensionAccessAge - retAge) },
-    { Item: "Bridge Pot Needed", "Value": curr(bridge.bridgePotNeeded) },
-    { Item: "Accessible Wealth", "Value": curr(bridge.accessibleWealth) },
-    { Item: "Locked Pension Wealth", "Value": curr(bridge.lockedWealth) },
-    { Item: "Bridge Surplus/Shortfall", "Value": curr(bridge.surplus) },
+    { Item: "Bridge Pot Required", "Value": curr(bridge.bridgePotRequired) },
+    { Item: "Accessible Wealth (non-pension)", "Value": curr(accessibleWealth) },
+    { Item: "Bridge Shortfall", "Value": curr(bridge.shortfall) },
+    { Item: "Bridge Sufficient?", "Value": bridge.sufficient ? "Yes" : "No" },
     { Item: "", "Value": "" },
     { Item: "--- Scenario Analysis ---", "Value": "" },
   ];
@@ -422,21 +429,18 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
   // ============================
   // Sheet 9: Committed Outgoings
   // ============================
-  const outgoingRows = household.committedOutgoings.map((o) => ({
-    Category: o.category,
+  const outgoingItems = household.committedOutgoings.map((o) => ({
+    Category: o.category as string,
     Label: o.label || o.category,
     Amount: curr(o.amount),
-    Frequency: o.frequency,
-    "Annual (£)": curr(annualiseOutgoing(o.amount, o.frequency)),
+    Frequency: o.frequency as string,
+    "Annual (£)": annualiseOutgoing(o.amount, o.frequency),
   }));
-  const totalOutgoings = outgoingRows.reduce((s, r) => s + (r["Annual (£)"] as number), 0);
-  outgoingRows.push({
-    Category: "TOTAL",
-    Label: "",
-    Amount: 0,
-    Frequency: "",
-    "Annual (£)": curr(totalOutgoings),
-  });
+  const totalOutgoings = outgoingItems.reduce((s, r) => s + r["Annual (£)"], 0);
+  const outgoingRows = [
+    ...outgoingItems.map((r) => ({ ...r, "Annual (£)": curr(r["Annual (£)"]) })),
+    { Category: "TOTAL", Label: "", Amount: "", Frequency: "", "Annual (£)": curr(totalOutgoings) },
+  ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(outgoingRows), "Outgoings");
 
   // ============================

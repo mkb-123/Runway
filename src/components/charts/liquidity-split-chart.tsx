@@ -128,8 +128,8 @@ export function LiquiditySplitChart({ accounts }: LiquiditySplitChartProps) {
               tickLine={false}
             />
             <Tooltip
-              formatter={(value: number) => [
-                formatCurrencyTooltip(value),
+              formatter={(value: number | undefined) => [
+                formatCurrencyTooltip(value ?? 0),
                 "Value",
               ]}
               contentStyle={{
