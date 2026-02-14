@@ -18,7 +18,7 @@ export function PersonToggle() {
   if (persons.length < 2) return null;
 
   const options = [
-    ...persons.map((p) => ({ id: p.id, label: p.name, short: p.name.slice(0, 1) })),
+    ...persons.map((p) => ({ id: p.id, label: p.name, short: p.name.split(" ")[0] })),
     { id: "household" as const, label: "Household", short: "All" },
   ];
 
