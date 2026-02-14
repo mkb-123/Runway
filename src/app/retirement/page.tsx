@@ -23,7 +23,6 @@ import {
   formatPercent,
 } from "@/lib/format";
 import {
-  calculateRequiredPot,
   calculateAdjustedRequiredPot,
   calculateRetirementCountdown,
   calculateCoastFIRE,

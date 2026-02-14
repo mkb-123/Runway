@@ -26,16 +26,18 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("system");
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "system";
+    return (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? "system";
+  });
 
-  // Read saved preference on mount
+  // Apply theme on mount and when theme changes
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    const initial = saved ?? "system";
-    setTheme(initial);
-    applyTheme(initial);
+    applyTheme(theme);
+  }, [theme]);
 
-    // Listen for system preference changes when in "system" mode
+  // Listen for system preference changes when in "system" mode
+  useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = () => {
       const current = localStorage.getItem(STORAGE_KEY) as Theme | null;

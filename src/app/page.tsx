@@ -6,7 +6,6 @@ import {
   Settings,
   TrendingUp,
   TrendingDown,
-  Minus,
   X,
   Lightbulb,
   Printer,
@@ -25,11 +24,9 @@ import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { CollapsibleSection } from "@/components/collapsible-section";
-import { EmptyState } from "@/components/empty-state";
 import { projectScenarios } from "@/lib/projections";
 import {
   calculateRetirementCountdown,
-  calculateRequiredPot,
   calculateAdjustedRequiredPot,
   calculateProRataStatePension,
 } from "@/lib/projections";
@@ -69,7 +66,7 @@ interface HeroMetricData {
 function resolveMetric(
   type: HeroMetricType,
   data: HeroMetricData
-): { label: string; value: string; subtext?: string; color: string } {
+): { label: string; value: string; subtext?: string; color: string; trend?: "up" | "down" } {
   switch (type) {
     case "net_worth":
       return {
@@ -94,21 +91,25 @@ function resolveMetric(
       };
     }
     case "period_change": {
-      const pos = data.monthOnMonthChange >= 0;
+      const v = data.monthOnMonthChange;
+      const color = v > 0 ? "text-emerald-600 dark:text-emerald-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
       return {
         label: "Period Change",
-        value: `${pos ? "+" : ""}${formatCurrencyCompact(data.monthOnMonthChange)}`,
-        subtext: `${pos ? "+" : ""}${formatPercent(data.monthOnMonthPercent)} MoM`,
-        color: pos ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
+        value: `${v >= 0 ? "+" : ""}${formatCurrencyCompact(v)}`,
+        subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.monthOnMonthPercent)} MoM`,
+        color,
+        trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
       };
     }
     case "year_on_year_change": {
-      const pos = data.yearOnYearChange >= 0;
+      const v = data.yearOnYearChange;
+      const color = v > 0 ? "text-emerald-600 dark:text-emerald-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
       return {
         label: "Year-on-Year",
-        value: `${pos ? "+" : ""}${formatCurrencyCompact(data.yearOnYearChange)}`,
-        subtext: `${pos ? "+" : ""}${formatPercent(data.yearOnYearPercent)} YoY`,
-        color: pos ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
+        value: `${v >= 0 ? "+" : ""}${formatCurrencyCompact(v)}`,
+        subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.yearOnYearPercent)} YoY`,
+        color,
+        trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
       };
     }
     case "savings_rate":
@@ -135,16 +136,20 @@ function resolveMetric(
   }
 }
 
-function HeroMetric({ type, data }: { type: HeroMetricType; data: HeroMetricData }) {
-  const { label, value, subtext, color } = resolveMetric(type, data);
+function HeroMetric({ type, data, primary }: { type: HeroMetricType; data: HeroMetricData; primary?: boolean }) {
+  const { label, value, subtext, color, trend } = resolveMetric(type, data);
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className={`flex flex-col gap-1 ${!primary ? "sm:border-l sm:border-border/40 sm:pl-6" : ""}`}>
       <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
-      <span className={`text-2xl font-bold tracking-tight tabular-nums sm:text-3xl ${color}`}>
-        {value}
-      </span>
+      <div className="flex items-center gap-2">
+        <span className={`${primary ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl"} font-bold tracking-tight tabular-nums ${color}`}>
+          {value}
+        </span>
+        {trend === "up" && <TrendingUp className="size-5 text-emerald-500" />}
+        {trend === "down" && <TrendingDown className="size-5 text-red-500" />}
+      </div>
       {subtext && <span className="text-xs text-muted-foreground">{subtext}</span>}
     </div>
   );
@@ -511,9 +516,9 @@ export default function Home() {
         </div>
 
         {/* HERO METRICS — 3 configurable slots, zero scrolling */}
-        <div className="mb-6 grid grid-cols-1 gap-4 rounded-xl border bg-card p-4 sm:grid-cols-3 sm:gap-6 sm:p-6">
+        <div className="mb-8 grid grid-cols-1 gap-3 rounded-2xl border bg-gradient-to-br from-card via-card to-primary/5 p-5 shadow-sm sm:grid-cols-3 sm:gap-6 sm:p-8">
           {heroMetrics.map((metric, i) => (
-            <HeroMetric key={`${metric}-${i}`} type={metric} data={heroData} />
+            <HeroMetric key={`${metric}-${i}`} type={metric} data={heroData} primary={i === 0} />
           ))}
         </div>
 
@@ -535,27 +540,35 @@ export default function Home() {
           </div>
         )}
 
-        {/* COLLAPSIBLE SECTIONS — progressive disclosure */}
-        <CollapsibleSection title="Net Worth by Wrapper" summary={wrapperSummary} storageKey="wrappers">
+        {/* PRIMARY CHARTS — always visible, 2-col on desktop */}
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-5">
+              <div className="mb-4 flex items-baseline justify-between">
+                <h2 className="text-base font-semibold tracking-tight">Net Worth by Wrapper</h2>
+                <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
+              </div>
               <WrapperSplitChart data={byWrapper} />
             </CardContent>
           </Card>
-        </CollapsibleSection>
 
-        <CollapsibleSection
-          title="Net Worth Trajectory"
-          summary={`${scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over ${projectionYears}yr`}
-          storageKey="trajectory"
-        >
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-5">
+              <div className="mb-4 flex items-baseline justify-between">
+                <h2 className="text-base font-semibold tracking-tight">Net Worth Trajectory</h2>
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  {scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over {projectionYears}yr
+                </span>
+              </div>
               <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} />
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Projections are estimates, not guarantees. Capital is at risk. Past performance does not predict future returns.
+              </p>
             </CardContent>
           </Card>
-        </CollapsibleSection>
+        </div>
 
+        {/* SECONDARY SECTIONS — collapsible */}
         <CollapsibleSection title="Net Worth History" summary="By tax wrapper over time" storageKey="history">
           <Card>
             <CardContent className="pt-6">
