@@ -28,6 +28,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page-header";
 
 const RunwayExportSchema = z.object({
   _runway: z.literal(true),
@@ -193,12 +194,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-8 p-4 md:p-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage all your financial data. Changes are saved automatically.
-        </p>
-      </div>
+      <PageHeader title="Settings" description="Manage all your financial data. Changes are saved automatically." />
 
       {/* Quick Setup Guide */}
       {!allComplete && (

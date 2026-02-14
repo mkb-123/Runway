@@ -5,6 +5,7 @@ import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import {
@@ -206,16 +207,9 @@ export default function IncomePage() {
 
   return (
     <div className="space-y-8 p-4 md:p-8">
-      {/* Page Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Income &amp; Cash Flow</h1>
-          <p className="text-sm text-muted-foreground">
-            Detailed income tax breakdown, take-home pay, bonus structures, and cash flow analysis.
-          </p>
-        </div>
+      <PageHeader title="Income & Cash Flow" description="Detailed income tax breakdown, take-home pay, bonus structures, and cash flow analysis.">
         <PersonToggle />
-      </div>
+      </PageHeader>
 
       {personAnalysis.length === 0 && (
         <EmptyState message="No income data yet. Add household members and their salary details in Settings." settingsTab="household" />
