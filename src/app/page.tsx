@@ -91,23 +91,25 @@ function resolveMetric(
       };
     }
     case "period_change": {
-      const pos = data.monthOnMonthChange >= 0;
+      const v = data.monthOnMonthChange;
+      const color = v > 0 ? "text-emerald-600 dark:text-emerald-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
       return {
         label: "Period Change",
-        value: `${pos ? "+" : ""}${formatCurrencyCompact(data.monthOnMonthChange)}`,
-        subtext: `${pos ? "+" : ""}${formatPercent(data.monthOnMonthPercent)} MoM`,
-        color: pos ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
-        trend: data.monthOnMonthChange > 0 ? "up" : data.monthOnMonthChange < 0 ? "down" : undefined,
+        value: `${v >= 0 ? "+" : ""}${formatCurrencyCompact(v)}`,
+        subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.monthOnMonthPercent)} MoM`,
+        color,
+        trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
       };
     }
     case "year_on_year_change": {
-      const pos = data.yearOnYearChange >= 0;
+      const v = data.yearOnYearChange;
+      const color = v > 0 ? "text-emerald-600 dark:text-emerald-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
       return {
         label: "Year-on-Year",
-        value: `${pos ? "+" : ""}${formatCurrencyCompact(data.yearOnYearChange)}`,
-        subtext: `${pos ? "+" : ""}${formatPercent(data.yearOnYearPercent)} YoY`,
-        color: pos ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
-        trend: data.yearOnYearChange > 0 ? "up" : data.yearOnYearChange < 0 ? "down" : undefined,
+        value: `${v >= 0 ? "+" : ""}${formatCurrencyCompact(v)}`,
+        subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.yearOnYearPercent)} YoY`,
+        color,
+        trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
       };
     }
     case "savings_rate":
@@ -514,7 +516,7 @@ export default function Home() {
         </div>
 
         {/* HERO METRICS — 3 configurable slots, zero scrolling */}
-        <div className="mb-8 grid grid-cols-1 gap-5 rounded-2xl border bg-gradient-to-br from-card via-card to-primary/5 p-5 shadow-sm sm:grid-cols-3 sm:gap-6 sm:p-8">
+        <div className="mb-8 grid grid-cols-1 gap-3 rounded-2xl border bg-gradient-to-br from-card via-card to-primary/5 p-5 shadow-sm sm:grid-cols-3 sm:gap-6 sm:p-8">
           {heroMetrics.map((metric, i) => (
             <HeroMetric key={`${metric}-${i}`} type={metric} data={heroData} primary={i === 0} />
           ))}
@@ -544,7 +546,7 @@ export default function Home() {
             <CardContent className="pt-5">
               <div className="mb-4 flex items-baseline justify-between">
                 <h2 className="text-base font-semibold tracking-tight">Net Worth by Wrapper</h2>
-                <span className="text-xs text-muted-foreground">{wrapperSummary}</span>
+                <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
               </div>
               <WrapperSplitChart data={byWrapper} />
             </CardContent>
@@ -554,11 +556,14 @@ export default function Home() {
             <CardContent className="pt-5">
               <div className="mb-4 flex items-baseline justify-between">
                 <h2 className="text-base font-semibold tracking-tight">Net Worth Trajectory</h2>
-                <span className="text-xs text-muted-foreground">
+                <span className="hidden text-xs text-muted-foreground sm:inline">
                   {scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over {projectionYears}yr
                 </span>
               </div>
               <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} />
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Projections are estimates, not guarantees. Capital is at risk. Past performance does not predict future returns.
+              </p>
             </CardContent>
           </Card>
         </div>
