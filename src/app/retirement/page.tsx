@@ -7,7 +7,7 @@ import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { getAccountTaxWrapper, annualiseContribution } from "@/types";
+import { getAccountTaxWrapper, annualiseContribution, isAccountAccessible } from "@/types";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -20,7 +20,8 @@ import {
   calculatePensionBridge,
   calculateProRataStatePension,
   calculateAge,
-  projectCompoundGrowth,
+  projectFinalValue,
+  getMidScenarioRate,
 } from "@/lib/projections";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { RetirementDrawdownChart } from "@/components/charts/retirement-drawdown-chart";
@@ -195,47 +196,23 @@ export default function RetirementPage() {
       : 0;
 
   const { baseAccessibleWealth, baseLockedWealth } = useMemo(() => {
-    const accessibleWrappers = new Set([
-      "isa",
-      "gia",
-      "cash",
-      "premium_bonds",
-    ]);
     let accessible = 0;
     let locked = 0;
-
     for (const account of baseAccounts) {
-      const wrapper = getAccountTaxWrapper(account.type);
-      if (accessibleWrappers.has(wrapper)) {
-        accessible += account.currentValue;
-      } else {
-        locked += account.currentValue;
-      }
+      if (isAccountAccessible(account.type)) accessible += account.currentValue;
+      else locked += account.currentValue;
     }
-
     return { baseAccessibleWealth: accessible, baseLockedWealth: locked };
   }, [baseAccounts]);
 
   // Calculate accessible vs locked wealth
   const { accessibleWealth, lockedWealth } = useMemo(() => {
-    const accessibleWrappers = new Set([
-      "isa",
-      "gia",
-      "cash",
-      "premium_bonds",
-    ]);
     let accessible = 0;
     let locked = 0;
-
     for (const account of accounts) {
-      const wrapper = getAccountTaxWrapper(account.type);
-      if (accessibleWrappers.has(wrapper)) {
-        accessible += account.currentValue;
-      } else {
-        locked += account.currentValue;
-      }
+      if (isAccountAccessible(account.type)) accessible += account.currentValue;
+      else locked += account.currentValue;
     }
-
     return { accessibleWealth: accessible, lockedWealth: locked };
   }, [accounts]);
 
@@ -261,8 +238,9 @@ export default function RetirementPage() {
     Math.floor((retirement.scenarioRates.length || 1) / 2)
   );
 
-  // Coast FIRE: use the selected scenario rate
-  const midRate = retirement.scenarioRates[selectedRateIndex] ?? 0.07;
+  // Selected scenario rate (for projections, Coast FIRE, drawdown)
+  const midRate = retirement.scenarioRates[selectedRateIndex]
+    ?? getMidScenarioRate(retirement.scenarioRates);
   const coastFIRE = useMemo(
     () =>
       calculateCoastFIRE(
@@ -289,23 +267,6 @@ export default function RetirementPage() {
     }));
   }, [requiredPot, currentPot, midRate]);
 
-  // Pension Bridge Analysis
-  const bridgeResult = useMemo(
-    () =>
-      calculatePensionBridge(
-        effectiveRetirementAge,
-        pensionAccessAge,
-        retirement.targetAnnualIncome,
-        accessibleWealth
-      ),
-    [
-      effectiveRetirementAge,
-      pensionAccessAge,
-      retirement.targetAnnualIncome,
-      accessibleWealth,
-    ]
-  );
-
   // Primary person pro-rata state pension
   const primaryStatePensionAnnual = useMemo(() => {
     if (!primaryPerson)
@@ -322,42 +283,67 @@ export default function RetirementPage() {
   const personContribBreakdown = useMemo(() => {
     return persons.map((person) => {
       const personIncome = income.find((i) => i.personId === person.id);
-      const pensionContrib = personIncome
+      const employmentPensionContrib = personIncome
         ? personIncome.employeePensionContribution + personIncome.employerPensionContribution
         : 0;
       const personContribs = filteredContributions.filter((c) => c.personId === person.id);
-      const accessibleContrib = personContribs.reduce(
-        (sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0
-      );
-      return { personId: person.id, pensionContrib, accessibleContrib };
+      // Route discretionary contributions by target: pension vs accessible (ISA/GIA)
+      const discretionaryPension = personContribs
+        .filter((c) => c.target === "pension")
+        .reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+      const accessibleContrib = personContribs
+        .filter((c) => c.target === "isa" || c.target === "gia")
+        .reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+      return {
+        personId: person.id,
+        pensionContrib: employmentPensionContrib + discretionaryPension,
+        accessibleContrib,
+      };
     });
   }, [persons, income, filteredContributions]);
 
   // Projected pot at retirement (current pot + contributions compounded at selected growth rate)
-  const projectedPotAtRetirement = useMemo(() => {
-    if (yearsToRetirement <= 0) return currentPot;
-    const monthlyContrib = totalAnnualContributions / 12;
-    const projection = projectCompoundGrowth(currentPot, monthlyContrib, midRate, yearsToRetirement);
-    return projection.length > 0 ? projection[projection.length - 1].value : currentPot;
-  }, [currentPot, totalAnnualContributions, midRate, yearsToRetirement]);
+  const projectedPotAtRetirement = useMemo(() =>
+    projectFinalValue(currentPot, totalAnnualContributions, midRate, yearsToRetirement),
+    [currentPot, totalAnnualContributions, midRate, yearsToRetirement]
+  );
+
+  // Projected accessible wealth at retirement (for pension bridge)
+  const totalAccessibleContrib = useMemo(() =>
+    personContribBreakdown.reduce((sum, p) => sum + p.accessibleContrib, 0),
+    [personContribBreakdown]
+  );
+  const projectedAccessibleWealth = useMemo(() =>
+    projectFinalValue(accessibleWealth, totalAccessibleContrib, midRate, yearsToRetirement),
+    [accessibleWealth, totalAccessibleContrib, midRate, yearsToRetirement]
+  );
+
+  // Pension Bridge Analysis (uses projected accessible wealth at retirement)
+  const bridgeResult = useMemo(
+    () =>
+      calculatePensionBridge(
+        effectiveRetirementAge,
+        pensionAccessAge,
+        retirement.targetAnnualIncome,
+        projectedAccessibleWealth
+      ),
+    [
+      effectiveRetirementAge,
+      pensionAccessAge,
+      retirement.targetAnnualIncome,
+      projectedAccessibleWealth,
+    ]
+  );
 
   // Combined Retirement Income Timeline data — projected to retirement age
   const personRetirementInputs: PersonRetirementInput[] = useMemo(() => {
     return persons.map((person) => {
       const personPensionPot = accounts
-        .filter(
-          (a) =>
-            a.personId === person.id &&
-            (a.type === "workplace_pension" || a.type === "sipp")
-        )
+        .filter((a) => a.personId === person.id && !isAccountAccessible(a.type))
         .reduce((sum, a) => sum + a.currentValue, 0);
 
       const personAccessible = accounts
-        .filter((a) => {
-          if (a.personId !== person.id) return false;
-          const wrapper = getAccountTaxWrapper(a.type);
-          return wrapper !== "pension";
-        })
+        .filter((a) => a.personId === person.id && isAccountAccessible(a.type))
         .reduce((sum, a) => sum + a.currentValue, 0);
 
       const statePensionAnnual = calculateProRataStatePension(
@@ -366,24 +352,13 @@ export default function RetirementPage() {
 
       // Project pots forward to retirement age with contributions + growth
       const contribs = personContribBreakdown.find((c) => c.personId === person.id);
-      const monthlyPensionContrib = (contribs?.pensionContrib ?? 0) / 12;
-      const monthlyAccessibleContrib = (contribs?.accessibleContrib ?? 0) / 12;
-
-      let projectedPension = personPensionPot;
-      let projectedAccessible = personAccessible;
-      if (yearsToRetirement > 0) {
-        const pensionProj = projectCompoundGrowth(personPensionPot, monthlyPensionContrib, midRate, yearsToRetirement);
-        projectedPension = pensionProj.length > 0 ? pensionProj[pensionProj.length - 1].value : personPensionPot;
-        const accessibleProj = projectCompoundGrowth(personAccessible, monthlyAccessibleContrib, midRate, yearsToRetirement);
-        projectedAccessible = accessibleProj.length > 0 ? accessibleProj[accessibleProj.length - 1].value : personAccessible;
-      }
 
       return {
         name: person.name,
         pensionAccessAge: person.pensionAccessAge,
         stateRetirementAge: person.stateRetirementAge,
-        pensionPot: projectedPension,
-        accessibleWealth: projectedAccessible,
+        pensionPot: projectFinalValue(personPensionPot, contribs?.pensionContrib ?? 0, midRate, yearsToRetirement),
+        accessibleWealth: projectFinalValue(personAccessible, contribs?.accessibleContrib ?? 0, midRate, yearsToRetirement),
         statePensionAnnual: Math.round(statePensionAnnual),
       };
     });
@@ -435,7 +410,7 @@ export default function RetirementPage() {
         title="Pension Bridge"
         summary={
           bridgeResult.sufficient
-            ? `Sufficient — ${formatCurrencyCompact(accessibleWealth - bridgeResult.bridgePotRequired)} surplus`
+            ? `Sufficient — ${formatCurrencyCompact(projectedAccessibleWealth - bridgeResult.bridgePotRequired)} surplus`
             : `Shortfall — ${formatCurrencyCompact(bridgeResult.shortfall)} needed`
         }
         storageKey="retirement-bridge"
@@ -446,7 +421,7 @@ export default function RetirementPage() {
           effectiveRetirementAge={effectiveRetirementAge}
           pensionAccessAge={pensionAccessAge}
           targetAnnualIncome={retirement.targetAnnualIncome}
-          accessibleWealth={accessibleWealth}
+          accessibleWealth={projectedAccessibleWealth}
           lockedWealth={lockedWealth}
           baseAccessibleWealth={baseAccessibleWealth}
           baseLockedWealth={baseLockedWealth}

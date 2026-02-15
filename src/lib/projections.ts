@@ -28,6 +28,33 @@ export interface PensionBridgeResult {
   sufficient: boolean;
 }
 
+// --- Helpers ---
+
+/**
+ * Get the mid scenario growth rate from scenarioRates array.
+ * Returns the middle element, or a fallback if the array is empty.
+ */
+export function getMidScenarioRate(scenarioRates: number[], fallback = 0.07): number {
+  if (scenarioRates.length === 0) return fallback;
+  return scenarioRates[Math.floor(scenarioRates.length / 2)] ?? fallback;
+}
+
+/**
+ * Project compound growth and return only the final value (not the full array).
+ * Returns currentValue unchanged if years <= 0.
+ */
+export function projectFinalValue(
+  currentValue: number,
+  annualContribution: number,
+  growthRate: number,
+  years: number
+): number {
+  if (years <= 0) return currentValue;
+  const monthlyContrib = annualContribution / 12;
+  const projection = projectCompoundGrowth(currentValue, monthlyContrib, growthRate, years);
+  return projection.length > 0 ? projection[projection.length - 1].value : currentValue;
+}
+
 // --- Compound Growth ---
 
 /**

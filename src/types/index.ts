@@ -298,6 +298,15 @@ export function getAccountTaxWrapper(type: AccountType): TaxWrapper {
   }
 }
 
+/**
+ * Returns true if the account is accessible before pension access age
+ * (ISA, GIA, cash, premium bonds). Pensions are not accessible.
+ */
+export function isAccountAccessible(type: AccountType): boolean {
+  const wrapper = getAccountTaxWrapper(type);
+  return wrapper !== "pension";
+}
+
 export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   workplace_pension: "Workplace Pension",
   sipp: "SIPP",

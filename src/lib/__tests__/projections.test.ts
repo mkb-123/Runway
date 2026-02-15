@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   projectCompoundGrowth,
   projectScenarios,
+  getMidScenarioRate,
+  projectFinalValue,
   calculateRetirementCountdown,
   calculateCoastFIRE,
   calculateRequiredSavings,
@@ -569,5 +571,50 @@ describe("projectSalaryTrajectory", () => {
     for (const point of result) {
       expect(point.salary).toBe(80000);
     }
+  });
+});
+
+describe("getMidScenarioRate", () => {
+  it("returns the middle element of an odd-length array", () => {
+    expect(getMidScenarioRate([0.04, 0.07, 0.10])).toBe(0.07);
+  });
+
+  it("returns the middle element of an even-length array", () => {
+    // Math.floor(4/2) = 2, so index 2
+    expect(getMidScenarioRate([0.04, 0.06, 0.08, 0.10])).toBe(0.08);
+  });
+
+  it("returns the only element of a single-element array", () => {
+    expect(getMidScenarioRate([0.05])).toBe(0.05);
+  });
+
+  it("returns fallback for empty array", () => {
+    expect(getMidScenarioRate([])).toBe(0.07);
+  });
+
+  it("returns custom fallback for empty array", () => {
+    expect(getMidScenarioRate([], 0.05)).toBe(0.05);
+  });
+});
+
+describe("projectFinalValue", () => {
+  it("returns current value when years is 0", () => {
+    expect(projectFinalValue(100_000, 12_000, 0.07, 0)).toBe(100_000);
+  });
+
+  it("returns current value when years is negative", () => {
+    expect(projectFinalValue(100_000, 12_000, 0.07, -5)).toBe(100_000);
+  });
+
+  it("matches projectCompoundGrowth final value", () => {
+    const full = projectCompoundGrowth(200_000, 1_000, 0.06, 10);
+    const final = projectFinalValue(200_000, 12_000, 0.06, 10);
+    expect(final).toBe(full[full.length - 1].value);
+  });
+
+  it("includes both contributions and growth", () => {
+    const withContrib = projectFinalValue(100_000, 12_000, 0.06, 20);
+    const withoutContrib = projectFinalValue(100_000, 0, 0.06, 20);
+    expect(withContrib).toBeGreaterThan(withoutContrib);
   });
 });
