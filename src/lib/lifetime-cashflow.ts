@@ -13,7 +13,7 @@
 // adjustment is explicitly requested.
 
 import type { HouseholdData, Person, PersonIncome } from "@/types";
-import { annualiseOutgoing, annualiseContribution } from "@/types";
+import { annualiseOutgoing, annualiseContribution, getDeferredBonus } from "@/types";
 import { calculateTakeHomePay } from "@/lib/tax";
 import { calculateProRataStatePension, calculateAge } from "@/lib/projections";
 
@@ -107,7 +107,7 @@ export function generateLifetimeCashFlow(
 
     const bonusStructure = bonusStructures.find((b) => b.personId === person.id);
     const annualCashBonus = bonusStructure?.cashBonusAnnual ?? 0;
-    const annualDeferredBonus = bonusStructure?.deferredBonusAnnual ?? 0;
+    const annualDeferredBonus = bonusStructure ? getDeferredBonus(bonusStructure) : 0;
 
     // Pension contributions: employment-based
     const annualPensionContribution = personIncome

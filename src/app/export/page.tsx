@@ -12,6 +12,7 @@ import {
   annualiseOutgoing,
 } from "@/types";
 import type { TaxWrapper, HouseholdData } from "@/types";
+import { getDeferredBonus } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
@@ -130,7 +131,7 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
 
     const bonus = household.bonusStructures.find((b) => b.personId === person.id);
     const cashBonus = bonus?.cashBonusAnnual ?? 0;
-    const deferredBonus = bonus?.deferredBonusAnnual ?? 0;
+    const deferredBonus = bonus ? getDeferredBonus(bonus) : 0;
     const totalGross = inc.grossSalary + cashBonus;
     const taxResult = calculateIncomeTax(totalGross, inc.employeePensionContribution, inc.pensionContributionMethod);
     const niResult = calculateNI(totalGross, inc.employeePensionContribution, inc.pensionContributionMethod);

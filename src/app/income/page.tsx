@@ -19,7 +19,7 @@ import {
   projectSalaryTrajectory,
 } from "@/lib/projections";
 import { generateDeferredTranches, totalProjectedDeferredValue } from "@/lib/deferred-bonus";
-import { getPersonContributionTotals, annualiseOutgoing, OUTGOING_CATEGORY_LABELS } from "@/types";
+import { getPersonContributionTotals, annualiseOutgoing, OUTGOING_CATEGORY_LABELS, getDeferredBonus } from "@/types";
 import type { CommittedOutgoingCategory } from "@/types";
 import { SchoolFeeSummary } from "@/components/school-fee-summary";
 import {
@@ -293,7 +293,7 @@ export default function IncomePage() {
           const base = baseIncomeLookup.get(person.id);
           const totalPension = personIncome.employeePensionContribution + personIncome.employerPensionContribution;
           const cashBonus = bonus?.cashBonusAnnual ?? 0;
-          const deferredBonus = bonus?.deferredBonusAnnual ?? 0;
+          const deferredBonus = bonus ? getDeferredBonus(bonus) : 0;
           const hasBonus = cashBonus > 0 || deferredBonus > 0;
 
           return (
@@ -509,7 +509,7 @@ export default function IncomePage() {
             const salary = personIncome.grossSalary;
             const employerPension = personIncome.employerPensionContribution;
             const cashBonus = bonus?.cashBonusAnnual ?? 0;
-            const deferredBonus = bonus?.deferredBonusAnnual ?? 0;
+            const deferredBonus = bonus ? getDeferredBonus(bonus) : 0;
             const totalComp = salary + employerPension + cashBonus + deferredBonus;
 
             return (
@@ -563,7 +563,9 @@ export default function IncomePage() {
                   const salaryGrowth = personIncome.salaryGrowthRate ?? 0;
                   const bonusGrowth = personIncome.bonusGrowthRate ?? 0;
                   const trajectory = projectSalaryTrajectory(personIncome.grossSalary, salaryGrowth, 10);
+                  const totalBonus = bonus?.totalBonusAnnual ?? 0;
                   const cashBonus = bonus?.cashBonusAnnual ?? 0;
+                  const hasDeferred = totalBonus > cashBonus;
 
                   return (
                     <Card key={person.id}>
@@ -573,24 +575,32 @@ export default function IncomePage() {
                           <Badge variant="secondary">
                             {salaryGrowth > 0 && `Salary +${formatPercent(salaryGrowth)}/yr`}
                             {salaryGrowth > 0 && bonusGrowth > 0 && " · "}
-                            {bonusGrowth > 0 && `Bonus +${formatPercent(bonusGrowth)}/yr`}
+                            {bonusGrowth > 0 && `Total bonus +${formatPercent(bonusGrowth)}/yr`}
                           </Badge>
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
+                        {hasDeferred && (
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Total bonus grows at {formatPercent(bonusGrowth)}/yr. Cash portion fixed at {formatCurrency(cashBonus)}; deferred increases as total grows.
+                          </p>
+                        )}
                         <div className="overflow-x-auto">
                           <Table>
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Year</TableHead>
                                 <TableHead className="text-right">Salary</TableHead>
-                                {cashBonus > 0 && <TableHead className="text-right">Cash Bonus</TableHead>}
+                                {totalBonus > 0 && <TableHead className="text-right">Total Bonus</TableHead>}
+                                {hasDeferred && <TableHead className="text-right">Cash</TableHead>}
+                                {hasDeferred && <TableHead className="text-right">Deferred</TableHead>}
                                 <TableHead className="text-right">Total Comp</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {trajectory.filter((_, i) => i % 2 === 0 || i === trajectory.length - 1).map((point) => {
-                                const yearBonus = cashBonus * Math.pow(1 + bonusGrowth, point.year);
+                                const yearTotalBonus = totalBonus * Math.pow(1 + bonusGrowth, point.year);
+                                const yearDeferred = Math.max(0, yearTotalBonus - cashBonus);
                                 const employerPension = personIncome.employerPensionContribution * Math.pow(1 + salaryGrowth, point.year);
                                 return (
                                   <TableRow key={point.year}>
@@ -598,11 +608,17 @@ export default function IncomePage() {
                                       {point.year === 0 ? "Now" : `+${point.year}yr`}
                                     </TableCell>
                                     <TableCell className="text-right">{formatCurrency(point.salary)}</TableCell>
-                                    {cashBonus > 0 && (
-                                      <TableCell className="text-right">{formatCurrency(yearBonus)}</TableCell>
+                                    {totalBonus > 0 && (
+                                      <TableCell className="text-right">{formatCurrency(yearTotalBonus)}</TableCell>
+                                    )}
+                                    {hasDeferred && (
+                                      <TableCell className="text-right text-muted-foreground">{formatCurrency(cashBonus)}</TableCell>
+                                    )}
+                                    {hasDeferred && (
+                                      <TableCell className="text-right text-muted-foreground">{formatCurrency(yearDeferred)}</TableCell>
                                     )}
                                     <TableCell className="text-right font-semibold">
-                                      {formatCurrency(point.salary + yearBonus + employerPension)}
+                                      {formatCurrency(point.salary + yearTotalBonus + employerPension)}
                                     </TableCell>
                                   </TableRow>
                                 );

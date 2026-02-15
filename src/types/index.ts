@@ -58,13 +58,21 @@ export interface DeferredBonusTranche {
 
 export interface BonusStructure {
   personId: string;
+  /** Total annual bonus (cash + deferred). Grows at bonusGrowthRate. */
+  totalBonusAnnual: number;
+  /** Fixed cash portion paid immediately each year. Does NOT grow. */
   cashBonusAnnual: number;
-  /** Total annual deferred bonus amount (vests equally over vestingYears) */
-  deferredBonusAnnual: number;
   /** Number of years for equal vesting (e.g. 3 = 1/3 vests each year) */
   vestingYears: number;
-  /** Expected annual return on deferred amounts */
+  /** Gap years before first vesting tranche (e.g. 1 = vest starts year 2 after grant) */
+  vestingGapYears: number;
+  /** Expected annual return on deferred amounts while vesting */
   estimatedAnnualReturn: number;
+}
+
+/** Derived: deferred portion = total - cash (never negative) */
+export function getDeferredBonus(bonus: BonusStructure): number {
+  return Math.max(0, bonus.totalBonusAnnual - bonus.cashBonusAnnual);
 }
 
 export interface PersonIncome {

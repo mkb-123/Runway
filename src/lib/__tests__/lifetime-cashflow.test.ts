@@ -379,9 +379,10 @@ describe("generateLifetimeCashFlow deferred bonus", () => {
       bonusStructures: [
         {
           personId: "p1",
+          totalBonusAnnual: 45_000,
           cashBonusAnnual: 0,
-          deferredBonusAnnual: 45_000,
           vestingYears: 3,
+          vestingGapYears: 0,
           estimatedAnnualReturn: 0.08,
         },
       ],
@@ -403,9 +404,10 @@ describe("generateLifetimeCashFlow deferred bonus", () => {
       bonusStructures: [
         {
           personId: "p1",
+          totalBonusAnnual: 25_000,
           cashBonusAnnual: 25_000,
-          deferredBonusAnnual: 0,
           vestingYears: 3,
+          vestingGapYears: 0,
           estimatedAnnualReturn: 0.08,
         },
       ],
@@ -425,9 +427,10 @@ describe("generateLifetimeCashFlow deferred bonus", () => {
       bonusStructures: [
         {
           personId: "p1",
+          totalBonusAnnual: 45_000,
           cashBonusAnnual: 0,
-          deferredBonusAnnual: 45_000,
           vestingYears: 3,
+          vestingGapYears: 0,
           estimatedAnnualReturn: 0.08,
         },
       ],
