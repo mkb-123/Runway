@@ -38,6 +38,44 @@ describe("applyScenarioOverrides", () => {
     expect(result).toEqual(h);
   });
 
+  describe("person overrides", () => {
+    it("merges partial person overrides by id", () => {
+      const h = makeHousehold();
+      const overrides: ScenarioOverrides = {
+        personOverrides: [{ id: "p1", plannedRetirementAge: 55 }],
+      };
+      const result = applyScenarioOverrides(h, overrides);
+      expect(result.persons[0].plannedRetirementAge).toBe(55);
+      // Other fields preserved
+      expect(result.persons[0].name).toBe("Alice");
+      expect(result.persons[0].dateOfBirth).toBe("1990-01-01");
+      // Person 2 unchanged
+      expect(result.persons[1].plannedRetirementAge).toBe(60);
+    });
+
+    it("applies retirement age overrides to multiple persons", () => {
+      const h = makeHousehold();
+      const overrides: ScenarioOverrides = {
+        personOverrides: [
+          { id: "p1", plannedRetirementAge: 52 },
+          { id: "p2", plannedRetirementAge: 58 },
+        ],
+      };
+      const result = applyScenarioOverrides(h, overrides);
+      expect(result.persons[0].plannedRetirementAge).toBe(52);
+      expect(result.persons[1].plannedRetirementAge).toBe(58);
+    });
+
+    it("does not mutate original persons", () => {
+      const h = makeHousehold();
+      const original = h.persons[0].plannedRetirementAge;
+      applyScenarioOverrides(h, {
+        personOverrides: [{ id: "p1", plannedRetirementAge: 50 }],
+      });
+      expect(h.persons[0].plannedRetirementAge).toBe(original);
+    });
+  });
+
   describe("income overrides", () => {
     it("merges partial income overrides by personId", () => {
       const h = makeHousehold();

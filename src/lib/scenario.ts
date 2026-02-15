@@ -4,7 +4,7 @@
 // Extracted from scenario-context.tsx for testability.
 // Each override type has explicit merge semantics.
 
-import type { HouseholdData, PersonIncome, Contribution } from "@/types";
+import type { HouseholdData, Person, PersonIncome, Contribution } from "@/types";
 
 // --- Override types ---
 
@@ -16,6 +16,8 @@ export interface ContributionOverride {
 }
 
 export interface ScenarioOverrides {
+  /** Partial person-level overrides (e.g. plannedRetirementAge), merged by personId */
+  personOverrides?: Partial<Person>[];
   income?: Partial<PersonIncome>[];
   contributionOverrides?: ContributionOverride[];
   retirement?: Partial<HouseholdData["retirement"]>;
@@ -32,6 +34,7 @@ export interface ScenarioOverrides {
  * with overridden values. The original data is not mutated.
  *
  * Override merge semantics:
+ * - personOverrides: spread-merge by personId (e.g. retirement age)
  * - income: spread-merge by personId (partial override)
  * - contributionOverrides: full replacement per person (synthetic contributions)
  * - retirement: spread-merge on top of existing config
@@ -44,6 +47,7 @@ export function applyScenarioOverrides(
 ): HouseholdData {
   let result = { ...household };
 
+  result = applyPersonOverrides(result, overrides.personOverrides);
   result = applyIncomeOverrides(result, overrides.income);
   result = applyContributionOverrides(result, overrides.contributionOverrides);
   result = applyRetirementOverrides(result, overrides.retirement);
@@ -53,6 +57,24 @@ export function applyScenarioOverrides(
 }
 
 // --- Individual override applicators ---
+
+function applyPersonOverrides(
+  household: HouseholdData,
+  personOverrides?: Partial<Person>[]
+): HouseholdData {
+  if (!personOverrides || personOverrides.length === 0) return household;
+
+  return {
+    ...household,
+    persons: household.persons.map((person) => {
+      const override = personOverrides.find((o) => o.id === person.id);
+      if (override) {
+        return { ...person, ...override } as Person;
+      }
+      return person;
+    }),
+  };
+}
 
 function applyIncomeOverrides(
   household: HouseholdData,

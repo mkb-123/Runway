@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronUp,
   Percent,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,9 +36,10 @@ import {
 } from "@/components/ui/sheet";
 import { useScenario, type ScenarioOverrides } from "@/context/scenario-context";
 import { useData } from "@/context/data-context";
-import { getPersonContributionTotals } from "@/types";
+import { getPersonContributionTotals, isAccountAccessible } from "@/types";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/format";
 import { calculateIncomeTax, calculateNI } from "@/lib/tax";
+import { calculateAge, projectFinalValue, calculateSWR, calculateProRataStatePension } from "@/lib/projections";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 
 // --- Types ---
@@ -302,6 +304,7 @@ export function ScenarioPanel() {
   >({});
   const [marketShock, setMarketShock] = useState<string>("");
   const [savingsRateOverride, setSavingsRateOverride] = useState<number | null>(null);
+  const [retirementAgeOverrides, setRetirementAgeOverrides] = useState<Record<string, number>>({});
 
   // Current savings rate calculation
   const { currentSavingsRate, totalGrossIncome, contribsByPerson } = useMemo(() => {
@@ -343,6 +346,7 @@ export function ScenarioPanel() {
         setContributionOverrides({});
         setMarketShock("");
         setSavingsRateOverride(null);
+        setRetirementAgeOverrides({});
       }
     },
     [isScenarioMode]
@@ -363,9 +367,10 @@ export function ScenarioPanel() {
       }) ||
       Object.keys(contributionOverrides).length > 0 ||
       marketShock !== "" ||
-      savingsRateOverride !== null
+      savingsRateOverride !== null ||
+      Object.keys(retirementAgeOverrides).length > 0
     );
-  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, household.income]);
+  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, retirementAgeOverrides, household.income]);
 
   const applyCustomScenario = useCallback(() => {
     const newOverrides: ScenarioOverrides = {};
@@ -443,8 +448,17 @@ export function ScenarioPanel() {
       if (!isNaN(pct)) newOverrides.marketShockPercent = pct / 100;
     }
 
+    // Person overrides (retirement age)
+    const personChanges = Object.entries(retirementAgeOverrides);
+    if (personChanges.length > 0) {
+      newOverrides.personOverrides = personChanges.map(([personId, plannedRetirementAge]) => ({
+        id: personId,
+        plannedRetirementAge,
+      }));
+    }
+
     enableScenario("Custom Scenario", newOverrides);
-  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, totalGrossIncome, contribsByPerson, enableScenario]);
+  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, totalGrossIncome, contribsByPerson, retirementAgeOverrides, enableScenario]);
 
   const applyPreset = useCallback(
     (preset: SmartPreset) => {
@@ -464,6 +478,7 @@ export function ScenarioPanel() {
       setIncomeOverrides({});
       setContributionOverrides({});
       setSavingsRateOverride(null);
+      setRetirementAgeOverrides({});
       setMarketShock(
         overrides.marketShockPercent !== undefined
           ? String(overrides.marketShockPercent * 100)
@@ -480,6 +495,7 @@ export function ScenarioPanel() {
     setContributionOverrides({});
     setMarketShock("");
     setSavingsRateOverride(null);
+    setRetirementAgeOverrides({});
   }, [disableScenario]);
 
   // Total impact summary
@@ -659,6 +675,83 @@ export function ScenarioPanel() {
                   })}
                 </div>
               )}
+            </div>
+          </Section>
+
+          {/* Retirement Age */}
+          <Section title="Retirement Age" icon={CalendarClock}>
+            <div className="space-y-4">
+              {household.persons.map((person) => {
+                const currentPlannedAge = person.plannedRetirementAge;
+                const sliderValue = retirementAgeOverrides[person.id] ?? currentPlannedAge;
+                const age = calculateAge(person.dateOfBirth);
+                const yearsToRetirement = Math.max(0, sliderValue - age);
+
+                // Project total pot at chosen retirement age
+                const personAccounts = household.accounts.filter((a) => a.personId === person.id);
+                const currentPot = personAccounts.reduce((s, a) => s + a.currentValue, 0);
+                const personContribs = contribsByPerson[person.id] ?? { isa: 0, pension: 0, gia: 0, total: 0 };
+                const personIncome = household.income.find((i) => i.personId === person.id);
+                const annualContrib = personContribs.total + (personIncome?.employeePensionContribution ?? 0) + (personIncome?.employerPensionContribution ?? 0);
+                const growthRate = household.retirement.scenarioRates[Math.floor(household.retirement.scenarioRates.length / 2)] ?? 0.05;
+                const projectedPot = projectFinalValue(currentPot, annualContrib, growthRate, yearsToRetirement);
+                const withdrawalRate = household.retirement.withdrawalRate;
+                const sustainableIncome = calculateSWR(projectedPot, withdrawalRate);
+                const statePension = household.retirement.includeStatePension
+                  ? calculateProRataStatePension(person.niQualifyingYears)
+                  : 0;
+
+                const changed = sliderValue !== currentPlannedAge;
+
+                return (
+                  <div key={person.id} className="space-y-2">
+                    <RangeInput
+                      label={`${person.name} — retire at`}
+                      value={sliderValue}
+                      min={45}
+                      max={75}
+                      step={1}
+                      current={currentPlannedAge}
+                      format={(v) => `${v}`}
+                      onChange={(v) =>
+                        setRetirementAgeOverrides((prev) => ({
+                          ...prev,
+                          [person.id]: v,
+                        }))
+                      }
+                    />
+                    {changed && (
+                      <div className="rounded-md bg-muted/50 px-2 py-1.5 space-y-0.5">
+                        <p className="text-xs text-muted-foreground">
+                          {yearsToRetirement > 0
+                            ? <><span className="tabular-nums font-medium text-foreground">{yearsToRetirement}yr</span> until retirement</>
+                            : <span className="font-medium text-amber-600 dark:text-amber-400">Already past this age</span>}
+                        </p>
+                        {yearsToRetirement > 0 && (
+                          <>
+                            <p className="text-xs text-muted-foreground">
+                              Projected pot: <span className="tabular-nums font-medium text-foreground">{formatCurrencyCompact(projectedPot)}</span>
+                              <span className="text-muted-foreground/60"> at {(growthRate * 100).toFixed(0)}% growth</span>
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Sustainable income: <span className="tabular-nums font-medium text-foreground">{formatCurrencyCompact(sustainableIncome)}/yr</span>
+                              <span className="text-muted-foreground/60"> at {(withdrawalRate * 100).toFixed(0)}% SWR</span>
+                              {statePension > 0 && (
+                                <span className="text-muted-foreground/60"> + {formatCurrencyCompact(statePension)} state pension</span>
+                              )}
+                            </p>
+                            {statePension > 0 && (
+                              <p className="text-xs font-medium text-foreground tabular-nums">
+                                Total: {formatCurrencyCompact(sustainableIncome + statePension)}/yr
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Section>
 
