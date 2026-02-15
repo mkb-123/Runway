@@ -528,10 +528,14 @@ export function generateRecommendations(
     const personContributions = getPersonContributionTotals(contributions, person.id);
 
     // FEAT-001: Calculate tapered annual allowance
+    // Threshold income includes salary + bonus (HMRC PTM057100)
     const adjustedGross = getAdjustedGrossForTax(personIncome);
-    const adjustedIncomeForTaper = personIncome.grossSalary + personIncome.employerPensionContribution;
+    const personBonus = household.bonusStructures.find((b) => b.personId === person.id);
+    const cashBonus = personBonus?.cashBonusAnnual ?? 0;
+    const thresholdIncome = personIncome.grossSalary + cashBonus;
+    const adjustedIncomeForTaper = thresholdIncome + personIncome.employerPensionContribution;
     const effectivePensionAllowance = calculateTaperedAnnualAllowance(
-      personIncome.grossSalary,
+      thresholdIncome,
       adjustedIncomeForTaper
     );
 

@@ -215,10 +215,13 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
     const employerPension = inc?.employerPensionContribution ?? 0;
     const totalPensionUsed = employeePension + employerPension + discretionary.pensionContribution;
 
-    // Tapered allowance
+    // Tapered allowance — threshold income includes salary + bonus (HMRC PTM057100)
     const grossSalary = inc?.grossSalary ?? 0;
-    const adjustedIncome = grossSalary + (inc?.employerPensionContribution ?? 0);
-    const effectiveAllowance = calculateTaperedAnnualAllowance(grossSalary, adjustedIncome);
+    const bonus = household.bonusStructures.find((b) => b.personId === person.id);
+    const cashBonus = bonus?.cashBonusAnnual ?? 0;
+    const thresholdIncome = grossSalary + cashBonus;
+    const adjustedIncome = thresholdIncome + (inc?.employerPensionContribution ?? 0);
+    const effectiveAllowance = calculateTaperedAnnualAllowance(thresholdIncome, adjustedIncome);
 
     pensionRows.push(
       { Person: person.name, Item: "Employee Pension", "Value (£)": curr(employeePension) },
