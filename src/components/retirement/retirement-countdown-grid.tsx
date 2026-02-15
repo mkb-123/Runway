@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ScenarioDelta } from "@/components/scenario-delta";
 import { formatPercent, formatCurrencyCompact } from "@/lib/format";
 import { calculateRetirementCountdown } from "@/lib/projections";
 
@@ -12,6 +13,10 @@ interface RetirementCountdownGridProps {
   scenarioRates: number[];
   currentAge: number;
   selectedRateIndex: number;
+  /** Base (un-overridden) values for what-if comparison */
+  baseCurrentPot?: number;
+  baseTotalAnnualContributions?: number;
+  baseRequiredPot?: number;
 }
 
 export function RetirementCountdownGrid({
@@ -21,6 +26,9 @@ export function RetirementCountdownGrid({
   scenarioRates,
   currentAge,
   selectedRateIndex,
+  baseCurrentPot,
+  baseTotalAnnualContributions,
+  baseRequiredPot,
 }: RetirementCountdownGridProps) {
   return (
     <Card>
@@ -39,6 +47,14 @@ export function RetirementCountdownGrid({
             const isSelected = idx === selectedRateIndex;
             const targetReached =
               countdown.years === 0 && countdown.months === 0;
+
+            // Base countdown for what-if comparison
+            const hasBase = baseCurrentPot !== undefined && baseTotalAnnualContributions !== undefined && baseRequiredPot !== undefined;
+            const baseCountdown = hasBase
+              ? calculateRetirementCountdown(baseCurrentPot, baseTotalAnnualContributions, baseRequiredPot, rate)
+              : null;
+            const baseTotalMonths = baseCountdown ? baseCountdown.years * 12 + baseCountdown.months : 0;
+            const scenarioTotalMonths = countdown.years * 12 + countdown.months;
 
             return (
               <div
@@ -66,7 +82,21 @@ export function RetirementCountdownGrid({
                     isSelected ? "" : "text-muted-foreground"
                   }`}
                 >
-                  {targetReached ? "Now" : `${countdown.years}y ${countdown.months}m`}
+                  {hasBase ? (
+                    <ScenarioDelta
+                      base={baseTotalMonths}
+                      scenario={scenarioTotalMonths}
+                      format={(n) => {
+                        if (n === 0) return "Now";
+                        const y = Math.floor(n / 12);
+                        const m = Math.round(n % 12);
+                        return `${y}y ${m}m`;
+                      }}
+                      showPercent={false}
+                    />
+                  ) : (
+                    targetReached ? "Now" : `${countdown.years}y ${countdown.months}m`
+                  )}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {targetReached

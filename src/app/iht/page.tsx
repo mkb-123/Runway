@@ -63,8 +63,19 @@ export default function IHTPage() {
     const giftsWithin7Years = baseHousehold.iht.gifts
       .filter((g) => yearsSince(g.date) < 7)
       .reduce((sum, g) => sum + g.amount, 0);
+    const pensionVal = wrapperTotals.get("pension") ?? 0;
     const result = calculateIHT(baseInEstate, numberOfPersons, giftsWithin7Years, baseHousehold.iht.passingToDirectDescendants);
-    return { totalNetWorth: totalNW, inEstate: baseInEstate, taxableAmount: result.taxableAmount, ihtLiability: result.ihtLiability };
+    const baseContribs = selectedView === "household"
+      ? baseHousehold.contributions
+      : baseHousehold.contributions.filter((c) => c.personId === selectedView);
+    const baseAnnualSavingsInEstate = baseContribs
+      .filter((c) => c.target === "isa" || c.target === "gia")
+      .reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+    return {
+      totalNetWorth: totalNW, inEstate: baseInEstate, taxableAmount: result.taxableAmount, ihtLiability: result.ihtLiability,
+      propertyValue: baseHousehold.iht.estimatedPropertyValue, isaValue: isaVal, giaValue: giaVal, cashValue: cashVal,
+      premiumBondsValue: pbVal, pensionValue: pensionVal, outsideEstate: pensionVal, annualSavingsInEstate: baseAnnualSavingsInEstate,
+    };
   }, [baseHousehold, selectedView]);
 
   const ihtData = useMemo(() => {
@@ -292,11 +303,21 @@ export default function IHTPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {estateBreakdown.map((item) => (
+                {estateBreakdown.map((item) => {
+                  const baseValueMap: Record<string, number> = {
+                    "Property": baseIhtData.propertyValue,
+                    "ISA": baseIhtData.isaValue,
+                    "GIA": baseIhtData.giaValue,
+                    "Cash Savings": baseIhtData.cashValue,
+                    "Premium Bonds": baseIhtData.premiumBondsValue,
+                    "Pensions": baseIhtData.pensionValue,
+                  };
+                  const baseVal = baseValueMap[item.label] ?? item.value;
+                  return (
                   <TableRow key={item.label}>
                     <TableCell className="font-medium">{item.label}</TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(item.value)}
+                      <ScenarioDelta base={baseVal} scenario={item.value} format={formatCurrency} />
                     </TableCell>
                     <TableCell className="text-right">
                       {item.inEstate ? (
@@ -306,7 +327,8 @@ export default function IHTPage() {
                       )}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -423,7 +445,7 @@ export default function IHTPage() {
                     Sheltered (Pensions - outside estate)
                   </p>
                   <p className="text-2xl font-bold tabular-nums">
-                    {formatCurrency(outsideEstate)}
+                    <ScenarioDelta base={baseIhtData.outsideEstate} scenario={outsideEstate} format={formatCurrency} />
                   </p>
                   <Badge variant="secondary" className="mt-1">
                     {formatPercent(shelteredPct)}
@@ -434,7 +456,7 @@ export default function IHTPage() {
                     Exposed (In estate)
                   </p>
                   <p className="text-2xl font-bold tabular-nums">
-                    {formatCurrency(inEstate)}
+                    <ScenarioDelta base={baseIhtData.inEstate} scenario={inEstate} format={formatCurrency} />
                   </p>
                   <Badge variant="secondary" className="mt-1">
                     {formatPercent(exposedPct)}
@@ -523,7 +545,7 @@ export default function IHTPage() {
                     Annual Savings Into Estate (ISA + GIA)
                   </p>
                   <p className="text-2xl font-bold tabular-nums">
-                    {formatCurrency(annualSavingsInEstate)}
+                    <ScenarioDelta base={baseIhtData.annualSavingsInEstate} scenario={annualSavingsInEstate} format={formatCurrency} />
                   </p>
                 </div>
                 <div className="rounded-lg border p-4">

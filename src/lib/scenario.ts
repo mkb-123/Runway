@@ -232,19 +232,33 @@ export function scaleSavingsRateContributions(
     const personTarget = targetTotalContribs * personShare;
 
     if (current.total > 0) {
-      // Scale maintaining existing ISA/pension/GIA ratio
+      // Scale maintaining existing ISA/pension/GIA ratio, capping ISA at £20k
       const scale = personTarget / current.total;
+      let scaledISA = Math.round(current.isa * scale);
+      let scaledGIA = Math.round(current.gia * scale);
+      const scaledPension = Math.round(current.pension * scale);
+
+      // Cap ISA at annual allowance, spill excess into GIA
+      if (scaledISA > UK_TAX_CONSTANTS.isaAnnualAllowance) {
+        const excess = scaledISA - UK_TAX_CONSTANTS.isaAnnualAllowance;
+        scaledISA = UK_TAX_CONSTANTS.isaAnnualAllowance;
+        scaledGIA += excess;
+      }
+
       return {
         personId: person.id,
-        isaContribution: Math.round(current.isa * scale),
-        pensionContribution: Math.round(current.pension * scale),
-        giaContribution: Math.round(current.gia * scale),
+        isaContribution: scaledISA,
+        pensionContribution: scaledPension,
+        giaContribution: scaledGIA,
       };
     }
-    // No existing contributions — allocate to ISA based on income share
+    // No existing contributions — allocate to ISA (capped) based on income share, excess to GIA
+    const isaAmount = Math.min(Math.round(personTarget), UK_TAX_CONSTANTS.isaAnnualAllowance);
+    const giaAmount = Math.max(0, Math.round(personTarget) - isaAmount);
     return {
       personId: person.id,
-      isaContribution: Math.round(personTarget),
+      isaContribution: isaAmount,
+      giaContribution: giaAmount > 0 ? giaAmount : undefined,
     };
   });
 }

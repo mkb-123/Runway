@@ -374,6 +374,38 @@ describe("scaleSavingsRateContributions", () => {
     const total = result.reduce((s, r) => s + (r.isaContribution ?? 0) + (r.pensionContribution ?? 0) + (r.giaContribution ?? 0), 0);
     expect(total).toBe(0);
   });
+
+  it("caps ISA contributions at £20,000 per person, spilling excess to GIA", () => {
+    const persons = [
+      { id: "p1", name: "Alice", relationship: "self" as const, dateOfBirth: "1990-01-01", plannedRetirementAge: 60, pensionAccessAge: 57, stateRetirementAge: 67, niQualifyingYears: 35, studentLoanPlan: "none" as const },
+    ];
+    const income = [
+      { personId: "p1", grossSalary: 200000, employerPensionContribution: 0, employeePensionContribution: 0, pensionContributionMethod: "salary_sacrifice" as const },
+    ];
+    // Start with £10k ISA. At 50% savings rate, target = £100k. Scaling ISA by 10x → £100k.
+    // But ISA should be capped at £20k, with excess £80k going to GIA.
+    const contributions = [
+      { id: "c1", personId: "p1", label: "ISA", target: "isa" as const, amount: 10000, frequency: "annually" as const },
+    ];
+    const result = scaleSavingsRateContributions(persons, income, [], contributions, 50);
+    const p1 = result.find((r) => r.personId === "p1")!;
+    expect(p1.isaContribution).toBe(20000);
+    expect(p1.giaContribution).toBe(80000);
+  });
+
+  it("caps ISA at £20k when no existing contributions (fallback allocation)", () => {
+    const persons = [
+      { id: "p1", name: "Alice", relationship: "self" as const, dateOfBirth: "1990-01-01", plannedRetirementAge: 60, pensionAccessAge: 57, stateRetirementAge: 67, niQualifyingYears: 35, studentLoanPlan: "none" as const },
+    ];
+    const income = [
+      { personId: "p1", grossSalary: 100000, employerPensionContribution: 0, employeePensionContribution: 0, pensionContributionMethod: "salary_sacrifice" as const },
+    ];
+    // No existing contributions. Target 50% = £50k. Should cap ISA at £20k, rest to GIA.
+    const result = scaleSavingsRateContributions(persons, income, [], [], 50);
+    const p1 = result.find((r) => r.personId === "p1")!;
+    expect(p1.isaContribution).toBe(20000);
+    expect(p1.giaContribution).toBe(30000);
+  });
 });
 
 describe("calculateScenarioImpact", () => {

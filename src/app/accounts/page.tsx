@@ -84,6 +84,17 @@ export default function AccountsPage() {
       .sort((a, b) => b[1] - a[1]);
   }, [filteredAccounts]);
 
+  // Base wrapper totals for what-if comparison
+  const baseWrapperTotals = useMemo(() => {
+    const map = new Map<TaxWrapper, number>();
+    for (const a of filteredAccounts) {
+      const wrapper = getAccountTaxWrapper(a.type);
+      const baseVal = baseAccountValues.get(a.id) ?? a.currentValue;
+      map.set(wrapper, (map.get(wrapper) ?? 0) + baseVal);
+    }
+    return map;
+  }, [filteredAccounts, baseAccountValues]);
+
   return (
     <div className="space-y-8 p-4 md:p-8">
       <PageHeader title="Accounts" description="Overview of all accounts grouped by person.">
@@ -101,7 +112,9 @@ export default function AccountsPage() {
             <Card key={wrapper}>
               <CardContent className="pt-4 pb-3 px-4">
                 <div className="text-xs text-muted-foreground uppercase tracking-wider">{TAX_WRAPPER_LABELS[wrapper]}</div>
-                <div className="text-lg font-bold tabular-nums mt-1">{formatCurrency(total)}</div>
+                <div className="text-lg font-bold tabular-nums mt-1">
+                  <ScenarioDelta base={baseWrapperTotals.get(wrapper) ?? total} scenario={total} format={formatCurrency} />
+                </div>
               </CardContent>
             </Card>
           ))}

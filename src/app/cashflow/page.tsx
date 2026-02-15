@@ -24,10 +24,12 @@ import {
 import { SchoolFeeSummary } from "@/components/school-fee-summary";
 import { SchoolFeeTimelineChart } from "@/components/charts/school-fee-timeline-chart";
 import { generateSchoolFeeTimeline, findLastSchoolFeeYear } from "@/lib/school-fees";
+import { ScenarioDelta } from "@/components/scenario-delta";
 
 export default function CashFlowPage() {
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
+  const baseHousehold = scenarioData.baseHousehold;
   const { selectedView } = usePersonView();
 
   // --- Person filtering ---
@@ -92,6 +94,37 @@ export default function CashFlowPage() {
     };
   }, [data]);
 
+  // --- Base (un-overridden) metrics for what-if comparison ---
+  const baseFilteredHousehold = useMemo(() => {
+    if (selectedView === "household") return baseHousehold;
+    return {
+      ...baseHousehold,
+      persons: baseHousehold.persons.filter((p) => p.id === selectedView),
+      income: baseHousehold.income.filter((i) => i.personId === selectedView),
+      accounts: baseHousehold.accounts.filter((a) => a.personId === selectedView),
+      bonusStructures: baseHousehold.bonusStructures.filter((b) => b.personId === selectedView),
+      contributions: baseHousehold.contributions.filter((c) => c.personId === selectedView),
+    };
+  }, [baseHousehold, selectedView]);
+
+  // Use base growth rate (not scenario-derived) for base data comparison
+  const baseGrowthRate = useMemo(() => {
+    const rates = baseHousehold.retirement.scenarioRates;
+    return rates[Math.floor(rates.length / 2)] ?? 0.05;
+  }, [baseHousehold.retirement.scenarioRates]);
+
+  const baseData = useMemo(
+    () => generateLifetimeCashFlow(baseFilteredHousehold, baseGrowthRate).data,
+    [baseFilteredHousehold, baseGrowthRate]
+  );
+
+  const baseMetrics = useMemo(() => {
+    if (baseData.length === 0) return null;
+    const currentYear = baseData[0];
+    const shortfallYears = baseData.filter((d) => d.surplus < 0);
+    return { currentYear, shortfallYears };
+  }, [baseData]);
+
   if (filteredHousehold.persons.length === 0) {
     return (
       <div className="space-y-8">
@@ -148,7 +181,7 @@ export default function CashFlowPage() {
                 </span>
               </div>
               <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums">
-                {formatCurrencyCompact(metrics.currentYear.totalIncome)}
+                <ScenarioDelta base={baseMetrics?.currentYear.totalIncome ?? metrics.currentYear.totalIncome} scenario={metrics.currentYear.totalIncome} format={formatCurrencyCompact} />
               </span>
               <span className="mt-0.5 block text-[11px] text-muted-foreground">/year net</span>
             </CardContent>
@@ -166,7 +199,7 @@ export default function CashFlowPage() {
                 </span>
               </div>
               <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums">
-                {formatCurrencyCompact(metrics.currentYear.totalExpenditure)}
+                <ScenarioDelta base={baseMetrics?.currentYear.totalExpenditure ?? metrics.currentYear.totalExpenditure} scenario={metrics.currentYear.totalExpenditure} format={formatCurrencyCompact} />
               </span>
               <span className="mt-0.5 block text-[11px] text-muted-foreground">/year committed + lifestyle</span>
             </CardContent>
@@ -195,7 +228,11 @@ export default function CashFlowPage() {
                   ? "text-emerald-600 dark:text-emerald-400"
                   : "text-red-600 dark:text-red-400"
               }`}>
-                {metrics.currentYear.surplus >= 0 ? "+" : ""}{formatCurrencyCompact(metrics.currentYear.surplus)}
+                <ScenarioDelta
+                  base={baseMetrics?.currentYear.surplus ?? metrics.currentYear.surplus}
+                  scenario={metrics.currentYear.surplus}
+                  format={(n) => `${n >= 0 ? "+" : ""}${formatCurrencyCompact(n)}`}
+                />
               </span>
               <span className="mt-0.5 block text-[11px] text-muted-foreground">income less spending</span>
             </CardContent>
@@ -222,7 +259,12 @@ export default function CashFlowPage() {
               {metrics.shortfallYears.length > 0 ? (
                 <>
                   <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-amber-600 dark:text-amber-400">
-                    {metrics.shortfallYears.length} yr{metrics.shortfallYears.length !== 1 ? "s" : ""}
+                    <ScenarioDelta
+                      base={baseMetrics?.shortfallYears.length ?? metrics.shortfallYears.length}
+                      scenario={metrics.shortfallYears.length}
+                      format={(n) => `${Math.round(n)} yr${Math.round(n) !== 1 ? "s" : ""}`}
+                      showPercent={false}
+                    />
                   </span>
                   <span className="mt-0.5 block text-[11px] text-muted-foreground">
                     income below spending

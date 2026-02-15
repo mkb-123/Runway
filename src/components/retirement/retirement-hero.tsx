@@ -18,6 +18,7 @@ interface RetirementHeroProps {
   /** Base (un-overridden) values for what-if comparison */
   baseCurrentPot?: number;
   baseProgressPercent?: number;
+  baseRequiredPot?: number;
 }
 
 export function RetirementHero({
@@ -30,6 +31,7 @@ export function RetirementHero({
   totalStatePensionAnnual,
   baseCurrentPot,
   baseProgressPercent,
+  baseRequiredPot,
 }: RetirementHeroProps) {
   const remaining = requiredPot - currentPot;
   const clampedPercent = Math.min(progressPercent, 100);
@@ -82,7 +84,15 @@ export function RetirementHero({
             <div>
               <p className="text-muted-foreground">Target pot</p>
               <p className="text-lg font-bold font-mono">
-                {formatCurrencyCompact(requiredPot)}
+                {baseRequiredPot !== undefined ? (
+                  <ScenarioDelta
+                    base={baseRequiredPot}
+                    scenario={requiredPot}
+                    format={formatCurrencyCompact}
+                  />
+                ) : (
+                  formatCurrencyCompact(requiredPot)
+                )}
               </p>
             </div>
           </div>
