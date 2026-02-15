@@ -47,6 +47,7 @@ import { IhtTab } from "./components/iht-tab";
 import { CommitmentsTab } from "./components/commitments-tab";
 import { ChildrenTab } from "./components/children-tab";
 import { SettingsSummaryBar } from "./components/settings-summary-bar";
+import { EmmaImportDialog } from "./components/emma-import-dialog";
 
 // ============================================================
 // Settings Page — Thin Orchestrator
@@ -349,6 +350,10 @@ function SettingsPageInner() {
               <Upload className="size-3.5" />
               Import JSON
             </Button>
+            <EmmaImportDialog
+              household={household}
+              updateHousehold={updateHousehold}
+            />
             <input
               ref={fileInputRef}
               type="file"

@@ -14,7 +14,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (410 tests)
+- **Testing:** Vitest + Testing Library (459 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
@@ -223,6 +223,13 @@ Single source of truth. Never hardcode rates elsewhere.
 - `generateDeferredTranches(bonus, referenceDate?) → DeferredBonusTranche[]` — respects `vestingGapYears`
 - `totalProjectedDeferredValue(bonus, referenceDate?) → number`
 
+#### `emma-import.ts` — Emma App CSV Import
+- `parseEmmaCSV(csvText) → EmmaParseResult` — parse Emma CSV export into structured transactions
+- `analyzeEmmaSpending(transactions) → EmmaSpendingSummary` — derive monthly spending, category breakdown, recurring payments
+- `toCommittedOutgoings(suggestions) → CommittedOutgoing[]` — convert detected payments to Runway outgoings
+- Helpers: `parseCSVRow()`, `parseDate()`, `parseAmount()`
+- Types: `EmmaTransaction`, `EmmaParseResult`, `EmmaSpendingSummary`
+
 #### `recommendations.ts` — Actionable Financial Recommendations
 - `generateRecommendations(household) → Recommendation[]` — master function calling 10+ analyzers
 - Individual analyzers: `analyzeSalaryTaper`, `analyzePensionAllowance` (taper), `analyzeSalaryContribution`, `analyzePensionDeficit`, `analyzeISA`, `analyzeGIA`, `analyzeBedAndISA`, `analyzeCGTAllowance`, `analyzeStudentLoan`, `analyzeEmergencyFund`
@@ -322,6 +329,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | `commitments-tab.tsx` | Commitments | Committed outgoings (category, label, amount, frequency, dates), auto-synced school fees |
 | `iht-tab.tsx` | IHT | Property value, direct descendants toggle, gifts register |
 | `accounts-tab.tsx` | (inline) | Account type, provider, name, balance, cost basis |
+| `emma-import-dialog.tsx` | — | Emma CSV import dialog: upload, review spending analysis, apply outgoings |
 | `field-helpers.tsx` | — | Shared form input components (currency, date, percentage fields) |
 | `field-warning.tsx` | — | Validation warning component |
 
@@ -404,6 +412,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | `cash-flow.test.ts` | 24-month timeline: salary growth, bonus months, deferred vesting, term fees |
 | `migration.test.ts` | All 9 data migrations: old formats → current schema |
 | `tax-constants.test.ts` | Constants structure validation |
+| `emma-import.test.ts` | CSV parsing, date/amount parsing, spending analysis, recurring payment detection, category classification |
 
 ### Key Data Flows
 
