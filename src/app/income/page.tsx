@@ -102,7 +102,8 @@ export default function IncomePage() {
   const personAnalysis = useMemo(
     () =>
       persons.map((person) => {
-        const personIncome = income.find((i) => i.personId === person.id)!;
+        const personIncome = income.find((i) => i.personId === person.id);
+        if (!personIncome) return null;
         const bonus = bonusStructures.find((b) => b.personId === person.id);
         const contribTotals = getPersonContributionTotals(contributions, person.id);
 
@@ -142,7 +143,7 @@ export default function IncomePage() {
           studentLoan,
           takeHome,
         };
-      }),
+      }).filter((p): p is NonNullable<typeof p> => p !== null),
     [persons, income, bonusStructures, contributions]
   );
 
@@ -257,7 +258,7 @@ export default function IncomePage() {
   }, [personAnalysis, committedOutgoings, emergencyFund.monthlyLifestyleSpending, income]);
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-6 p-4 md:p-8">
       <PageHeader title="Income & Cash Flow" description="Detailed income tax breakdown, take-home pay, bonus structures, and cash flow analysis.">
         <PersonToggle />
       </PageHeader>
@@ -506,34 +507,34 @@ export default function IncomePage() {
                           </span>
                         </div>
                       )}
-                      <div className="flex items-baseline justify-between text-red-600">
+                      <div className="flex items-baseline justify-between text-red-600 dark:text-red-400">
                         <span>Income tax</span>
                         <span>-<ScenarioDelta base={base?.incomeTax ?? takeHome.incomeTax} scenario={takeHome.incomeTax} format={formatCurrency} /></span>
                       </div>
-                      <div className="flex items-baseline justify-between text-red-600">
+                      <div className="flex items-baseline justify-between text-red-600 dark:text-red-400">
                         <span>National Insurance</span>
                         <span>-<ScenarioDelta base={base?.ni ?? takeHome.ni} scenario={takeHome.ni} format={formatCurrency} /></span>
                       </div>
                       {takeHome.studentLoan > 0 && (
-                        <div className="flex items-baseline justify-between text-red-600">
+                        <div className="flex items-baseline justify-between text-red-600 dark:text-red-400">
                           <span>Student loan</span>
                           <span>-<ScenarioDelta base={base?.studentLoan ?? takeHome.studentLoan} scenario={takeHome.studentLoan} format={formatCurrency} /></span>
                         </div>
                       )}
-                      <div className="flex items-baseline justify-between text-red-600">
+                      <div className="flex items-baseline justify-between text-red-600 dark:text-red-400">
                         <span>Pension deduction</span>
                         <span>-<ScenarioDelta base={base?.pensionDeduction ?? takeHome.pensionDeduction} scenario={takeHome.pensionDeduction} format={formatCurrency} /></span>
                       </div>
                       <div className="border-t pt-3">
                         <div className="flex items-baseline justify-between">
                           <span className="text-lg font-semibold">Annual take-home</span>
-                          <span className="text-lg font-bold text-green-600">
+                          <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
                             <ScenarioDelta base={base?.takeHome ?? takeHome.takeHome} scenario={takeHome.takeHome} format={formatCurrency} />
                           </span>
                         </div>
                         <div className="mt-1 flex items-baseline justify-between">
                           <span className="text-muted-foreground">Monthly take-home</span>
-                          <span className="font-semibold text-green-600">
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                             <ScenarioDelta base={base?.monthlyTakeHome ?? takeHome.monthlyTakeHome} scenario={takeHome.monthlyTakeHome} format={formatCurrency} />
                           </span>
                         </div>
@@ -838,14 +839,14 @@ export default function IncomePage() {
               </div>
               <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-green-500 transition-all"
+                  className="h-full rounded-full bg-emerald-500/80 transition-all duration-500 ease-out"
                   style={{ width: `${Math.min(taxEfficiencyScore * 100, 100)}%` }}
                 />
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border p-3">
                   <div className="text-sm text-muted-foreground">ISA + Pension (tax-advantaged)</div>
-                  <div className="text-lg font-semibold text-green-600">
+                  <div className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(taxAdvantagedSavings)}
                   </div>
                 </div>

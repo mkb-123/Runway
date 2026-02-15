@@ -239,12 +239,12 @@ export default function IHTPage() {
           <CardTitle>Estate Value Estimator</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-3 mb-6">
+          <div className="grid gap-4 sm:grid-cols-3 mb-8">
             <div className="rounded-lg border p-4 text-center">
               <p className="text-sm text-muted-foreground">
                 Total Net Worth (all accounts)
               </p>
-              <p className="text-2xl font-bold">
+              <p className="text-2xl font-bold tabular-nums">
                 <ScenarioDelta base={baseIhtData.totalNetWorth} scenario={totalNetWorth} format={formatCurrency} />
               </p>
             </div>
@@ -252,7 +252,7 @@ export default function IHTPage() {
               <p className="text-sm text-muted-foreground">
                 Estimated Property Value
               </p>
-              <p className="text-2xl font-bold">
+              <p className="text-2xl font-bold tabular-nums">
                 {formatCurrency(propertyValue)}
               </p>
             </div>
@@ -260,7 +260,7 @@ export default function IHTPage() {
               <p className="text-sm text-muted-foreground">
                 Estimated Estate (excl. pensions)
               </p>
-              <p className="text-2xl font-bold">
+              <p className="text-2xl font-bold tabular-nums">
                 <ScenarioDelta base={baseIhtData.inEstate} scenario={inEstate} format={formatCurrency} />
               </p>
             </div>
@@ -358,13 +358,13 @@ export default function IHTPage() {
                 <p className="text-sm text-muted-foreground">
                   Estate Value (in estate)
                 </p>
-                <p className="text-2xl font-bold">
+                <p className="text-2xl font-bold tabular-nums">
                   <ScenarioDelta base={baseIhtData.inEstate} scenario={inEstate} format={formatCurrency} />
                 </p>
               </div>
               <div className="rounded-lg border p-4 text-center">
                 <p className="text-sm text-muted-foreground">Taxable Amount</p>
-                <p className="text-2xl font-bold">
+                <p className="text-2xl font-bold tabular-nums">
                   <ScenarioDelta base={baseIhtData.taxableAmount} scenario={taxableAmount} format={formatCurrency} />
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -375,7 +375,7 @@ export default function IHTPage() {
                 <p className="text-sm text-muted-foreground">
                   IHT Payable at {formatPercent(ihtRate)}
                 </p>
-                <p className="text-2xl font-bold text-destructive">
+                <p className="text-2xl font-bold tabular-nums text-destructive">
                   <ScenarioDelta base={baseIhtData.ihtLiability} scenario={ihtLiability} format={formatCurrency} />
                 </p>
               </div>
@@ -406,7 +406,7 @@ export default function IHTPage() {
                   <p className="text-sm font-medium text-muted-foreground">
                     Sheltered (Pensions - outside estate)
                   </p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl font-bold tabular-nums">
                     {formatCurrency(outsideEstate)}
                   </p>
                   <Badge variant="secondary" className="mt-1">
@@ -417,7 +417,7 @@ export default function IHTPage() {
                   <p className="text-sm font-medium text-muted-foreground">
                     Exposed (In estate)
                   </p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl font-bold tabular-nums">
                     {formatCurrency(inEstate)}
                   </p>
                   <Badge variant="secondary" className="mt-1">
@@ -506,7 +506,7 @@ export default function IHTPage() {
                   <p className="text-sm text-muted-foreground">
                     Annual Savings Into Estate (ISA + GIA)
                   </p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl font-bold tabular-nums">
                     {formatCurrency(annualSavingsInEstate)}
                   </p>
                 </div>
@@ -514,7 +514,7 @@ export default function IHTPage() {
                   <p className="text-sm text-muted-foreground">
                     Combined IHT Threshold
                   </p>
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl font-bold tabular-nums">
                     {formatCurrency(combinedThreshold)}
                   </p>
                 </div>

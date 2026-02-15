@@ -73,11 +73,11 @@ function computeWaterfallBars(data: WaterfallDataPoint[]): WaterfallBarEntry[] {
 function getBarColor(type: "income" | "deduction" | "subtotal"): string {
   switch (type) {
     case "income":
-      return "hsl(142, 71%, 45%)"; // green
+      return "hsl(152, 55%, 42%)"; // green
     case "deduction":
-      return "hsl(0, 72%, 51%)"; // red
+      return "hsl(0, 55%, 55%)"; // red
     case "subtotal":
-      return "hsl(221, 83%, 53%)"; // blue
+      return "hsl(221, 60%, 55%)"; // blue
   }
 }
 
@@ -98,11 +98,15 @@ export function CashFlowWaterfall({ data }: CashFlowWaterfallProps) {
             textAnchor="end"
             height={80}
             interval={0}
+            tickLine={false}
+            axisLine={false}
           />
           <YAxis
             tickFormatter={formatCurrencyAxis}
             tick={{ fontSize: 12 }}
             width={70}
+            tickLine={false}
+            axisLine={false}
           />
           <Tooltip
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

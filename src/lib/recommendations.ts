@@ -185,14 +185,19 @@ export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
         category: "isa",
         personId: person.id,
         personName: person.name,
-        actionUrl: "/settings",
+        actionUrl: "/settings?tab=household",
         plainAction: `Open or fund an ISA with up to £${isaAllowance.toLocaleString()}. Everything inside grows tax-free, forever.`,
       },
     ];
   }
 
   // Partially used — any remaining amount triggers recommendation
-  const monthsLeft = 12 - new Date().getMonth(); // rough estimate to April
+  // ISA year ends 5 April — calculate months remaining in tax year
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+  const taxYearEnd = new Date(currentMonth >= 3 && now.getDate() > 5 ? currentYear + 1 : currentYear, 3, 5);
+  const monthsLeft = Math.max(0, Math.round((taxYearEnd.getTime() - now.getTime()) / (30.44 * 24 * 60 * 60 * 1000)));
   const monthlyNeeded = Math.round(isaRemaining / Math.max(1, monthsLeft));
 
   return [
@@ -205,7 +210,7 @@ export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
       category: "isa",
       personId: person.id,
       personName: person.name,
-      actionUrl: "/settings",
+      actionUrl: "/settings?tab=household",
       plainAction: `Transfer £${isaRemaining.toLocaleString()} into your ISA before 5 April. You can't get this allowance back once the tax year ends.`,
     },
   ];
@@ -399,7 +404,7 @@ export function analyzeEmergencyFund(household: HouseholdData): Recommendation[]
       impact: `Shortfall of £${Math.round(shortfall).toLocaleString()}. Build cash reserves before investing.`,
       priority: shortfall > emergencyTarget * 0.5 ? "high" : "medium",
       category: "risk",
-      actionUrl: "/settings",
+      actionUrl: "/settings?tab=planning",
       plainAction: `You need £${Math.round(shortfall).toLocaleString()} more in easy-access savings to cover ${household.emergencyFund.targetMonths} months of expenses. Keep this separate from investments.`,
     },
   ];
@@ -431,7 +436,7 @@ export function analyzeExcessCash(household: HouseholdData): Recommendation[] {
       impact: `Consider investing the excess in ISA or pension for long-term growth.`,
       priority: "medium",
       category: "investment",
-      actionUrl: "/settings",
+      actionUrl: "/settings?tab=household",
       plainAction: `You have more cash than you need for emergencies. The extra £${Math.round(excessCash).toLocaleString()} could be working harder in an ISA or pension.`,
     },
   ];

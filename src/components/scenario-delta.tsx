@@ -46,17 +46,18 @@ export function ScenarioDelta({
       <span className="text-[0.8em] text-muted-foreground line-through decoration-muted-foreground/40">
         {format(base)}
       </span>
+      <span className="text-[0.7em] text-muted-foreground/60" aria-hidden="true">{"\u2192"}</span>
       <span>{format(scenario)}</span>
       {showPercent && base !== 0 && (
         <span
-          className={`text-[0.75em] font-medium ${
+          className={`text-[0.75em] font-medium rounded-full px-1.5 py-0.5 ${
             isPositive
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-red-600 dark:text-red-400"
+              ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-950/40"
+              : "text-red-700 bg-red-50 dark:text-red-300 dark:bg-red-950/40"
           }`}
         >
-          ({isPositive ? "+" : ""}
-          {pct.toFixed(1)}%)
+          {isPositive ? "+" : ""}
+          {pct.toFixed(1)}%
         </span>
       )}
     </span>

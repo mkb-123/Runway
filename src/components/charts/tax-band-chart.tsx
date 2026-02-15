@@ -52,11 +52,15 @@ export function TaxBandChart({ data, height = 200 }: TaxBandChartProps) {
             type="number"
             tickFormatter={formatCurrencyAxis}
             tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
           />
           <YAxis
             type="category"
             dataKey="name"
             tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
             width={80}
           />
           <Tooltip

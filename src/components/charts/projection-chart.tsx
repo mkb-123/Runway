@@ -15,11 +15,11 @@ import type { ScenarioProjection } from "@/lib/projections";
 import { formatCurrencyCompact } from "@/lib/format";
 
 const SCENARIO_COLORS = [
-  "#2563eb", // blue-600
-  "#16a34a", // green-600
-  "#9333ea", // purple-600
-  "#ea580c", // orange-600
-  "#0891b2", // cyan-600
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
 ];
 
 interface ProjectionChartProps {
@@ -60,10 +60,14 @@ export function ProjectionChart({
             dataKey="year"
             label={{ value: "Years", position: "insideBottom", offset: -5 }}
             tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
           />
           <YAxis
             tickFormatter={(value: number) => formatCurrencyCompact(value)}
             tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
             width={70}
           />
           <Tooltip
@@ -74,17 +78,22 @@ export function ProjectionChart({
             ]}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             labelFormatter={(label: any) => `Year ${label}`}
+            contentStyle={{
+              backgroundColor: "var(--card)",
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+            }}
           />
           <Legend />
           <ReferenceLine
             y={targetPot}
-            stroke="#dc2626"
+            stroke="var(--destructive)"
             strokeDasharray="8 4"
             strokeWidth={2}
             label={{
               value: `Target: ${formatCurrencyCompact(targetPot)}`,
               position: "right",
-              fill: "#dc2626",
+              fill: "var(--destructive)",
               fontSize: 12,
             }}
           />

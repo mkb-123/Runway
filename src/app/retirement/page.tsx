@@ -100,15 +100,16 @@ export default function RetirementPage() {
   // Progress
   const progressPercent = requiredPot > 0 ? (currentPot / requiredPot) * 100 : 0;
 
-  // Total annual contributions
-  const totalAnnualContributions = useMemo(
-    () =>
-      filteredContributions.reduce(
-        (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
-        0
-      ),
-    [filteredContributions]
-  );
+  // Total annual contributions (discretionary + employment pension)
+  const totalAnnualContributions = useMemo(() => {
+    const discretionary = filteredContributions.reduce(
+      (sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0
+    );
+    const employmentPension = income.reduce(
+      (sum, i) => sum + i.employeePensionContribution + i.employerPensionContribution, 0
+    );
+    return discretionary + employmentPension;
+  }, [filteredContributions, income]);
 
   // Total gross income
   const totalGrossIncome = useMemo(
@@ -172,14 +173,15 @@ export default function RetirementPage() {
   const baseProgressPercent =
     baseRequiredPot > 0 ? (baseCurrentPot / baseRequiredPot) * 100 : 0;
 
-  const baseTotalAnnualContributions = useMemo(
-    () =>
-      baseFilteredContributions.reduce(
-        (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
-        0
-      ),
-    [baseFilteredContributions]
-  );
+  const baseTotalAnnualContributions = useMemo(() => {
+    const discretionary = baseFilteredContributions.reduce(
+      (sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0
+    );
+    const employmentPension = baseIncome.reduce(
+      (sum, i) => sum + i.employeePensionContribution + i.employerPensionContribution, 0
+    );
+    return discretionary + employmentPension;
+  }, [baseFilteredContributions, baseIncome]);
 
   const baseTotalGrossIncome = useMemo(
     () => baseIncome.reduce((sum, i) => sum + i.grossSalary, 0),

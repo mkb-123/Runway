@@ -444,12 +444,13 @@ export function calculateProRataStatePension(qualifyingYears: number): number {
  */
 export function calculateAge(dateOfBirth: string, now: Date = new Date()): number {
   const dob = new Date(dateOfBirth);
+  if (isNaN(dob.getTime())) return 0;
   let age = now.getFullYear() - dob.getFullYear();
   const monthDiff = now.getMonth() - dob.getMonth();
   if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
     age--;
   }
-  return age;
+  return Math.max(0, age);
 }
 
 // --- Tax Efficiency ---

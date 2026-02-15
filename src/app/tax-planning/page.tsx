@@ -41,7 +41,7 @@ import { getPersonContributionTotals, getAccountTaxWrapper } from "@/types";
 import type { TaxWrapper } from "@/types";
 
 export default function TaxPlanningPage() {
-  const { getAccountsForPerson } = useData();
+  useData(); // keep context provider mounted
   const { selectedView } = usePersonView();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
@@ -62,7 +62,11 @@ export default function TaxPlanningPage() {
 
   const { income, contributions } = household;
 
-  const currentTaxYear = "2024/25";
+  const currentTaxYear = (() => {
+    const now = new Date();
+    const y = now.getMonth() >= 3 && now.getDate() > 5 ? now.getFullYear() : now.getFullYear() - 1;
+    return `${y}/${(y + 1) % 100}`;
+  })();
   const isaAllowance = UK_TAX_CONSTANTS.isaAnnualAllowance;
   const pensionAllowance = UK_TAX_CONSTANTS.pensionAnnualAllowance;
   const cgtAnnualExempt = UK_TAX_CONSTANTS.cgt.annualExemptAmount;
@@ -79,7 +83,7 @@ export default function TaxPlanningPage() {
       persons.map((person) => {
         const personIncome = income.find((i) => i.personId === person.id);
         const personContributions = getPersonContributionTotals(contributions, person.id);
-        const personAccounts = getAccountsForPerson(person.id);
+        const personAccounts = household.accounts.filter((a) => a.personId === person.id);
         const personGiaAccounts = personAccounts.filter((a) => a.type === "gia");
 
         // GIA value
@@ -184,7 +188,7 @@ export default function TaxPlanningPage() {
           baseTotalUnrealisedGain,
         };
       }),
-    [persons, income, contributions, getAccountsForPerson, isaAllowance, pensionAllowance, cgtAnnualExempt, baseIncomeLookup, baseHousehold.contributions, baseHousehold.accounts]
+    [persons, income, contributions, household.accounts, isaAllowance, pensionAllowance, cgtAnnualExempt, baseIncomeLookup, baseHousehold.contributions, baseHousehold.accounts]
   );
 
   // Pension modelling scenarios
@@ -341,7 +345,7 @@ export default function TaxPlanningPage() {
                             <p
                               className={`text-lg font-semibold ${
                                 totalUnrealisedGain >= 0
-                                  ? "text-green-600"
+                                  ? "text-emerald-600 dark:text-emerald-400"
                                   : "text-red-600"
                               }`}
                             >
@@ -365,7 +369,7 @@ export default function TaxPlanningPage() {
                           <p className="mb-2 text-sm font-medium">
                             Bed &amp; ISA Analysis
                           </p>
-                          <div className="grid grid-cols-3 gap-4 text-center">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                             <div>
                               <p className="text-muted-foreground text-xs">
                                 CGT Allowance Left
@@ -470,43 +474,47 @@ export default function TaxPlanningPage() {
                       )}
                     </div>
 
-                    <div className="mb-3 grid grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-muted-foreground text-sm">
-                          Current Pension Contributions
-                        </p>
-                        <p className="font-semibold">
-                          {formatCurrency(
-                            (personIncome?.employeePensionContribution ?? 0) +
-                              (personIncome?.employerPensionContribution ?? 0)
-                          )}
-                          <span className="text-muted-foreground text-xs">
-                            {" "}
-                            /yr (employee + employer)
-                          </span>
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-sm">
-                          Pension Allowance Used
-                        </p>
-                        <p className="font-semibold">
-                          {formatCurrency(
-                            personContributions.pensionContribution
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-sm">
-                          Remaining Allowance
-                        </p>
-                        <p className="font-semibold">
-                          {formatCurrency(
-                            pensionAllowance -
-                              personContributions.pensionContribution
-                          )}
-                        </p>
-                      </div>
+                    <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {(() => {
+                        const totalPensionUsed =
+                          (personIncome?.employeePensionContribution ?? 0) +
+                          (personIncome?.employerPensionContribution ?? 0) +
+                          personContributions.pensionContribution;
+                        return (
+                          <>
+                            <div>
+                              <p className="text-muted-foreground text-sm">
+                                Current Pension Contributions
+                              </p>
+                              <p className="font-semibold">
+                                {formatCurrency(totalPensionUsed)}
+                                <span className="text-muted-foreground text-xs">
+                                  {" "}
+                                  /yr (employee + employer + discretionary)
+                                </span>
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-sm">
+                                Pension Allowance Used
+                              </p>
+                              <p className="font-semibold">
+                                {formatCurrency(totalPensionUsed)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-sm">
+                                Remaining Allowance
+                              </p>
+                              <p className="font-semibold">
+                                {formatCurrency(
+                                  pensionAllowance - totalPensionUsed
+                                )}
+                              </p>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
 
                     <div className="overflow-x-auto">
@@ -556,7 +564,7 @@ export default function TaxPlanningPage() {
                                 {formatCurrency(scenario.incomeTax)}
                               </TableCell>
                               {isSalarySacrifice && (
-                                <TableCell className="text-right text-green-600">
+                                <TableCell className="text-right text-emerald-600 dark:text-emerald-400">
                                   {scenario.niSaving > 0
                                     ? formatCurrency(scenario.niSaving)
                                     : "--"}

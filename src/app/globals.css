@@ -124,6 +124,15 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  /* Tabular figures for all numeric displays — essential for financial data alignment */
+  td, th, [data-numeric], .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Smooth transitions for collapsible sections and cards */
+  [data-collapsible] {
+    transition: grid-template-rows 250ms ease-out;
   }
 }
 

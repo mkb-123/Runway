@@ -8,6 +8,7 @@
 import type { HouseholdData, DeferredBonusTranche } from "@/types";
 import { annualiseOutgoing } from "@/types";
 import type { CashFlowMonth } from "@/components/charts/cash-flow-timeline";
+import { calculateTakeHomePay } from "@/lib/tax";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -62,15 +63,18 @@ export function generateCashFlowTimeline(household: HouseholdData): CashFlowMont
 }
 
 /**
- * Calculate monthly salary for a given month offset from now.
- * Applies salary growth rate compound by year.
+ * Calculate monthly take-home salary for a given month offset from now.
+ * Applies salary growth rate compound by year, then computes net pay
+ * (after tax, NI, and pension deductions) for accurate cash flow.
  */
 function calculateMonthlySalaryForMonth(household: HouseholdData, monthOffset: number): number {
   const yearsElapsed = monthOffset / 12;
   return household.income.reduce((sum, inc) => {
     const growthRate = inc.salaryGrowthRate ?? 0;
     const grownSalary = inc.grossSalary * Math.pow(1 + growthRate, yearsElapsed);
-    return sum + grownSalary / 12;
+    const grownIncome = { ...inc, grossSalary: grownSalary };
+    const takeHome = calculateTakeHomePay(grownIncome);
+    return sum + takeHome.monthlyTakeHome;
   }, 0);
 }
 

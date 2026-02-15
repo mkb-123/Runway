@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 /**
  * Collapsible section header — reusable across all pages.
@@ -47,14 +47,12 @@ export function CollapsibleSection({
     <div>
       <button
         onClick={toggle}
-        className="flex w-full items-center justify-between rounded-lg border bg-card px-4 py-3 text-left transition-colors hover:bg-accent/50"
+        className="group flex w-full items-center justify-between rounded-lg border bg-card px-4 py-3 text-left transition-all duration-200 hover:bg-accent/50 hover:shadow-sm"
       >
-        <div className="flex items-center gap-2">
-          {isOpen ? (
-            <ChevronDown className="size-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="size-4 text-muted-foreground" />
-          )}
+        <div className="flex items-center gap-2.5">
+          <ChevronRight
+            className={`size-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+          />
           <span className="font-semibold text-sm">{title}</span>
         </div>
         {!isOpen && summary && (
@@ -63,7 +61,13 @@ export function CollapsibleSection({
           </span>
         )}
       </button>
-      {isOpen && <div className="mt-3">{children}</div>}
+      <div
+        className={`grid transition-all duration-250 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+      >
+        <div className="overflow-hidden">
+          <div className="mt-3">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }

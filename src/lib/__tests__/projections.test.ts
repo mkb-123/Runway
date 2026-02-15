@@ -306,6 +306,23 @@ describe("calculateAge", () => {
     const now = new Date("2025-02-28");
     expect(calculateAge("1992-02-29", now)).toBe(32);
   });
+
+  it("returns 0 for invalid date strings", () => {
+    const now = new Date("2024-06-15");
+    expect(calculateAge("not-a-date", now)).toBe(0);
+    expect(calculateAge("", now)).toBe(0);
+    expect(calculateAge("abc-13-99", now)).toBe(0);
+  });
+
+  it("returns 0 for future date of birth", () => {
+    const now = new Date("2024-06-15");
+    // DOB is 2 years in the future — should return 0, not negative
+    expect(calculateAge("2026-06-15", now)).toBe(0);
+    // DOB is 6 months in the future
+    expect(calculateAge("2024-12-25", now)).toBe(0);
+    // DOB is tomorrow
+    expect(calculateAge("2024-06-16", now)).toBe(0);
+  });
 });
 
 describe("calculateTaxEfficiencyScore", () => {

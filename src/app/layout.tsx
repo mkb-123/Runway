@@ -34,7 +34,7 @@ export default function RootLayout({
                 <ScenarioBanner />
                 <main
                   id="main-content"
-                  className="mx-auto max-w-screen-2xl px-4 py-6 sm:px-6 lg:px-8"
+                  className="mx-auto max-w-screen-2xl px-4 pt-6 pb-16 sm:px-6 sm:pb-20 lg:px-8"
                 >
                   {children}
                 </main>

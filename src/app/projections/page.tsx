@@ -18,7 +18,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/format";
 import { annualiseContribution } from "@/types";
-import { projectScenarios, projectScenariosWithGrowth, calculateRequiredPot } from "@/lib/projections";
+import { projectScenarios, projectScenariosWithGrowth, calculateAdjustedRequiredPot, calculateProRataStatePension } from "@/lib/projections";
 import { ProjectionChart } from "@/components/charts/projection-chart";
 
 const PROJECTION_YEARS = 30;
@@ -46,15 +46,21 @@ export default function ProjectionsPage() {
     [filteredAccounts]
   );
 
-  // Calculate total annual contributions (filtered)
-  const totalAnnualContributions = useMemo(
-    () =>
-      filteredContributions.reduce(
-        (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
-        0
-      ),
-    [filteredContributions]
-  );
+  // Calculate total annual contributions (discretionary + employment pension)
+  const filteredIncome = useMemo(() => {
+    if (selectedView === "household") return household.income;
+    return household.income.filter((i) => i.personId === selectedView);
+  }, [household.income, selectedView]);
+
+  const totalAnnualContributions = useMemo(() => {
+    const discretionary = filteredContributions.reduce(
+      (sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0
+    );
+    const employmentPension = filteredIncome.reduce(
+      (sum, i) => sum + i.employeePensionContribution + i.employerPensionContribution, 0
+    );
+    return discretionary + employmentPension;
+  }, [filteredContributions, filteredIncome]);
 
   // Monthly contributions
   const monthlyContributions = totalAnnualContributions / 12;
@@ -71,14 +77,27 @@ export default function ProjectionsPage() {
 
   const hasGrowthRate = weightedContributionGrowthRate > 0;
 
-  // Required pot from retirement config
+  // State pension total for adjusted required pot
+  const filteredPersons = useMemo(() => {
+    if (selectedView === "household") return household.persons;
+    return household.persons.filter((p) => p.id === selectedView);
+  }, [household.persons, selectedView]);
+
+  const totalStatePensionAnnual = useMemo(
+    () => filteredPersons.reduce((sum, p) => sum + calculateProRataStatePension(p.niQualifyingYears ?? 0), 0),
+    [filteredPersons]
+  );
+
+  // Required pot (adjusted for state pension, consistent with retirement page)
   const requiredPot = useMemo(
     () =>
-      calculateRequiredPot(
+      calculateAdjustedRequiredPot(
         retirement.targetAnnualIncome,
-        retirement.withdrawalRate
+        retirement.withdrawalRate,
+        retirement.includeStatePension,
+        totalStatePensionAnnual
       ),
-    [retirement.targetAnnualIncome, retirement.withdrawalRate]
+    [retirement.targetAnnualIncome, retirement.withdrawalRate, retirement.includeStatePension, totalStatePensionAnnual]
   );
 
   // Run projections — use growth-aware version if salary growth is configured
@@ -120,7 +139,7 @@ export default function ProjectionsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{formatCurrency(currentPot)}</p>
+            <p className="text-2xl font-bold tabular-nums">{formatCurrency(currentPot)}</p>
             <p className="text-xs text-muted-foreground mt-1">
               Total net worth across all accounts
             </p>
@@ -134,7 +153,7 @@ export default function ProjectionsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
+            <p className="text-2xl font-bold tabular-nums">
               {formatCurrency(totalAnnualContributions)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -150,7 +169,7 @@ export default function ProjectionsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{formatCurrency(requiredPot)}</p>
+            <p className="text-2xl font-bold tabular-nums">{formatCurrency(requiredPot)}</p>
             <p className="text-xs text-muted-foreground mt-1">
               {formatCurrency(retirement.targetAnnualIncome)}/yr at{" "}
               {formatPercent(retirement.withdrawalRate)} SWR

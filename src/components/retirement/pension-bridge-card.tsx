@@ -140,14 +140,14 @@ export function PensionBridgeCard({
               {formatCurrencyCompact(totalWealth)} total
             </span>
           </div>
-          <div className="relative h-6 w-full overflow-hidden rounded-full bg-muted">
+          <div className="relative h-4 w-full overflow-hidden rounded-full bg-muted">
             <div className="flex h-full">
               <div
-                className="h-full bg-blue-500 transition-all"
+                className="h-full bg-blue-500/80 transition-all duration-300 ease-out"
                 style={{ width: `${accessiblePercent}%` }}
               />
               <div
-                className="h-full bg-amber-500 transition-all"
+                className="h-full bg-amber-500/80 transition-all duration-300 ease-out"
                 style={{ width: `${lockedPercent}%` }}
               />
             </div>

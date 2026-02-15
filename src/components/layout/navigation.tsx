@@ -77,9 +77,9 @@ export function Navigation() {
           : "bg-background/95"
       )}
     >
-      <div className="mx-auto flex h-14 max-w-screen-2xl items-center px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-screen-2xl items-center px-4 sm:px-6 lg:px-8">
         {/* Logo / App Title */}
-        <Link href="/" className="mr-6 flex items-center gap-2 font-semibold">
+        <Link href="/" className="mr-8 flex items-center gap-2.5 text-lg font-bold tracking-tight">
           <Landmark className="size-5 text-primary" />
           <span>Runway</span>
         </Link>
@@ -88,7 +88,7 @@ export function Navigation() {
         <nav className="hidden flex-1 items-center gap-0.5 overflow-x-auto lg:flex">
           {navGroups.map((group) => (
             <div key={group.label} className="flex items-center">
-              <span className="mr-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+              <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">
                 {group.label}
               </span>
               {group.links.map((link) => {

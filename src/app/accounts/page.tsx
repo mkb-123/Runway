@@ -71,7 +71,7 @@ export default function AccountsPage() {
   );
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-6 p-4 md:p-8">
       <PageHeader title="Accounts" description="Overview of all accounts grouped by person.">
         <PersonToggle />
       </PageHeader>
@@ -177,10 +177,10 @@ export default function AccountsPage() {
       ))}
 
       {/* Grand total */}
-      <div className="rounded-lg border bg-muted/50 p-4">
+      <div className="rounded-xl border-0 bg-gradient-to-br from-primary/8 via-primary/4 to-card p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <span className="text-lg font-semibold">Grand Total</span>
-          <span className="text-2xl font-bold">
+          <span className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Grand Total</span>
+          <span className="text-3xl font-bold tracking-tight tabular-nums">
             <ScenarioDelta base={baseGrandTotal} scenario={grandTotal} format={formatCurrency} />
           </span>
         </div>

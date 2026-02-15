@@ -10,12 +10,12 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (226 tests)
+- **Testing:** Vitest + Testing Library (301 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
 
-- `src/app/` — Pages: dashboard, accounts, holdings, projections, retirement, income, tax-planning, allocation, iht, export, settings
+- `src/app/` — Pages: dashboard, accounts, projections, retirement, income, tax-planning, iht, export, settings
 - `src/components/ui/` — 26 shadcn/ui components
 - `src/components/charts/` — 15 financial visualization charts (Recharts)
 - `src/components/layout/` — Navigation
@@ -148,8 +148,6 @@ Most calculations are now extracted to `src/lib/` with tests. The following rema
 
 | Page | Inline Calculation | Risk |
 |------|--------------------|------|
-| `holdings/page.tsx` | Unrealised gain/loss aggregation | Floating-point drift across many holdings |
-| `allocation/page.tsx` | By-asset-class/region percentage aggregation | Same floating-point concern |
 | `retirement/page.tsx` | Mid-scenario rate selection | Array index assumption |
 | `retirement/page.tsx` | Savings rate: `contributions / grossIncome * 100` | Division by zero if no income |
 

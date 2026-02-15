@@ -46,11 +46,15 @@ export function CashFlowTimeline({ data }: CashFlowTimelineProps) {
           <XAxis
             dataKey="month"
             tick={{ fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
             tickFormatter={formatCurrencyAxis}
             tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
             width={70}
           />
           <Tooltip

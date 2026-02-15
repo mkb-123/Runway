@@ -100,11 +100,15 @@ export function RetirementDrawdownChart({
           <XAxis
             dataKey="age"
             tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
             label={{ value: "Age", position: "insideBottom", offset: -5 }}
           />
           <YAxis
             tickFormatter={formatCurrencyAxis}
             tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
             width={70}
           />
           <Tooltip
