@@ -19,8 +19,7 @@ import {
   projectSalaryTrajectory,
 } from "@/lib/projections";
 import { generateDeferredTranches, totalProjectedDeferredValue } from "@/lib/deferred-bonus";
-import { getPersonContributionTotals, annualiseOutgoing, OUTGOING_CATEGORY_LABELS, getDeferredBonus } from "@/types";
-import type { CommittedOutgoingCategory } from "@/types";
+import { getPersonContributionTotals, getDeferredBonus } from "@/types";
 import { SchoolFeeSummary } from "@/components/school-fee-summary";
 import {
   Table,
@@ -33,15 +32,9 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  CashFlowWaterfall,
-  type WaterfallDataPoint,
-} from "@/components/charts/cash-flow-waterfall";
 import { CashFlowTimeline } from "@/components/charts/cash-flow-timeline";
 import { generateCashFlowTimeline } from "@/lib/cash-flow";
 import { ScenarioDelta } from "@/components/scenario-delta";
-
-// projectedValue helper removed — now using totalProjectedDeferredValue from lib
 
 // --- Helper: student loan plan label ---
 function studentLoanLabel(plan: string): string {
@@ -66,7 +59,7 @@ export default function IncomePage() {
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
   const baseHousehold = scenarioData.baseHousehold;
-  const { persons: allPersons, income: allIncome, bonusStructures: allBonusStructures, contributions: allContributions, committedOutgoings, emergencyFund } = household;
+  const { persons: allPersons, income: allIncome, bonusStructures: allBonusStructures, contributions: allContributions } = household;
 
   const persons = useMemo(() => {
     if (selectedView === "household") return allPersons;
@@ -179,75 +172,12 @@ export default function IncomePage() {
     return map;
   }, [baseHousehold]);
 
-  // Compute combined waterfall data
+  // Tax Efficiency Score
   const {
-    waterfallData,
     totalSavings,
     taxAdvantagedSavings,
     taxEfficiencyScore,
   } = useMemo(() => {
-    const combinedGross = personAnalysis.reduce((sum, p) => sum + p.personIncome.grossSalary, 0);
-    const combinedTax = personAnalysis.reduce((sum, p) => sum + p.incomeTaxResult.tax, 0);
-    const combinedNI = personAnalysis.reduce((sum, p) => sum + p.niResult.ni, 0);
-    const combinedStudentLoan = personAnalysis.reduce((sum, p) => sum + p.studentLoan, 0);
-    const combinedPension = personAnalysis.reduce(
-      (sum, p) => sum + p.personIncome.employeePensionContribution,
-      0
-    );
-    const combinedTakeHome = personAnalysis.reduce((sum, p) => sum + p.takeHome.takeHome, 0);
-    const combinedISA = personAnalysis.reduce(
-      (sum, p) => sum + p.contributions.isaContribution,
-      0
-    );
-    const combinedGIA = personAnalysis.reduce(
-      (sum, p) => sum + p.contributions.giaContribution,
-      0
-    );
-    const annualLifestyle = emergencyFund.monthlyLifestyleSpending * 12;
-    const totalCommitted = committedOutgoings.reduce((s, o) => s + annualiseOutgoing(o.amount, o.frequency), 0);
-    const totalOutgoings = combinedTax + combinedNI + combinedStudentLoan + combinedPension + combinedISA + combinedGIA + totalCommitted + annualLifestyle;
-    const surplus = combinedGross - totalOutgoings;
-
-    const wfData: WaterfallDataPoint[] = [
-      { name: "Gross Income", value: combinedGross, type: "income" },
-      { name: "Income Tax", value: combinedTax, type: "deduction" },
-      { name: "National Insurance", value: combinedNI, type: "deduction" },
-      ...(combinedStudentLoan > 0
-        ? [{ name: "Student Loan", value: combinedStudentLoan, type: "deduction" as const }]
-        : []),
-      { name: "Employee Pension", value: combinedPension, type: "deduction" },
-      { name: "Take-Home Pay", value: combinedTakeHome, type: "subtotal" },
-      // Break committed outgoings down by category
-      ...(() => {
-        const byCategory = new Map<CommittedOutgoingCategory, number>();
-        for (const o of committedOutgoings) {
-          const annual = annualiseOutgoing(o.amount, o.frequency);
-          byCategory.set(o.category, (byCategory.get(o.category) ?? 0) + annual);
-        }
-        const entries: WaterfallDataPoint[] = [];
-        for (const [category, value] of byCategory) {
-          if (value > 0) {
-            entries.push({ name: OUTGOING_CATEGORY_LABELS[category], value, type: "deduction" });
-          }
-        }
-        if (entries.length <= 1 && totalCommitted > 0) {
-          return [{ name: "Committed Outgoings", value: totalCommitted, type: "deduction" as const }];
-        }
-        return entries;
-      })(),
-      ...(annualLifestyle > 0
-        ? [{ name: "Lifestyle", value: annualLifestyle, type: "deduction" as const }]
-        : []),
-      ...(combinedISA > 0
-        ? [{ name: "ISA Savings", value: combinedISA, type: "deduction" as const }]
-        : []),
-      ...(combinedGIA > 0
-        ? [{ name: "GIA Savings", value: combinedGIA, type: "deduction" as const }]
-        : []),
-      { name: surplus >= 0 ? "Surplus" : "Shortfall", value: Math.max(0, surplus), type: "subtotal" },
-    ];
-
-    // Tax Efficiency Score (via lib function)
     // Include ALL pension contributions: salary sacrifice/net pay from income + discretionary
     const totISA = personAnalysis.reduce((sum, p) => sum + p.contributions.isaContribution, 0);
     const discretionaryPension = personAnalysis.reduce((sum, p) => sum + p.contributions.pensionContribution, 0);
@@ -262,12 +192,11 @@ export default function IncomePage() {
     const taxEffScore = calculateTaxEfficiencyScore(totISA, totPension, totGIA);
 
     return {
-      waterfallData: wfData,
       totalSavings: totSavings,
       taxAdvantagedSavings: taxAdvSavings,
       taxEfficiencyScore: taxEffScore,
     };
-  }, [personAnalysis, committedOutgoings, emergencyFund.monthlyLifestyleSpending, income]);
+  }, [personAnalysis, income]);
 
   return (
     <div className="space-y-8 p-4 md:p-8">
@@ -634,17 +563,6 @@ export default function IncomePage() {
           </section>
         </CollapsibleSection>
       )}
-
-      {/* Cash Flow Waterfall */}
-      <CollapsibleSection title="Cash Flow Waterfall" summary="Gross income through deductions to savings" defaultOpen storageKey="income-waterfall">
-      <section>
-        <Card>
-          <CardContent className="pt-6">
-            <CashFlowWaterfall data={waterfallData} />
-          </CardContent>
-        </Card>
-      </section>
-      </CollapsibleSection>
 
       {/* School Fees — only when children exist */}
       {household.children.length > 0 && household.children.some((c) => c.schoolFeeAnnual > 0) && (

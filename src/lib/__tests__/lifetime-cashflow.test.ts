@@ -511,6 +511,90 @@ describe("generateLifetimeCashFlow with inflated outgoings", () => {
   });
 });
 
+describe("generateLifetimeCashFlow person filtering", () => {
+  it("filters to a single person when household is pre-filtered", () => {
+    const household = makeCoupleHousehold();
+    const fullResult = generateLifetimeCashFlow(household, 0.05);
+
+    // Filter household to just Jordan (p2)
+    const jordanHousehold: HouseholdData = {
+      ...household,
+      persons: household.persons.filter((p) => p.id === "p2"),
+      income: household.income.filter((i) => i.personId === "p2"),
+      accounts: household.accounts.filter((a) => a.personId === "p2"),
+      bonusStructures: household.bonusStructures.filter((b) => b.personId === "p2"),
+      contributions: household.contributions.filter((c) => c.personId === "p2"),
+    };
+    const jordanResult = generateLifetimeCashFlow(jordanHousehold, 0.05);
+
+    expect(jordanResult.primaryPersonName).toBe("Jordan");
+    expect(jordanResult.data.length).toBeGreaterThan(0);
+    // Events should only mention Jordan
+    for (const event of jordanResult.events) {
+      expect(event.label).toContain("Jordan");
+    }
+    // Jordan's solo income should be less than the full household
+    expect(jordanResult.data[0].employmentIncome).toBeLessThan(fullResult.data[0].employmentIncome);
+  });
+
+  it("shows only the selected person's accounts for drawdown", () => {
+    const household = makeCoupleHousehold();
+
+    // Alex has 500k pension + 150k ISA, Jordan has 200k SIPP + 50k cash
+    const alexHousehold: HouseholdData = {
+      ...household,
+      persons: household.persons.filter((p) => p.id === "p1"),
+      income: household.income.filter((i) => i.personId === "p1"),
+      accounts: household.accounts.filter((a) => a.personId === "p1"),
+      bonusStructures: household.bonusStructures.filter((b) => b.personId === "p1"),
+      contributions: household.contributions.filter((c) => c.personId === "p1"),
+    };
+    const jordanHousehold: HouseholdData = {
+      ...household,
+      persons: household.persons.filter((p) => p.id === "p2"),
+      income: household.income.filter((i) => i.personId === "p2"),
+      accounts: household.accounts.filter((a) => a.personId === "p2"),
+      bonusStructures: household.bonusStructures.filter((b) => b.personId === "p2"),
+      contributions: household.contributions.filter((c) => c.personId === "p2"),
+    };
+
+    const alexResult = generateLifetimeCashFlow(alexHousehold, 0.05);
+    const jordanResult = generateLifetimeCashFlow(jordanHousehold, 0.05);
+
+    // Post-retirement drawdown: Alex has much larger pots so should have more drawdown
+    const alexPostRetirement = alexResult.data.filter((d) => d.age >= 60);
+    const jordanPostRetirement = jordanResult.data.filter((d) => d.age >= 60);
+
+    const alexTotalDrawdown = alexPostRetirement.reduce(
+      (sum, d) => sum + d.pensionIncome + d.investmentIncome, 0
+    );
+    const jordanTotalDrawdown = jordanPostRetirement.reduce(
+      (sum, d) => sum + d.pensionIncome + d.investmentIncome, 0
+    );
+
+    expect(alexTotalDrawdown).toBeGreaterThan(jordanTotalDrawdown);
+  });
+
+  it("single-person result has no events for the other person", () => {
+    const household = makeCoupleHousehold();
+
+    const alexHousehold: HouseholdData = {
+      ...household,
+      persons: household.persons.filter((p) => p.id === "p1"),
+      income: household.income.filter((i) => i.personId === "p1"),
+      accounts: household.accounts.filter((a) => a.personId === "p1"),
+      bonusStructures: [],
+      contributions: [],
+    };
+    const result = generateLifetimeCashFlow(alexHousehold, 0.05);
+
+    expect(result.primaryPersonName).toBe("Alex");
+    for (const event of result.events) {
+      expect(event.label).not.toContain("Jordan");
+    }
+  });
+});
+
 describe("generateLifetimeCashFlow property: income consistency", () => {
   it("during working years, employment income is the dominant source", () => {
     const household = makeHousehold();

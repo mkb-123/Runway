@@ -30,6 +30,19 @@ export default function CashFlowPage() {
   const household = scenarioData.household;
   const { selectedView } = usePersonView();
 
+  // --- Person filtering ---
+  const filteredHousehold = useMemo(() => {
+    if (selectedView === "household") return household;
+    return {
+      ...household,
+      persons: household.persons.filter((p) => p.id === selectedView),
+      income: household.income.filter((i) => i.personId === selectedView),
+      accounts: household.accounts.filter((a) => a.personId === selectedView),
+      bonusStructures: household.bonusStructures.filter((b) => b.personId === selectedView),
+      contributions: household.contributions.filter((c) => c.personId === selectedView),
+    };
+  }, [household, selectedView]);
+
   // Use mid scenario rate for the projection
   const growthRate = useMemo(() => {
     const rates = household.retirement.scenarioRates;
@@ -38,8 +51,8 @@ export default function CashFlowPage() {
 
   // Generate lifetime cash flow data
   const { data, events, primaryPersonName } = useMemo(
-    () => generateLifetimeCashFlow(household, growthRate),
-    [household, growthRate]
+    () => generateLifetimeCashFlow(filteredHousehold, growthRate),
+    [filteredHousehold, growthRate]
   );
 
   // Key metrics
@@ -79,7 +92,7 @@ export default function CashFlowPage() {
     };
   }, [data]);
 
-  if (household.persons.length === 0) {
+  if (filteredHousehold.persons.length === 0) {
     return (
       <div className="space-y-8">
         <PageHeader title="Lifetime Cash Flow" description="Year-by-year income vs expenditure" />
@@ -108,7 +121,7 @@ export default function CashFlowPage() {
   );
   const hasSchoolFees = household.children.length > 0 && household.children.some((c) => c.schoolFeeAnnual > 0);
 
-  const primaryPerson = household.persons.find((p) => p.relationship === "self") ?? household.persons[0];
+  const primaryPerson = filteredHousehold.persons.find((p) => p.relationship === "self") ?? filteredHousehold.persons[0];
   const currentAge = calculateAge(primaryPerson.dateOfBirth);
 
   return (
