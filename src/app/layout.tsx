@@ -4,6 +4,7 @@ import { ScenarioBanner } from "@/components/scenario-banner";
 import { DataProvider } from "@/context/data-context";
 import { ScenarioProvider } from "@/context/scenario-context";
 import { PersonViewProvider } from "@/context/person-view-context";
+import { PrivacyProvider } from "@/context/privacy-context";
 import { ErrorBoundary } from "@/components/error-boundary";
 import "./globals.css";
 
@@ -24,20 +25,22 @@ export default function RootLayout({
           <DataProvider>
             <ScenarioProvider>
               <PersonViewProvider>
-                <a
-                  href="#main-content"
-                  className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none"
-                >
-                  Skip to main content
-                </a>
-                <Navigation />
-                <ScenarioBanner />
-                <main
-                  id="main-content"
-                  className="mx-auto max-w-screen-2xl px-4 pt-6 pb-16 sm:px-6 sm:pb-20 lg:px-8"
-                >
-                  {children}
-                </main>
+                <PrivacyProvider>
+                  <a
+                    href="#main-content"
+                    className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none"
+                  >
+                    Skip to main content
+                  </a>
+                  <Navigation />
+                  <ScenarioBanner />
+                  <main
+                    id="main-content"
+                    className="mx-auto max-w-screen-2xl px-4 pt-6 pb-16 sm:px-6 sm:pb-20 lg:px-8"
+                  >
+                    {children}
+                  </main>
+                </PrivacyProvider>
               </PersonViewProvider>
             </ScenarioProvider>
           </DataProvider>

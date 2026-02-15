@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { ScenarioPanel } from "@/components/scenario-panel";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PrivacyToggle } from "@/components/privacy-toggle";
 import { useScenario } from "@/context/scenario-context";
 
 // Navigation grouped into "Today" (current position) and "Plan" (future outlook)
@@ -139,12 +140,14 @@ export function Navigation() {
         {/* What-If Scenario Button + Theme Toggle */}
         <div className="ml-auto mr-2 hidden items-center gap-1 lg:flex">
           <ScenarioPanel />
+          <PrivacyToggle />
           <ThemeToggle />
         </div>
 
         {/* Mobile Navigation */}
         <div className="flex flex-1 items-center justify-end gap-1 lg:hidden">
           <ScenarioPanel />
+          <PrivacyToggle />
           <ThemeToggle />
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>

@@ -291,18 +291,22 @@ export default function CashFlowPage() {
           defaultOpen
           storageKey="cashflow-events"
         >
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="relative pl-6 space-y-0">
+            {/* Timeline line */}
+            <div className="absolute left-2.5 top-0 bottom-0 w-px bg-border" />
             {events
               .sort((a, b) => a.age - b.age)
               .map((event, i) => (
-                <Card key={`${event.age}-${event.label}-${i}`}>
-                  <CardContent className="flex items-center gap-3 py-3">
-                    <Badge variant="secondary" className="shrink-0 tabular-nums">
-                      Age {event.age}
-                    </Badge>
-                    <span className="text-sm">{event.label}</span>
-                  </CardContent>
-                </Card>
+                <div key={`${event.age}-${event.label}-${i}`} className="relative flex items-start gap-3 py-2">
+                  {/* Timeline dot */}
+                  <div className="absolute -left-6 top-3 flex size-5 items-center justify-center">
+                    <div className="size-2.5 rounded-full bg-primary ring-2 ring-background" />
+                  </div>
+                  <Badge variant="secondary" className="shrink-0 tabular-nums text-xs mt-0.5">
+                    {event.age}
+                  </Badge>
+                  <span className="text-sm text-foreground">{event.label}</span>
+                </div>
               ))}
           </div>
         </CollapsibleSection>
