@@ -136,6 +136,36 @@ export function getPersonContributionTotals(
   };
 }
 
+/**
+ * Get a person's total gross income (salary + cash bonus).
+ * Use this anywhere you need "gross income" — never use grossSalary alone.
+ */
+export function getPersonGrossIncome(
+  income: PersonIncome[],
+  bonusStructures: BonusStructure[],
+  personId: string
+): number {
+  const personIncome = income.find((i) => i.personId === personId);
+  const personBonus = bonusStructures.find((b) => b.personId === personId);
+  return (personIncome?.grossSalary ?? 0) + (personBonus?.cashBonusAnnual ?? 0);
+}
+
+/**
+ * Get the household's total gross income (all persons' salary + cash bonus).
+ * Use this for savings rate, tax threshold comparisons, etc.
+ */
+export function getHouseholdGrossIncome(
+  income: PersonIncome[],
+  bonusStructures: BonusStructure[]
+): number {
+  let total = 0;
+  for (const inc of income) {
+    const bonus = bonusStructures.find((b) => b.personId === inc.personId);
+    total += inc.grossSalary + (bonus?.cashBonusAnnual ?? 0);
+  }
+  return total;
+}
+
 export interface RetirementConfig {
   targetAnnualIncome: number;
   withdrawalRate: number; // e.g. 0.04 for 4% SWR

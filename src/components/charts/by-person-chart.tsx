@@ -29,7 +29,7 @@ const COLORS = [
 
 export function ByPersonChart({ data }: ByPersonChartProps) {
   return (
-    <div className="h-[400px] w-full">
+    <div className="h-[300px] sm:h-[400px] w-full" role="img" aria-label="Net worth distribution by household member">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie

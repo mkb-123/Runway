@@ -104,15 +104,18 @@ export function PlanningTab({ household, updateHousehold }: PlanningTabProps) {
               <Input
                 type="number"
                 step="0.01"
+                min="0.01"
+                max="100"
                 value={
                   Math.round(household.retirement.withdrawalRate * 100 * 100) / 100
                 }
-                onChange={(e) =>
-                  updateRetirement("withdrawalRate", Number(e.target.value) / 100)
-                }
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  if (val > 0) updateRetirement("withdrawalRate", val / 100);
+                }}
                 placeholder="4"
               />,
-              "The 4% rule is a common starting point"
+              "The 4% rule is a common starting point (must be greater than 0)"
             )}
             {renderField(
               "Include State Pension",

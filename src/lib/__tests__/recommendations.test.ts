@@ -761,4 +761,34 @@ describe("analyzeSavingsRate", () => {
 
     expect(analyzeSavingsRate(household)).toHaveLength(0);
   });
+
+  it("includes cash bonus in gross income denominator", () => {
+    // Salary: £100k, Cash bonus: £50k → total gross = £150k
+    // Contributions: £15k → 15k/150k = 10% < 15% → should flag
+    // Without bonus: 15k/100k = 15% → would NOT flag (bug)
+    const household = makeHousehold({
+      income: [makeIncome({
+        grossSalary: 100000,
+        employeePensionContribution: 0,
+        employerPensionContribution: 0,
+      })],
+      bonusStructures: [{
+        personId: "person-1",
+        totalBonusAnnual: 50000,
+        cashBonusAnnual: 50000,
+        vestingYears: 0,
+        vestingGapYears: 0,
+        estimatedAnnualReturn: 0.07,
+      }],
+      contributions: makeContributions("person-1", {
+        isaContribution: 10000,
+        pensionContribution: 5000,
+        giaContribution: 0,
+      }),
+    });
+
+    const recs = analyzeSavingsRate(household);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].id).toBe("low-savings-rate");
+  });
 });

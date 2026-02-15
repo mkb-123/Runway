@@ -8,6 +8,7 @@ import {
   TAX_WRAPPER_LABELS,
   getAccountTaxWrapper,
   getPersonContributionTotals,
+  getHouseholdGrossIncome,
   annualiseContribution,
   annualiseOutgoing,
 } from "@/types";
@@ -30,7 +31,6 @@ import {
   calculatePensionBridge,
   calculateCoastFIRE,
   calculateRequiredSavings,
-  calculateProRataStatePension,
   calculateAge,
   calculateTaxEfficiencyScore,
   calculateTaperedAnnualAllowance,
@@ -44,6 +44,7 @@ import {
 } from "@/lib/cgt";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { generateRecommendations } from "@/lib/recommendations";
+import { calculateHouseholdStatePension } from "@/lib/aggregations";
 import { FileSpreadsheet, Printer } from "lucide-react";
 import Link from "next/link";
 
@@ -241,10 +242,7 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
   // Sheet 6: Retirement
   // ============================
   const { retirement } = household;
-  const totalStatePension = household.persons.reduce(
-    (sum, p) => sum + calculateProRataStatePension(p.niQualifyingYears ?? 0),
-    0
-  );
+  const totalStatePension = calculateHouseholdStatePension(household.persons);
   const requiredPot = calculateAdjustedRequiredPot(
     retirement.targetAnnualIncome,
     retirement.withdrawalRate,
@@ -283,7 +281,7 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
   const coastFireReached = calculateCoastFIRE(grandTotal, requiredPot, retAge, currentAge, midRate);
   const yearsToRetire = Math.max(0, retAge - currentAge);
   const coastFireNumber = yearsToRetire > 0 ? requiredPot / Math.pow(1 + midRate, yearsToRetire) : requiredPot;
-  const grossIncome = household.income.reduce((s, i) => s + i.grossSalary, 0);
+  const grossIncome = getHouseholdGrossIncome(household.income, household.bonusStructures);
   const savingsRate = grossIncome > 0 ? (totalAnnualContribs / grossIncome) * 100 : 0;
 
   const retRows: Record<string, string | number>[] = [
@@ -417,8 +415,9 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
     const gains = getUnrealisedGains(giaAccounts);
     const totalGain = gains.reduce((s, g) => s + g.unrealisedGain, 0);
     const inc = household.income.find((i) => i.personId === person.id);
+    const bonus = household.bonusStructures.find((b) => b.personId === person.id);
     const cgtRate = inc
-      ? determineCgtRate(inc.grossSalary, inc.employeePensionContribution, inc.pensionContributionMethod)
+      ? determineCgtRate(inc.grossSalary + (bonus?.cashBonusAnnual ?? 0), inc.employeePensionContribution, inc.pensionContributionMethod)
       : UK_TAX_CONSTANTS.cgt.basicRate;
     const bedISA = calculateBedAndISA(totalGain, UK_TAX_CONSTANTS.cgt.annualExemptAmount, cgtRate);
     const breakEven = calculateBedAndISABreakEven(bedISA.cgtCost, personGia, cgtRate);

@@ -2,6 +2,7 @@
 
 import { formatCurrencyCompact } from "@/lib/format";
 import type { HouseholdData } from "@/types";
+import { getHouseholdGrossIncome } from "@/types";
 
 interface SettingsSummaryBarProps {
   household: HouseholdData;
@@ -13,10 +14,7 @@ export function SettingsSummaryBar({ household }: SettingsSummaryBarProps) {
     0
   );
 
-  const totalIncome = household.income.reduce(
-    (sum, i) => sum + i.grossSalary,
-    0
-  );
+  const totalIncome = getHouseholdGrossIncome(household.income, household.bonusStructures);
 
   const retirementTarget = household.retirement.targetAnnualIncome;
   const withdrawalRate = household.retirement.withdrawalRate;

@@ -37,7 +37,7 @@ const OUTGOING_COLOR = "hsl(0, 72%, 60%)"; // red
 
 export function CashFlowTimeline({ data }: CashFlowTimelineProps) {
   return (
-    <div className="h-[400px] w-full">
+    <div className="h-[300px] sm:h-[400px] w-full" role="img" aria-label="Monthly cash flow projection over 24 months">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data}

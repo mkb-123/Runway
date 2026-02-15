@@ -121,6 +121,8 @@ export interface GrowingProjectionParams {
   investmentReturnRate: number;
   /** Number of years to project */
   years: number;
+  /** Years until retirement — contributions stop growing and drop to zero after this. If omitted, contributions grow for the full projection period. */
+  yearsOfContributions?: number;
 }
 
 /**
@@ -142,8 +144,10 @@ export function projectCompoundGrowthWithGrowingContributions(
     contributionGrowthRate,
     investmentReturnRate,
     years,
+    yearsOfContributions,
   } = params;
 
+  const maxContribYear = yearsOfContributions ?? years;
   const projections: YearlyProjection[] = [];
   let value = currentValue;
   let contribution = annualContribution;
@@ -151,11 +155,13 @@ export function projectCompoundGrowthWithGrowingContributions(
   for (let year = 1; year <= years; year++) {
     // Pot grows through the year
     value = value * (1 + investmentReturnRate);
-    // Contribution made at year-end (simplified from monthly for clarity)
-    value += contribution;
+    // Add contributions only while still working (before retirement)
+    if (year <= maxContribYear) {
+      value += contribution;
+      // Contribution grows for next year (while still employed)
+      contribution *= 1 + contributionGrowthRate;
+    }
     projections.push({ year, value: roundPence(value) });
-    // Contribution grows for next year
-    contribution *= 1 + contributionGrowthRate;
   }
 
   return projections;
@@ -169,7 +175,8 @@ export function projectScenariosWithGrowth(
   annualContribution: number,
   contributionGrowthRate: number,
   rates: number[],
-  years: number
+  years: number,
+  yearsOfContributions?: number
 ): ScenarioProjection[] {
   return rates.map((rate) => ({
     rate,
@@ -178,6 +185,7 @@ export function projectScenariosWithGrowth(
       annualContribution,
       contributionGrowthRate,
       investmentReturnRate: rate,
+      yearsOfContributions,
       years,
     }),
   }));
@@ -362,7 +370,7 @@ export function calculateSWR(pot: number, rate: number): number {
  * @param rate - Safe withdrawal rate as a decimal (e.g. 0.04 for 4%)
  */
 export function calculateRequiredPot(annualIncome: number, rate: number): number {
-  if (rate <= 0) return Infinity;
+  if (rate <= 0) return 0;
   return roundPence(annualIncome / rate);
 }
 

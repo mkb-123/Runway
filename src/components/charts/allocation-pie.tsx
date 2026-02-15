@@ -54,7 +54,7 @@ export function AllocationPie({
   }
 
   return (
-    <div style={{ height }} className="w-full">
+    <div style={{ height }} className="w-full" role="img" aria-label="Asset allocation breakdown by account type">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
