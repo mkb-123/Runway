@@ -2,6 +2,11 @@
 // UK Tax Constants - 2024/25 Tax Year
 // ============================================================
 
+/** The tax year these constants apply to. Format: "YYYY/YY" */
+export const TAX_YEAR = "2024/25";
+/** The April start date of the NEXT tax year (when these constants become stale) */
+export const TAX_YEAR_END = "2025-04-06";
+
 export const UK_TAX_CONSTANTS = {
   // --- Income Tax ---
   personalAllowance: 12_570,

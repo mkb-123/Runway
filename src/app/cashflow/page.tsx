@@ -112,7 +112,7 @@ export default function CashFlowPage() {
   const currentAge = calculateAge(primaryPerson.dateOfBirth);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4 md:p-8">
       <PageHeader
         title="Lifetime Cash Flow"
         description={`${primaryPersonName}'s household \u2014 age ${currentAge} to 95 at ${(growthRate * 100).toFixed(0)}% growth`}

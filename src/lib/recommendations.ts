@@ -23,7 +23,7 @@ import type {
   Person,
   Account,
 } from "@/types";
-import { getPersonContributionTotals, annualiseContribution } from "@/types";
+import { getPersonContributionTotals, getHouseholdGrossIncome, annualiseContribution } from "@/types";
 import { calculateIncomeTax, calculateNI } from "@/lib/tax";
 import { getUnrealisedGains } from "@/lib/cgt";
 import { calculateTaperedAnnualAllowance } from "@/lib/projections";
@@ -444,7 +444,7 @@ export function analyzeExcessCash(household: HouseholdData): Recommendation[] {
 
 /** 9. Savings rate tracker */
 export function analyzeSavingsRate(household: HouseholdData): Recommendation[] {
-  const totalGrossIncome = household.income.reduce((s, i) => s + i.grossSalary, 0);
+  const totalGrossIncome = getHouseholdGrossIncome(household.income, household.bonusStructures);
   if (totalGrossIncome <= 0) return [];
 
   // Include ALL savings: discretionary contributions + employee & employer pension contributions
@@ -473,7 +473,7 @@ export function analyzeSavingsRate(household: HouseholdData): Recommendation[] {
       impact: `Increasing to 15% would mean saving £${targetContrib.toLocaleString()}/yr — an extra £${increase.toLocaleString()}/yr.`,
       priority: savingsRate < 0.05 ? "high" : "medium",
       category: "retirement",
-      actionUrl: "/retirement",
+      actionUrl: "/settings?tab=household",
       plainAction: `You're saving ${savingsPercent}% of your income. Try to get this to 15% by increasing ISA or pension contributions by £${Math.round(increase / 12).toLocaleString()}/month.`,
     },
   ];

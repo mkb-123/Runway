@@ -85,7 +85,7 @@ export function CashFlowWaterfall({ data }: CashFlowWaterfallProps) {
   const bars = computeWaterfallBars(data);
 
   return (
-    <div className="h-[400px] w-full">
+    <div className="h-[300px] sm:h-[400px] w-full" role="img" aria-label="Income and deductions waterfall breakdown">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={bars}

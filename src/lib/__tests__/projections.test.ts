@@ -233,8 +233,12 @@ describe("calculateRequiredPot", () => {
     expect(at3).toBeGreaterThan(at4);
   });
 
-  it("handles zero rate", () => {
-    expect(calculateRequiredPot(40000, 0)).toBe(Infinity);
+  it("returns zero for zero rate instead of Infinity", () => {
+    expect(calculateRequiredPot(40000, 0)).toBe(0);
+  });
+
+  it("returns zero for negative rate", () => {
+    expect(calculateRequiredPot(40000, -0.01)).toBe(0);
   });
 });
 
@@ -531,6 +535,32 @@ describe("projectCompoundGrowthWithGrowingContributions", () => {
     // Pure compound growth
     expect(result[0].value).toBe(107000);
     expect(result[1].value).toBeCloseTo(114490, 0);
+  });
+
+  it("stops contributions after yearsOfContributions (retirement)", () => {
+    // Contributions for 5 years, then investment-only for 5 more years
+    const withCap = projectCompoundGrowthWithGrowingContributions({
+      currentValue: 100000,
+      annualContribution: 10000,
+      contributionGrowthRate: 0.03,
+      investmentReturnRate: 0.07,
+      years: 10,
+      yearsOfContributions: 5,
+    });
+    // No cap — contributions for all 10 years
+    const noCap = projectCompoundGrowthWithGrowingContributions({
+      currentValue: 100000,
+      annualContribution: 10000,
+      contributionGrowthRate: 0.03,
+      investmentReturnRate: 0.07,
+      years: 10,
+    });
+    // With cap should be lower since no contributions after year 5
+    expect(withCap[9].value).toBeLessThan(noCap[9].value);
+    // First 5 years should be identical
+    expect(withCap[4].value).toBe(noCap[4].value);
+    // Year 6 onward: capped version is lower (no contribution added)
+    expect(withCap[5].value).toBeLessThan(noCap[5].value);
   });
 });
 

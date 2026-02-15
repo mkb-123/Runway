@@ -270,7 +270,7 @@ export default function IncomePage() {
   }, [personAnalysis, committedOutgoings, emergencyFund.monthlyLifestyleSpending, income]);
 
   return (
-    <div className="space-y-6 p-4 md:p-8">
+    <div className="space-y-8 p-4 md:p-8">
       <PageHeader title="Income & Cash Flow" description="Detailed income tax breakdown, take-home pay, bonus structures, and cash flow analysis.">
         <PersonToggle />
       </PageHeader>

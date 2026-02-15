@@ -105,7 +105,7 @@ export function LiquiditySplitChart({ accounts }: LiquiditySplitChartProps) {
       </div>
 
       {/* Horizontal bar chart */}
-      <div className="h-[180px] w-full">
+      <div className="h-[180px] w-full" role="img" aria-label="Liquidity breakdown showing accessible versus locked-in assets">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={buckets}

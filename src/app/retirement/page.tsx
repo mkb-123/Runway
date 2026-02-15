@@ -7,7 +7,8 @@ import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { getAccountTaxWrapper, annualiseContribution, isAccountAccessible } from "@/types";
+import { getAccountTaxWrapper, isAccountAccessible, getHouseholdGrossIncome, annualiseContribution } from "@/types";
+import { calculateTotalAnnualContributions, calculateHouseholdStatePension } from "@/lib/aggregations";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -66,6 +67,11 @@ export default function RetirementPage() {
     return household.contributions.filter((c) => c.personId === selectedView);
   }, [household.contributions, selectedView]);
 
+  const bonusStructures = useMemo(() => {
+    if (selectedView === "household") return household.bonusStructures;
+    return household.bonusStructures.filter((b) => b.personId === selectedView);
+  }, [household.bonusStructures, selectedView]);
+
   const currentPot = useMemo(
     () => accounts.reduce((sum, a) => sum + a.currentValue, 0),
     [accounts]
@@ -75,12 +81,7 @@ export default function RetirementPage() {
 
   // Household total state pension
   const totalStatePensionAnnual = useMemo(
-    () =>
-      persons.reduce(
-        (sum, p) =>
-          sum + calculateProRataStatePension(p.niQualifyingYears ?? 0),
-        0
-      ),
+    () => calculateHouseholdStatePension(persons),
     [persons]
   );
 
@@ -105,20 +106,15 @@ export default function RetirementPage() {
   const progressPercent = requiredPot > 0 ? (currentPot / requiredPot) * 100 : 0;
 
   // Total annual contributions (discretionary + employment pension)
-  const totalAnnualContributions = useMemo(() => {
-    const discretionary = filteredContributions.reduce(
-      (sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0
-    );
-    const employmentPension = income.reduce(
-      (sum, i) => sum + i.employeePensionContribution + i.employerPensionContribution, 0
-    );
-    return discretionary + employmentPension;
-  }, [filteredContributions, income]);
+  const totalAnnualContributions = useMemo(
+    () => calculateTotalAnnualContributions(filteredContributions, income),
+    [filteredContributions, income]
+  );
 
-  // Total gross income
+  // Total gross income (salary + cash bonus)
   const totalGrossIncome = useMemo(
-    () => income.reduce((sum, i) => sum + i.grossSalary, 0),
-    [income]
+    () => getHouseholdGrossIncome(income, bonusStructures),
+    [income, bonusStructures]
   );
 
   // Savings rate (guard against division by zero)
@@ -154,12 +150,7 @@ export default function RetirementPage() {
   );
 
   const baseTotalStatePensionAnnual = useMemo(
-    () =>
-      basePersons.reduce(
-        (sum, p) =>
-          sum + calculateProRataStatePension(p.niQualifyingYears ?? 0),
-        0
-      ),
+    () => calculateHouseholdStatePension(basePersons),
     [basePersons]
   );
 
@@ -177,15 +168,10 @@ export default function RetirementPage() {
   const baseProgressPercent =
     baseRequiredPot > 0 ? (baseCurrentPot / baseRequiredPot) * 100 : 0;
 
-  const baseTotalAnnualContributions = useMemo(() => {
-    const discretionary = baseFilteredContributions.reduce(
-      (sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0
-    );
-    const employmentPension = baseIncome.reduce(
-      (sum, i) => sum + i.employeePensionContribution + i.employerPensionContribution, 0
-    );
-    return discretionary + employmentPension;
-  }, [baseFilteredContributions, baseIncome]);
+  const baseTotalAnnualContributions = useMemo(
+    () => calculateTotalAnnualContributions(baseFilteredContributions, baseIncome),
+    [baseFilteredContributions, baseIncome]
+  );
 
   const baseTotalGrossIncome = useMemo(
     () => baseIncome.reduce((sum, i) => sum + i.grossSalary, 0),
@@ -367,7 +353,7 @@ export default function RetirementPage() {
   }, [persons, accounts, personContribBreakdown, yearsToRetirement, midRate]);
 
   return (
-    <div className="space-y-6 p-4 md:p-8">
+    <div className="space-y-8 p-4 md:p-8">
       <PageHeader
         title="Retirement Planning"
         description="Track your progress toward financial independence"

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Navigation } from "@/components/layout/navigation";
 import { ScenarioBanner } from "@/components/scenario-banner";
+import { SaveErrorBanner } from "@/components/save-error-banner";
+import { TaxYearBanner } from "@/components/tax-year-banner";
 import { DataProvider } from "@/context/data-context";
 import { ScenarioProvider } from "@/context/scenario-context";
 import { PersonViewProvider } from "@/context/person-view-context";
@@ -33,6 +35,8 @@ export default function RootLayout({
                     Skip to main content
                   </a>
                   <Navigation />
+                  <SaveErrorBanner />
+                  <TaxYearBanner />
                   <ScenarioBanner />
                   <main
                     id="main-content"

@@ -26,6 +26,12 @@ import type {
 } from "@/types";
 import { getAccountTaxWrapper } from "@/types";
 import { roundPence } from "@/lib/format";
+import {
+  getTotalNetWorth as computeTotalNetWorth,
+  getNetWorthByPerson as computeNetWorthByPerson,
+  getNetWorthByWrapper as computeNetWorthByWrapper,
+  getNetWorthByAccountType as computeNetWorthByAccountType,
+} from "@/lib/aggregations";
 import { z } from "zod";
 import {
   HouseholdDataSchema,
@@ -73,6 +79,8 @@ interface DataContextValue {
   household: HouseholdData;
   snapshots: SnapshotsData;
   isHydrated: boolean;
+  saveError: string | null;
+  dismissSaveError: () => void;
   updateHousehold: (data: HouseholdData) => void;
   updateSnapshots: (data: SnapshotsData) => void;
   resetToDefaults: () => void;
@@ -117,12 +125,17 @@ function loadFromLocalStorage<T>(key: string, schema: z.ZodType<T>, migrate?: (r
   }
 }
 
-function saveToLocalStorage<T>(key: string, value: T): void {
-  if (typeof window === "undefined") return;
+function saveToLocalStorage<T>(key: string, value: T): string | null {
+  if (typeof window === "undefined") return null;
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Silently fail if localStorage is full or unavailable
+    return null;
+  } catch (e) {
+    const message = e instanceof DOMException && e.name === "QuotaExceededError"
+      ? "Storage is full. Your changes may not be saved. Try exporting your data and clearing old snapshots."
+      : "Unable to save data. You may be in private browsing mode or storage is unavailable.";
+    console.warn(`[Runway] localStorage write failed for "${key}":`, e);
+    return message;
   }
 }
 
@@ -180,6 +193,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [household, setHousehold] = useState<HouseholdData>(defaultHousehold);
   const [snapshots, setSnapshots] = useState<SnapshotsData>(defaultSnapshots);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const dismissSaveError = useCallback(() => setSaveError(null), []);
 
   // Hydrate from localStorage on mount (client only)
   useEffect(() => {
@@ -214,12 +230,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const updateHousehold = useCallback((data: HouseholdData) => {
     setHousehold(data);
-    saveToLocalStorage(LS_KEY_HOUSEHOLD, data);
+    const error = saveToLocalStorage(LS_KEY_HOUSEHOLD, data);
+    if (error) setSaveError(error);
   }, []);
 
   const updateSnapshots = useCallback((data: SnapshotsData) => {
     setSnapshots(data);
-    saveToLocalStorage(LS_KEY_SNAPSHOTS, data);
+    const error = saveToLocalStorage(LS_KEY_SNAPSHOTS, data);
+    if (error) setSaveError(error);
   }, []);
 
   const resetToDefaults = useCallback(() => {
@@ -266,67 +284,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [household]
   );
 
-  const getNetWorthByPerson = useCallback((): {
-    personId: string;
-    name: string;
-    value: number;
-  }[] => {
-    return household.persons.map((person) => {
-      const accounts = household.accounts.filter(
-        (a) => a.personId === person.id
-      );
-      const value = accounts.reduce((sum, acc) => sum + acc.currentValue, 0);
-      return {
-        personId: person.id,
-        name: person.name,
-        value: roundPence(value),
-      };
-    });
-  }, [household]);
+  const getNetWorthByPerson = useCallback(
+    () => computeNetWorthByPerson(household),
+    [household]
+  );
 
-  const getNetWorthByWrapper = useCallback((): {
-    wrapper: TaxWrapper;
-    value: number;
-  }[] => {
-    const totals = new Map<TaxWrapper, number>();
+  const getNetWorthByWrapper = useCallback(
+    () => computeNetWorthByWrapper(household),
+    [household]
+  );
 
-    for (const account of household.accounts) {
-      const wrapper = getAccountTaxWrapper(account.type);
-      totals.set(wrapper, (totals.get(wrapper) ?? 0) + account.currentValue);
-    }
+  const getNetWorthByAccountType = useCallback(
+    () => computeNetWorthByAccountType(household),
+    [household]
+  );
 
-    return Array.from(totals.entries()).map(([wrapper, value]) => ({
-      wrapper,
-      value: roundPence(value),
-    }));
-  }, [household]);
-
-  const getNetWorthByAccountType = useCallback((): {
-    type: AccountType;
-    value: number;
-  }[] => {
-    const totals = new Map<AccountType, number>();
-
-    for (const account of household.accounts) {
-      totals.set(
-        account.type,
-        (totals.get(account.type) ?? 0) + account.currentValue
-      );
-    }
-
-    return Array.from(totals.entries()).map(([type, value]) => ({
-      type,
-      value: roundPence(value),
-    }));
-  }, [household]);
-
-  const getTotalNetWorth = useCallback((): number => {
-    const total = household.accounts.reduce(
-      (sum, acc) => sum + acc.currentValue,
-      0
-    );
-    return roundPence(total);
-  }, [household]);
+  const getTotalNetWorth = useCallback(
+    () => computeTotalNetWorth(household),
+    [household]
+  );
 
   // --- Memoize context value ---
 
@@ -335,6 +311,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       household,
       snapshots,
       isHydrated,
+      saveError,
+      dismissSaveError,
       updateHousehold,
       updateSnapshots,
       resetToDefaults,
@@ -352,6 +330,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       household,
       snapshots,
       isHydrated,
+      saveError,
+      dismissSaveError,
       updateHousehold,
       updateSnapshots,
       resetToDefaults,

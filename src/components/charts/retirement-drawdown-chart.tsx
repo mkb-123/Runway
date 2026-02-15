@@ -94,7 +94,7 @@ export function RetirementDrawdownChart({
   const rateLabels = scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`);
 
   return (
-    <div className="h-[400px] w-full">
+    <div className="h-[300px] sm:h-[400px] w-full" role="img" aria-label="Retirement pot drawdown projection over time">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
           <XAxis

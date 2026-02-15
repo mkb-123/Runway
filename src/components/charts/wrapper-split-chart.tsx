@@ -53,6 +53,7 @@ export function WrapperSplitChart({ data }: WrapperSplitChartProps) {
     }));
 
   return (
+    <div role="img" aria-label="Asset allocation by tax wrapper type">
     <ResponsiveContainer width="100%" height={320}>
       <PieChart>
         <Pie
@@ -86,5 +87,6 @@ export function WrapperSplitChart({ data }: WrapperSplitChartProps) {
         />
       </PieChart>
     </ResponsiveContainer>
+    </div>
   );
 }

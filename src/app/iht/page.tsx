@@ -29,6 +29,7 @@ import {
 import { AllocationPie } from "@/components/charts/allocation-pie";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { ScenarioDelta } from "@/components/scenario-delta";
+import { SettingsBar } from "@/components/settings-bar";
 
 export default function IHTPage() {
   const scenarioData = useScenarioData();
@@ -234,6 +235,15 @@ export default function IHTPage() {
       <PageHeader title="Inheritance Tax Planning" description="Estimate your estate value, IHT liability, and track gifts within the 7-year window.">
         <PersonToggle />
       </PageHeader>
+
+      <SettingsBar label="IHT assumptions" settingsTab="iht">
+        <Badge variant="secondary" className="text-xs">
+          Property: {formatCurrency(ihtData.propertyValue)}
+        </Badge>
+        <Badge variant="secondary" className="text-xs">
+          {ihtData.ihtConfig.passingToDirectDescendants ? "RNRB applies" : "No RNRB"}
+        </Badge>
+      </SettingsBar>
 
       {household.persons.length === 0 && (
         <EmptyState message="No household data yet. Add people and accounts to estimate your IHT position." settingsTab="household" />
@@ -562,6 +572,10 @@ export default function IHTPage() {
           </CardContent>
         </Card>
       </CollapsibleSection>
+
+      <p className="text-xs text-muted-foreground italic">
+        Capital at risk — projections are illustrative only and do not constitute financial advice. Past performance does not predict future returns.
+      </p>
     </div>
   );
 }

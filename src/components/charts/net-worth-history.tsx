@@ -57,7 +57,7 @@ export function NetWorthHistoryChart({
   });
 
   return (
-    <div className="h-[400px] w-full">
+    <div className="h-[300px] sm:h-[400px] w-full" role="img" aria-label="Historical net worth by tax wrapper over time">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={chartData}

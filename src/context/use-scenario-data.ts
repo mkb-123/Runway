@@ -8,11 +8,15 @@
 // when they want to be scenario-aware.
 
 import { useMemo } from "react";
-import { roundPence } from "@/lib/format";
 import { useData } from "@/context/data-context";
 import { useScenario } from "@/context/scenario-context";
 import type { HouseholdData, TaxWrapper, AccountType } from "@/types";
-import { getAccountTaxWrapper } from "@/types";
+import {
+  getTotalNetWorth as computeTotalNetWorth,
+  getNetWorthByPerson as computeNetWorthByPerson,
+  getNetWorthByWrapper as computeNetWorthByWrapper,
+  getNetWorthByAccountType as computeNetWorthByAccountType,
+} from "@/lib/aggregations";
 
 export interface ScenarioAwareData {
   /** Household data with scenario overrides applied */
@@ -42,60 +46,23 @@ export function useScenarioData(): ScenarioAwareData {
   );
 
   const getTotalNetWorth = useMemo(
-    () => () => {
-      return roundPence(
-        household.accounts.reduce((sum, acc) => sum + acc.currentValue, 0)
-      );
-    },
-    [household.accounts]
+    () => () => computeTotalNetWorth(household),
+    [household]
   );
 
   const getNetWorthByPerson = useMemo(
-    () => () => {
-      return household.persons.map((person) => {
-        const value = household.accounts
-          .filter((a) => a.personId === person.id)
-          .reduce((sum, acc) => sum + acc.currentValue, 0);
-        return {
-          personId: person.id,
-          name: person.name,
-          value: roundPence(value),
-        };
-      });
-    },
+    () => () => computeNetWorthByPerson(household),
     [household]
   );
 
   const getNetWorthByWrapper = useMemo(
-    () => () => {
-      const totals = new Map<TaxWrapper, number>();
-      for (const account of household.accounts) {
-        const wrapper = getAccountTaxWrapper(account.type);
-        totals.set(wrapper, (totals.get(wrapper) ?? 0) + account.currentValue);
-      }
-      return Array.from(totals.entries()).map(([wrapper, value]) => ({
-        wrapper,
-        value: roundPence(value),
-      }));
-    },
-    [household.accounts]
+    () => () => computeNetWorthByWrapper(household),
+    [household]
   );
 
   const getNetWorthByAccountType = useMemo(
-    () => () => {
-      const totals = new Map<AccountType, number>();
-      for (const account of household.accounts) {
-        totals.set(
-          account.type,
-          (totals.get(account.type) ?? 0) + account.currentValue
-        );
-      }
-      return Array.from(totals.entries()).map(([type, value]) => ({
-        type,
-        value: roundPence(value),
-      }));
-    },
-    [household.accounts]
+    () => () => computeNetWorthByAccountType(household),
+    [household]
   );
 
   return {

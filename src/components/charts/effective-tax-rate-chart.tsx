@@ -67,7 +67,7 @@ export function EffectiveTaxRateChart({
   const data = buildTaxCurveData(maxIncome, step);
 
   return (
-    <div className="h-[400px] w-full">
+    <div className="h-[300px] sm:h-[400px] w-full" role="img" aria-label="Effective and marginal tax rates across income levels">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
           <XAxis

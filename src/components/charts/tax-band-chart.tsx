@@ -41,7 +41,7 @@ export function TaxBandChart({ data, height = 200 }: TaxBandChartProps) {
   }
 
   return (
-    <div style={{ height }} className="w-full">
+    <div style={{ height }} className="w-full" role="img" aria-label="Tax band breakdown showing income distributed across tax bands">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}

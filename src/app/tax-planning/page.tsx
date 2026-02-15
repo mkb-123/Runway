@@ -83,6 +83,7 @@ export default function TaxPlanningPage() {
     () =>
       persons.map((person) => {
         const personIncome = income.find((i) => i.personId === person.id);
+        const personBonus = household.bonusStructures.find((b) => b.personId === person.id);
         const personContributions = getPersonContributionTotals(contributions, person.id);
         const personAccounts = household.accounts.filter((a) => a.personId === person.id);
         const personGiaAccounts = personAccounts.filter((a) => a.type === "gia");
@@ -115,10 +116,10 @@ export default function TaxPlanningPage() {
         // Without transaction history, assume full CGT allowance is available
         const remainingCgtAllowance = cgtAnnualExempt;
 
-        // Determine CGT rate based on income (accounting for pension method)
+        // Determine CGT rate based on total income including bonus (accounting for pension method)
         const cgtRate = personIncome
           ? determineCgtRate(
-              personIncome.grossSalary,
+              personIncome.grossSalary + (personBonus?.cashBonusAnnual ?? 0),
               personIncome.employeePensionContribution,
               personIncome.pensionContributionMethod
             )
@@ -806,6 +807,10 @@ export default function TaxPlanningPage() {
           </CardContent>
         </Card>
       </CollapsibleSection>
+
+      <p className="text-xs text-muted-foreground italic">
+        Capital at risk — projections are illustrative only and do not constitute financial advice. Past performance does not predict future returns.
+      </p>
     </div>
   );
 }
