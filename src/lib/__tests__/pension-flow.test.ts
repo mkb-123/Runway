@@ -83,6 +83,7 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
       passingToDirectDescendants: false,
       gifts: [],
     },
+    children: [],
     committedOutgoings: [],
     dashboardConfig: {
       heroMetrics: ["net_worth", "cash_position", "retirement_countdown"],

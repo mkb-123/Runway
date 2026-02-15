@@ -141,6 +141,18 @@ export interface EmergencyFundConfig {
   monthlyLifestyleSpending: number; // groceries, transport, leisure — non-committed spending
 }
 
+// --- Children ---
+
+export interface Child {
+  id: string;
+  name: string;
+  dateOfBirth: string; // ISO date
+  schoolFeeAnnual: number; // current annual cost (today's money)
+  feeInflationRate: number; // annual fee increase rate, e.g. 0.05 for 5%
+  schoolStartAge: number; // age private school starts, e.g. 4
+  schoolEndAge: number; // age school ends, e.g. 18
+}
+
 // --- Committed Outgoings ---
 
 export type CommittedOutgoingCategory =
@@ -162,6 +174,8 @@ export interface CommittedOutgoing {
   startDate?: string; // ISO date
   endDate?: string; // ISO date (ongoing if omitted)
   personId?: string; // optional, for person-specific outgoings
+  inflationRate?: number; // annual increase rate (e.g. 0.05 for 5%/yr)
+  linkedChildId?: string; // links to a Child record (for school fees)
 }
 
 export const OUTGOING_CATEGORY_LABELS: Record<CommittedOutgoingCategory, string> = {
@@ -263,6 +277,7 @@ export interface NetWorthSnapshot {
 
 export interface HouseholdData {
   persons: Person[];
+  children: Child[];
   accounts: Account[];
   income: PersonIncome[];
   bonusStructures: BonusStructure[];

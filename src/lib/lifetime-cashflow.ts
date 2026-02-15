@@ -184,11 +184,12 @@ export function generateLifetimeCashFlow(
     // 2. State pension
     const statePensionIncome = calculateStatePensionIncome(personStates, yearOffset);
 
-    // 3. Expenditure
+    // 3. Expenditure (baseYear = currentYear so inflation compounds from today)
     const totalExpenditure = calculateExpenditure(
       committedOutgoings,
       emergencyFund.monthlyLifestyleSpending,
-      calendarYear
+      calendarYear,
+      currentYear
     );
 
     // 4. During working years: add contributions to pots
@@ -281,17 +282,26 @@ function calculateStatePensionIncome(personStates: PersonState[], yearOffset: nu
 /**
  * Calculate total annual expenditure for a calendar year.
  * Respects start/end dates on committed outgoings.
+ * Applies per-outgoing inflationRate when present (compounds from baseYear).
  */
 export function calculateExpenditure(
   committedOutgoings: HouseholdData["committedOutgoings"],
   monthlyLifestyleSpending: number,
-  calendarYear: number
+  calendarYear: number,
+  baseYear?: number
 ): number {
   let total = 0;
+  const effectiveBaseYear = baseYear ?? calendarYear;
 
   for (const outgoing of committedOutgoings) {
     if (!isOutgoingActiveInYear(outgoing, calendarYear)) continue;
-    total += annualiseOutgoing(outgoing.amount, outgoing.frequency);
+    const baseAmount = annualiseOutgoing(outgoing.amount, outgoing.frequency);
+    const inflationRate = outgoing.inflationRate ?? 0;
+    const yearsElapsed = calendarYear - effectiveBaseYear;
+    const inflatedAmount = inflationRate !== 0 && yearsElapsed > 0
+      ? baseAmount * Math.pow(1 + inflationRate, yearsElapsed)
+      : baseAmount;
+    total += inflatedAmount;
   }
 
   total += monthlyLifestyleSpending * 12;

@@ -44,6 +44,7 @@ const defaultSnapshots = SnapshotsDataSchema.parse(snapshotsJson);
 // Empty data for "Clear All"
 const emptyHousehold: HouseholdData = {
   persons: [],
+  children: [],
   accounts: [],
   income: [],
   bonusStructures: [],

@@ -23,6 +23,7 @@
       "studentLoanPlan": "none"
     }
   ],
+  "children": [],
   "accounts": [
     {
       "id": "acc-1",

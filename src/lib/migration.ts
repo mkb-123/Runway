@@ -35,6 +35,7 @@ export function migrateHouseholdData(raw: Record<string, unknown>): Record<strin
   data = migrateDashboardConfigDefault(data);
   data = migratePersonDefaults(data);
   data = migrateDeferredBonusSimplified(data);
+  data = migrateChildrenDefault(data);
   return data;
 }
 
@@ -243,6 +244,14 @@ function migrateDeferredBonusSimplified(data: Record<string, unknown>): Record<s
   });
 
   return { ...data, bonusStructures: updated };
+}
+
+/**
+ * Migration 8: Ensure children array exists
+ */
+function migrateChildrenDefault(data: Record<string, unknown>): Record<string, unknown> {
+  if (Array.isArray(data.children)) return data;
+  return { ...data, children: [] };
 }
 
 // --- Helpers ---
