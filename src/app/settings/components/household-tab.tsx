@@ -43,6 +43,8 @@ import {
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { clone, setField, renderField } from "./field-helpers";
 import { FieldWarning } from "./field-warning";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 const STUDENT_LOAN_LABELS: Record<StudentLoanPlan, string> = {
   none: "None",
@@ -203,9 +205,23 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
 
   return (
     <div className="space-y-4 mt-4">
-      <p className="text-sm text-muted-foreground">
-        Each person&apos;s details, income, and contribution targets in one place.
-      </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          Each person&apos;s details, income, and contribution targets in one place.
+        </p>
+        <div className="flex items-center gap-3 text-xs shrink-0">
+          <span className="text-muted-foreground">Shown on:</span>
+          <Link href="/tax-planning" className="text-primary hover:underline flex items-center gap-0.5">
+            Tax Planning <ArrowRight className="size-3" />
+          </Link>
+          <Link href="/income" className="text-primary hover:underline flex items-center gap-0.5">
+            Income <ArrowRight className="size-3" />
+          </Link>
+          <Link href="/retirement" className="text-primary hover:underline flex items-center gap-0.5">
+            Retirement <ArrowRight className="size-3" />
+          </Link>
+        </div>
+      </div>
 
       {/* Person selector — avoids scrolling past everyone */}
       {household.persons.length > 1 && (

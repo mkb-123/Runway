@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/card";
 import type { HouseholdData } from "@/types";
 import { clone, setField, renderField } from "./field-helpers";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 interface PlanningTabProps {
   household: HouseholdData;
@@ -58,10 +60,21 @@ export function PlanningTab({ household, updateHousehold }: PlanningTabProps) {
 
   return (
     <div className="space-y-4 mt-4">
-      <p className="text-sm text-muted-foreground">
-        Retirement targets, projection assumptions, and emergency fund settings.
-        These drive all projection and recommendation calculations.
-      </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          Retirement targets, projection assumptions, and emergency fund settings.
+          These drive all projection and recommendation calculations.
+        </p>
+        <div className="flex items-center gap-3 text-xs shrink-0">
+          <span className="text-muted-foreground">Shown on:</span>
+          <Link href="/retirement" className="text-primary hover:underline flex items-center gap-0.5">
+            Retirement <ArrowRight className="size-3" />
+          </Link>
+          <Link href="/income" className="text-primary hover:underline flex items-center gap-0.5">
+            Income <ArrowRight className="size-3" />
+          </Link>
+        </div>
+      </div>
 
       {/* Retirement Config */}
       <Card>
