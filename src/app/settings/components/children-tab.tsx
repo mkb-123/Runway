@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, GraduationCap } from "lucide-react";
+import { Plus, Trash2, GraduationCap, ArrowRight } from "lucide-react";
+import Link from "next/link";
 import type { HouseholdData, Child } from "@/types";
 import { formatCurrency } from "@/lib/format";
 import { calculateAge } from "@/lib/projections";
@@ -75,9 +76,23 @@ export function ChildrenTab({ household, updateHousehold }: ChildrenTabProps) {
             <GraduationCap className="size-5" />
             Children & School Fees
           </CardTitle>
-          <CardDescription>
-            Add your children to automatically generate school fee committed outgoings.
-            Fees are projected with per-child inflation rates in the lifetime cash flow.
+          <CardDescription className="flex flex-wrap items-baseline justify-between gap-2">
+            <span>
+              Add your children to automatically generate school fee committed outgoings.
+              Fees are projected with per-child inflation rates in the lifetime cash flow.
+            </span>
+            <span className="flex items-center gap-3 text-xs shrink-0">
+              <span className="text-muted-foreground">Shown on:</span>
+              <Link href="/" className="text-primary hover:underline flex items-center gap-0.5">
+                Dashboard <ArrowRight className="size-3" />
+              </Link>
+              <Link href="/income" className="text-primary hover:underline flex items-center gap-0.5">
+                Income <ArrowRight className="size-3" />
+              </Link>
+              <Link href="/cashflow" className="text-primary hover:underline flex items-center gap-0.5">
+                Cash Flow <ArrowRight className="size-3" />
+              </Link>
+            </span>
           </CardDescription>
         </CardHeader>
         <CardContent>

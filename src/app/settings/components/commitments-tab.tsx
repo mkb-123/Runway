@@ -11,7 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ArrowRight } from "lucide-react";
+import Link from "next/link";
 import type { HouseholdData, CommittedOutgoing, CommittedOutgoingCategory, OutgoingFrequency } from "@/types";
 import {
   OUTGOING_CATEGORY_LABELS,
@@ -85,10 +86,21 @@ export function CommitmentsTab({ household, updateHousehold }: CommitmentsTabPro
               <p className="text-2xl font-bold tabular-nums">{outgoings.length}</p>
             </div>
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            Committed outgoings are recurring obligations that reduce your effective net worth.
-            These are factored into cash flow forecasts, retirement projections, and dashboard metrics.
-          </p>
+          <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Committed outgoings are recurring obligations that reduce your effective net worth.
+              These are factored into cash flow forecasts, retirement projections, and dashboard metrics.
+            </p>
+            <div className="flex items-center gap-3 text-xs shrink-0">
+              <span className="text-muted-foreground">Shown on:</span>
+              <Link href="/income" className="text-primary hover:underline flex items-center gap-0.5">
+                Income <ArrowRight className="size-3" />
+              </Link>
+              <Link href="/cashflow" className="text-primary hover:underline flex items-center gap-0.5">
+                Cash Flow <ArrowRight className="size-3" />
+              </Link>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
