@@ -6,6 +6,9 @@ import {
   calculateTotalSchoolFeeCost,
   generateSchoolFeeOutgoing,
   syncSchoolFeeOutgoings,
+  generateSchoolFeeTimeline,
+  calculateTotalEducationCommitment,
+  findLastSchoolFeeYear,
 } from "../school-fees";
 import type { Child, CommittedOutgoing } from "@/types";
 
@@ -245,5 +248,151 @@ describe("syncSchoolFeeOutgoings", () => {
     expect(result[1].linkedChildId).toBe("c2");
     expect(result[0].amount).toBe(6_000);
     expect(result[1].amount).toBe(5_000);
+  });
+});
+
+// --- generateSchoolFeeTimeline ---
+
+describe("generateSchoolFeeTimeline", () => {
+  it("returns empty array for no children", () => {
+    expect(generateSchoolFeeTimeline([])).toEqual([]);
+  });
+
+  it("returns empty array for children with zero fees", () => {
+    const child = makeChild({ schoolFeeAnnual: 0 });
+    expect(generateSchoolFeeTimeline([child])).toEqual([]);
+  });
+
+  it("generates a timeline entry for each year of school fees", () => {
+    // Child born 2018-06-15, start 4, end 18 => school years 2022-2036
+    // Current year is 2026, so timeline starts at 2026 and ends at 2036
+    const child = makeChild();
+    const timeline = generateSchoolFeeTimeline([child]);
+
+    expect(timeline.length).toBe(11); // 2026 to 2036 inclusive
+    expect(timeline[0].calendarYear).toBe(2026);
+    expect(timeline[timeline.length - 1].calendarYear).toBe(2036);
+  });
+
+  it("first year has today's fee (no inflation)", () => {
+    const child = makeChild({ feeInflationRate: 0.05 });
+    const timeline = generateSchoolFeeTimeline([child]);
+
+    // Year 0 (2026): no inflation yet
+    expect(timeline[0][child.id]).toBe(18_000);
+  });
+
+  it("subsequent years have inflated fees", () => {
+    const child = makeChild({ feeInflationRate: 0.05 });
+    const timeline = generateSchoolFeeTimeline([child]);
+
+    // Year 1 (2027): 18000 * 1.05^1 = 18900
+    expect(timeline[1][child.id]).toBe(Math.round(18_000 * 1.05));
+    // Year 2 (2028): 18000 * 1.05^2 = 19845
+    expect(timeline[2][child.id]).toBe(Math.round(18_000 * 1.05 * 1.05));
+  });
+
+  it("total equals sum of per-child amounts", () => {
+    const child1 = makeChild({ id: "c1", name: "Arjun", schoolFeeAnnual: 18_000 });
+    const child2 = makeChild({
+      id: "c2", name: "Maya", schoolFeeAnnual: 15_000,
+      dateOfBirth: "2020-03-10", // age 5, school started at 4
+      schoolStartAge: 4, schoolEndAge: 18,
+    });
+
+    const timeline = generateSchoolFeeTimeline([child1, child2]);
+
+    for (const year of timeline) {
+      const childTotal = (year["c1"] ?? 0) + (year["c2"] ?? 0);
+      expect(year.total).toBe(childTotal);
+    }
+  });
+
+  it("handles children with different school year ranges", () => {
+    // child1: school 2022-2036 (born 2018, ages 4-18)
+    // child2: school 2028-2038 (born 2024, ages 4-14, i.e. ends at 14)
+    const child1 = makeChild({ id: "c1", schoolFeeAnnual: 18_000 });
+    const child2 = makeChild({
+      id: "c2", schoolFeeAnnual: 12_000,
+      dateOfBirth: "2024-01-01", schoolStartAge: 4, schoolEndAge: 14,
+    });
+
+    const timeline = generateSchoolFeeTimeline([child1, child2]);
+
+    // Timeline should start at 2026 (max of current year and earliest start)
+    // and end at 2038 (latest end)
+    expect(timeline[0].calendarYear).toBe(2026);
+    expect(timeline[timeline.length - 1].calendarYear).toBe(2038);
+
+    // In 2026, only child1 is in school (child2 starts 2028)
+    const year2026 = timeline.find((t) => t.calendarYear === 2026)!;
+    expect(year2026["c1"]).toBe(18_000);
+    expect(year2026["c2"]).toBeUndefined();
+
+    // In 2029, both children are in school
+    const year2029 = timeline.find((t) => t.calendarYear === 2029)!;
+    expect(year2029["c1"]).toBeGreaterThan(0);
+    expect(year2029["c2"]).toBeGreaterThan(0);
+
+    // In 2037, only child2 is in school (child1 finished 2036)
+    const year2037 = timeline.find((t) => t.calendarYear === 2037);
+    if (year2037) {
+      expect(year2037["c1"]).toBeUndefined();
+      expect(year2037["c2"]).toBeGreaterThan(0);
+    }
+  });
+});
+
+// --- calculateTotalEducationCommitment ---
+
+describe("calculateTotalEducationCommitment", () => {
+  it("returns 0 for no children", () => {
+    expect(calculateTotalEducationCommitment([])).toBe(0);
+  });
+
+  it("returns sum of individual projected costs", () => {
+    const child1 = makeChild({ id: "c1", schoolFeeAnnual: 18_000 });
+    const child2 = makeChild({
+      id: "c2", schoolFeeAnnual: 15_000,
+      dateOfBirth: "2020-03-10",
+    });
+
+    const total = calculateTotalEducationCommitment([child1, child2]);
+    const expected = calculateTotalSchoolFeeCost(child1) + calculateTotalSchoolFeeCost(child2);
+    expect(total).toBe(expected);
+  });
+
+  it("excludes children with zero fees", () => {
+    const child1 = makeChild({ id: "c1", schoolFeeAnnual: 18_000 });
+    const child2 = makeChild({ id: "c2", schoolFeeAnnual: 0 });
+
+    const total = calculateTotalEducationCommitment([child1, child2]);
+    expect(total).toBe(calculateTotalSchoolFeeCost(child1));
+  });
+});
+
+// --- findLastSchoolFeeYear ---
+
+describe("findLastSchoolFeeYear", () => {
+  it("returns null for no children", () => {
+    expect(findLastSchoolFeeYear([])).toBeNull();
+  });
+
+  it("returns null for children with zero fees", () => {
+    const child = makeChild({ schoolFeeAnnual: 0 });
+    expect(findLastSchoolFeeYear([child])).toBeNull();
+  });
+
+  it("returns the last school end year for a single child", () => {
+    const child = makeChild({ dateOfBirth: "2018-06-15", schoolEndAge: 18 });
+    // end year = 2018 + 18 = 2036
+    expect(findLastSchoolFeeYear([child])).toBe(2036);
+  });
+
+  it("returns the latest end year across multiple children", () => {
+    const child1 = makeChild({ id: "c1", dateOfBirth: "2018-06-15", schoolEndAge: 18 }); // 2036
+    const child2 = makeChild({ id: "c2", dateOfBirth: "2022-01-01", schoolEndAge: 18 }); // 2040
+
+    expect(findLastSchoolFeeYear([child1, child2])).toBe(2040);
   });
 });

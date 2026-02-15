@@ -21,6 +21,9 @@ import {
   ArrowUp,
   Calendar,
 } from "lucide-react";
+import { SchoolFeeSummary } from "@/components/school-fee-summary";
+import { SchoolFeeTimelineChart } from "@/components/charts/school-fee-timeline-chart";
+import { generateSchoolFeeTimeline, findLastSchoolFeeYear } from "@/lib/school-fees";
 
 export default function CashFlowPage() {
   const scenarioData = useScenarioData();
@@ -93,6 +96,17 @@ export default function CashFlowPage() {
       </div>
     );
   }
+
+  // School fee timeline data
+  const schoolFeeTimeline = useMemo(
+    () => generateSchoolFeeTimeline(household.children),
+    [household.children]
+  );
+  const lastSchoolFeeYear = useMemo(
+    () => findLastSchoolFeeYear(household.children),
+    [household.children]
+  );
+  const hasSchoolFees = household.children.length > 0 && household.children.some((c) => c.schoolFeeAnnual > 0);
 
   const primaryPerson = household.persons.find((p) => p.relationship === "self") ?? household.persons[0];
   const currentAge = calculateAge(primaryPerson.dateOfBirth);
@@ -235,6 +249,39 @@ export default function CashFlowPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* School Fees — summary + timeline */}
+      {hasSchoolFees && (
+        <CollapsibleSection
+          title="School Fees"
+          summary={`${household.children.filter((c) => c.schoolFeeAnnual > 0).length} child${household.children.filter((c) => c.schoolFeeAnnual > 0).length !== 1 ? "ren" : ""} in private education`}
+          defaultOpen
+          storageKey="cashflow-school-fees"
+        >
+          <div className="space-y-4">
+            <SchoolFeeSummary childrenList={household.children} />
+            {schoolFeeTimeline.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-baseline justify-between">
+                    <CardTitle>School Fee Timeline</CardTitle>
+                    <span className="hidden text-xs text-muted-foreground sm:inline">
+                      Annual fees by child (including inflation)
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <SchoolFeeTimelineChart
+                    data={schoolFeeTimeline}
+                    childrenList={household.children}
+                    lastSchoolFeeYear={lastSchoolFeeYear}
+                  />
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </CollapsibleSection>
+      )}
 
       {/* Key Events Timeline */}
       {events.length > 0 && (

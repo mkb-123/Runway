@@ -90,6 +90,97 @@ export function generateSchoolFeeOutgoing(child: Child): CommittedOutgoing {
  *
  * Returns a new outgoings array — does not mutate the input.
  */
+// --- Timeline data for charts ---
+
+export interface SchoolFeeTimelineYear {
+  /** Calendar year */
+  calendarYear: number;
+  /** Total fees across all children in this year (nominal, with inflation) */
+  total: number;
+  /** Per-child breakdown: key is child.id, value is nominal fee for that year */
+  [childId: string]: number;
+}
+
+/**
+ * Generate a year-by-year school fee timeline for all children.
+ * Returns one entry per calendar year from the earliest school start
+ * to the latest school end. Each entry includes per-child fees
+ * (inflated from today's cost) and a total.
+ *
+ * Uses the same compounding logic as calculateExpenditure so the
+ * numbers shown on the timeline chart match the lifetime cashflow.
+ */
+export function generateSchoolFeeTimeline(children: Child[]): SchoolFeeTimelineYear[] {
+  const activeChildren = children.filter((c) => c.schoolFeeAnnual > 0);
+  if (activeChildren.length === 0) return [];
+
+  const currentYear = new Date().getFullYear();
+
+  // Find the year range across all children
+  const startYears = activeChildren.map((c) => {
+    const startDate = calculateSchoolStartDate(c);
+    return new Date(startDate).getFullYear();
+  });
+  const endYears = activeChildren.map((c) => {
+    const endDate = calculateSchoolEndDate(c);
+    return new Date(endDate).getFullYear();
+  });
+
+  const firstYear = Math.max(currentYear, Math.min(...startYears));
+  const lastYear = Math.max(...endYears);
+
+  if (firstYear > lastYear) return [];
+
+  const timeline: SchoolFeeTimelineYear[] = [];
+
+  for (let year = firstYear; year <= lastYear; year++) {
+    const entry: SchoolFeeTimelineYear = { calendarYear: year, total: 0 };
+
+    for (const child of activeChildren) {
+      const startYear = new Date(calculateSchoolStartDate(child)).getFullYear();
+      const endYear = new Date(calculateSchoolEndDate(child)).getFullYear();
+
+      if (year >= startYear && year <= endYear) {
+        const yearsFromNow = year - currentYear;
+        const inflatedFee = child.schoolFeeAnnual * Math.pow(1 + child.feeInflationRate, Math.max(0, yearsFromNow));
+        const rounded = Math.round(inflatedFee);
+        entry[child.id] = rounded;
+        entry.total += rounded;
+      }
+    }
+
+    // Only include years where at least one child has fees
+    if (entry.total > 0) {
+      timeline.push(entry);
+    }
+  }
+
+  return timeline;
+}
+
+/**
+ * Calculate total remaining education commitment across all children.
+ * This is the sum of all projected costs from today to school end.
+ */
+export function calculateTotalEducationCommitment(children: Child[]): number {
+  return children.reduce((sum, c) => sum + calculateTotalSchoolFeeCost(c), 0);
+}
+
+/**
+ * Find the calendar year when the last child finishes school.
+ * Returns null if no children have school fees.
+ */
+export function findLastSchoolFeeYear(children: Child[]): number | null {
+  const activeChildren = children.filter((c) => c.schoolFeeAnnual > 0);
+  if (activeChildren.length === 0) return null;
+
+  const endYears = activeChildren.map((c) => {
+    return new Date(calculateSchoolEndDate(c)).getFullYear();
+  });
+
+  return Math.max(...endYears);
+}
+
 export function syncSchoolFeeOutgoings(
   children: Child[],
   existingOutgoings: CommittedOutgoing[]
