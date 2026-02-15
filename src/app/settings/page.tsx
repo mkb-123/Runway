@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useRef, useState, useEffect } from "react";
+import { Suspense, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Users,
@@ -70,18 +70,13 @@ function SettingsPageInner() {
 
   const searchParams = useSearchParams();
   const validTabs = ["household", "accounts", "planning", "commitments", "iht"];
-  const initialTab = validTabs.includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "household";
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const tabFromUrl = searchParams.get("tab");
+  const urlTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : null;
+  const [localTab, setLocalTab] = useState(urlTab ?? "household");
+  const activeTab = urlTab ?? localTab;
+  const setActiveTab = setLocalTab;
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Sync tab with URL search params when navigating via deep link
-  useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab && validTabs.includes(tab)) {
-      setActiveTab(tab);
-    }
-  }, [searchParams]);
 
   // ----------------------------------------------------------
   // Quick Setup completeness
