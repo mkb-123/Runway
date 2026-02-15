@@ -41,6 +41,7 @@ import {
   annualiseContribution,
 } from "@/types";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
+import { formatCurrency } from "@/lib/format";
 import { clone, setField, renderField } from "./field-helpers";
 import { FieldWarning } from "./field-warning";
 import Link from "next/link";
@@ -109,9 +110,10 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
     });
     updated.bonusStructures.push({
       personId: newPerson.id,
+      totalBonusAnnual: 0,
       cashBonusAnnual: 0,
-      deferredBonusAnnual: 0,
       vestingYears: 3,
+      vestingGapYears: 0,
       estimatedAnnualReturn: 0.08,
     });
     // No default contributions — user adds them explicitly
@@ -153,8 +155,8 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
     updateHousehold(updated);
   }
 
-  // Tranche helpers removed — deferred bonus now uses simplified model
-  // (deferredBonusAnnual + vestingYears + estimatedAnnualReturn)
+  // Tranche helpers removed — deferred bonus now uses total bonus model
+  // (totalBonusAnnual + cashBonusAnnual + vestingYears + vestingGapYears + estimatedAnnualReturn)
 
   // ----------------------------------------------------------
   // Contribution helpers
@@ -547,7 +549,29 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                     <div className="pt-2 pb-4 space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {renderField(
-                          "Cash Bonus (Annual)",
+                          "Total Bonus (Annual)",
+                          <>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={bonus.totalBonusAnnual}
+                              onChange={(e) =>
+                                updateBonus(bonusIdx, "totalBonusAnnual", Number(e.target.value))
+                              }
+                              placeholder="0.00"
+                            />
+                            <FieldWarning
+                              value={bonus.totalBonusAnnual}
+                              min={0}
+                              max={2000000}
+                              label="total bonus"
+                              isCurrency
+                            />
+                          </>,
+                          "Total annual bonus (cash + deferred). Grows at the bonus growth rate."
+                        )}
+                        {renderField(
+                          "Cash Portion (Fixed)",
                           <>
                             <Input
                               type="number"
@@ -561,43 +585,23 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                             <FieldWarning
                               value={bonus.cashBonusAnnual}
                               min={0}
-                              max={500000}
-                              label="annual bonus"
+                              max={bonus.totalBonusAnnual}
+                              label="cash bonus"
                               isCurrency
                             />
                           </>,
-                          "Expected annual cash bonus before tax"
+                          "Fixed cash paid immediately each year. Does not grow."
                         )}
                       </div>
+                      {bonus.totalBonusAnnual > bonus.cashBonusAnnual && (
+                        <p className="text-xs text-muted-foreground">
+                          Deferred: {formatCurrency(bonus.totalBonusAnnual - bonus.cashBonusAnnual)}/yr — vests equally over {bonus.vestingYears} year{bonus.vestingYears !== 1 ? "s" : ""}{bonus.vestingGapYears > 0 ? ` after a ${bonus.vestingGapYears}-year gap` : ""}.
+                        </p>
+                      )}
 
                       <div className="space-y-3">
-                        <h5 className="text-sm font-medium">Deferred Bonus</h5>
-                        <p className="text-xs text-muted-foreground">
-                          Set the total annual deferred amount and how many years it vests over equally. Vesting occurs in January each year.
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          {renderField(
-                            "Annual Deferred Amount",
-                            <>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={bonus.deferredBonusAnnual}
-                                onChange={(e) =>
-                                  updateBonus(bonusIdx, "deferredBonusAnnual", Number(e.target.value))
-                                }
-                                placeholder="0.00"
-                              />
-                              <FieldWarning
-                                value={bonus.deferredBonusAnnual}
-                                min={0}
-                                max={1000000}
-                                label="deferred bonus"
-                                isCurrency
-                              />
-                            </>,
-                            "Total annual deferred bonus before tax"
-                          )}
+                        <h5 className="text-sm font-medium">Vesting Schedule</h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                           {renderField(
                             "Vesting Years",
                             <>
@@ -620,6 +624,23 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                               />
                             </>,
                             "Equal vesting over this many years"
+                          )}
+                          {renderField(
+                            "Gap Before 1st Vest",
+                            <>
+                              <Input
+                                type="number"
+                                step="1"
+                                min="0"
+                                max="5"
+                                value={bonus.vestingGapYears}
+                                onChange={(e) =>
+                                  updateBonus(bonusIdx, "vestingGapYears", Number(e.target.value))
+                                }
+                                placeholder="0"
+                              />
+                            </>,
+                            "Years before first tranche vests (e.g. 1 = cliff year)"
                           )}
                           {renderField(
                             "Est. Annual Return (%)",
@@ -647,7 +668,7 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                                 suffix="%"
                               />
                             </>,
-                            "Expected annual return on deferred amount"
+                            "Expected annual return on deferred amount while vesting"
                           )}
                         </div>
                       </div>

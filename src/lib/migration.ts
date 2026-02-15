@@ -36,6 +36,7 @@ export function migrateHouseholdData(raw: Record<string, unknown>): Record<strin
   data = migratePersonDefaults(data);
   data = migrateDeferredBonusSimplified(data);
   data = migrateChildrenDefault(data);
+  data = migrateBonusTotalModel(data);
   return data;
 }
 
@@ -277,4 +278,39 @@ function estimateCommittedAnnual(outgoings: unknown): number {
     }
   }
   return total;
+}
+
+/**
+ * Migration 9: Convert deferredBonusAnnual → totalBonusAnnual model
+ *
+ * Old: { cashBonusAnnual, deferredBonusAnnual }
+ * New: { totalBonusAnnual, cashBonusAnnual, vestingGapYears }
+ *
+ * totalBonusAnnual = cashBonusAnnual + deferredBonusAnnual
+ * vestingGapYears defaults to 0 (preserving old behaviour)
+ */
+function migrateBonusTotalModel(data: Record<string, unknown>): Record<string, unknown> {
+  const bonusStructures = data.bonusStructures;
+  if (!Array.isArray(bonusStructures)) return data;
+
+  const updated = bonusStructures.map((bs: unknown) => {
+    if (typeof bs !== "object" || bs === null) return bs;
+    const bonus = bs as Record<string, unknown>;
+
+    // Already migrated — has totalBonusAnnual
+    if (typeof bonus.totalBonusAnnual === "number") return bonus;
+
+    const cash = typeof bonus.cashBonusAnnual === "number" ? bonus.cashBonusAnnual : 0;
+    const deferred = typeof bonus.deferredBonusAnnual === "number" ? bonus.deferredBonusAnnual : 0;
+
+    const result: Record<string, unknown> = {
+      ...bonus,
+      totalBonusAnnual: cash + deferred,
+      vestingGapYears: 0,
+    };
+    delete result.deferredBonusAnnual;
+    return result;
+  });
+
+  return { ...data, bonusStructures: updated };
 }

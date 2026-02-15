@@ -19,7 +19,7 @@ import {
   projectSalaryTrajectory,
 } from "@/lib/projections";
 import { generateDeferredTranches, totalProjectedDeferredValue } from "@/lib/deferred-bonus";
-import { getPersonContributionTotals, annualiseOutgoing, OUTGOING_CATEGORY_LABELS } from "@/types";
+import { getPersonContributionTotals, annualiseOutgoing, OUTGOING_CATEGORY_LABELS, getDeferredBonus } from "@/types";
 import type { CommittedOutgoingCategory } from "@/types";
 import { SchoolFeeSummary } from "@/components/school-fee-summary";
 import {
@@ -37,11 +37,8 @@ import {
   CashFlowWaterfall,
   type WaterfallDataPoint,
 } from "@/components/charts/cash-flow-waterfall";
-import { EffectiveTaxRateChart } from "@/components/charts/effective-tax-rate-chart";
-import { TaxBandChart } from "@/components/charts/tax-band-chart";
 import { CashFlowTimeline } from "@/components/charts/cash-flow-timeline";
 import { generateCashFlowTimeline } from "@/lib/cash-flow";
-import type { TaxBandDataItem } from "@/components/charts/tax-band-chart";
 import { ScenarioDelta } from "@/components/scenario-delta";
 
 // projectedValue helper removed — now using totalProjectedDeferredValue from lib
@@ -206,10 +203,10 @@ export default function IncomePage() {
       (sum, p) => sum + p.contributions.giaContribution,
       0
     );
-    // GIA overflow is whatever is directed to GIA from what remains
-    const giaOverflow = combinedGIA;
-
     const annualLifestyle = emergencyFund.monthlyLifestyleSpending * 12;
+    const totalCommitted = committedOutgoings.reduce((s, o) => s + annualiseOutgoing(o.amount, o.frequency), 0);
+    const totalOutgoings = combinedTax + combinedNI + combinedStudentLoan + combinedPension + combinedISA + combinedGIA + totalCommitted + annualLifestyle;
+    const surplus = combinedGross - totalOutgoings;
 
     const wfData: WaterfallDataPoint[] = [
       { name: "Gross Income", value: combinedGross, type: "income" },
@@ -220,7 +217,6 @@ export default function IncomePage() {
         : []),
       { name: "Employee Pension", value: combinedPension, type: "deduction" },
       { name: "Take-Home Pay", value: combinedTakeHome, type: "subtotal" },
-      { name: "ISA Contributions", value: combinedISA, type: "deduction" },
       // Break committed outgoings down by category
       ...(() => {
         const byCategory = new Map<CommittedOutgoingCategory, number>();
@@ -234,17 +230,21 @@ export default function IncomePage() {
             entries.push({ name: OUTGOING_CATEGORY_LABELS[category], value, type: "deduction" });
           }
         }
-        // If only one category, keep the generic label for simplicity
-        if (entries.length <= 1) {
-          const total = committedOutgoings.reduce((s, o) => s + annualiseOutgoing(o.amount, o.frequency), 0);
-          return total > 0 ? [{ name: "Committed Outgoings", value: total, type: "deduction" as const }] : [];
+        if (entries.length <= 1 && totalCommitted > 0) {
+          return [{ name: "Committed Outgoings", value: totalCommitted, type: "deduction" as const }];
         }
         return entries;
       })(),
       ...(annualLifestyle > 0
-        ? [{ name: "Lifestyle Spending", value: annualLifestyle, type: "deduction" as const }]
+        ? [{ name: "Lifestyle", value: annualLifestyle, type: "deduction" as const }]
         : []),
-      { name: "Discretionary", value: giaOverflow, type: "subtotal" },
+      ...(combinedISA > 0
+        ? [{ name: "ISA Savings", value: combinedISA, type: "deduction" as const }]
+        : []),
+      ...(combinedGIA > 0
+        ? [{ name: "GIA Savings", value: combinedGIA, type: "deduction" as const }]
+        : []),
+      { name: surplus >= 0 ? "Surplus" : "Shortfall", value: Math.max(0, surplus), type: "subtotal" },
     ];
 
     // Tax Efficiency Score (via lib function)
@@ -293,7 +293,7 @@ export default function IncomePage() {
           const base = baseIncomeLookup.get(person.id);
           const totalPension = personIncome.employeePensionContribution + personIncome.employerPensionContribution;
           const cashBonus = bonus?.cashBonusAnnual ?? 0;
-          const deferredBonus = bonus?.deferredBonusAnnual ?? 0;
+          const deferredBonus = bonus ? getDeferredBonus(bonus) : 0;
           const hasBonus = cashBonus > 0 || deferredBonus > 0;
 
           return (
@@ -509,7 +509,7 @@ export default function IncomePage() {
             const salary = personIncome.grossSalary;
             const employerPension = personIncome.employerPensionContribution;
             const cashBonus = bonus?.cashBonusAnnual ?? 0;
-            const deferredBonus = bonus?.deferredBonusAnnual ?? 0;
+            const deferredBonus = bonus ? getDeferredBonus(bonus) : 0;
             const totalComp = salary + employerPension + cashBonus + deferredBonus;
 
             return (
@@ -563,7 +563,9 @@ export default function IncomePage() {
                   const salaryGrowth = personIncome.salaryGrowthRate ?? 0;
                   const bonusGrowth = personIncome.bonusGrowthRate ?? 0;
                   const trajectory = projectSalaryTrajectory(personIncome.grossSalary, salaryGrowth, 10);
+                  const totalBonus = bonus?.totalBonusAnnual ?? 0;
                   const cashBonus = bonus?.cashBonusAnnual ?? 0;
+                  const hasDeferred = totalBonus > cashBonus;
 
                   return (
                     <Card key={person.id}>
@@ -573,24 +575,32 @@ export default function IncomePage() {
                           <Badge variant="secondary">
                             {salaryGrowth > 0 && `Salary +${formatPercent(salaryGrowth)}/yr`}
                             {salaryGrowth > 0 && bonusGrowth > 0 && " · "}
-                            {bonusGrowth > 0 && `Bonus +${formatPercent(bonusGrowth)}/yr`}
+                            {bonusGrowth > 0 && `Total bonus +${formatPercent(bonusGrowth)}/yr`}
                           </Badge>
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
+                        {hasDeferred && (
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Total bonus grows at {formatPercent(bonusGrowth)}/yr. Cash portion fixed at {formatCurrency(cashBonus)}; deferred increases as total grows.
+                          </p>
+                        )}
                         <div className="overflow-x-auto">
                           <Table>
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Year</TableHead>
                                 <TableHead className="text-right">Salary</TableHead>
-                                {cashBonus > 0 && <TableHead className="text-right">Cash Bonus</TableHead>}
+                                {totalBonus > 0 && <TableHead className="text-right">Total Bonus</TableHead>}
+                                {hasDeferred && <TableHead className="text-right">Cash</TableHead>}
+                                {hasDeferred && <TableHead className="text-right">Deferred</TableHead>}
                                 <TableHead className="text-right">Total Comp</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {trajectory.filter((_, i) => i % 2 === 0 || i === trajectory.length - 1).map((point) => {
-                                const yearBonus = cashBonus * Math.pow(1 + bonusGrowth, point.year);
+                                const yearTotalBonus = totalBonus * Math.pow(1 + bonusGrowth, point.year);
+                                const yearDeferred = Math.max(0, yearTotalBonus - cashBonus);
                                 const employerPension = personIncome.employerPensionContribution * Math.pow(1 + salaryGrowth, point.year);
                                 return (
                                   <TableRow key={point.year}>
@@ -598,11 +608,17 @@ export default function IncomePage() {
                                       {point.year === 0 ? "Now" : `+${point.year}yr`}
                                     </TableCell>
                                     <TableCell className="text-right">{formatCurrency(point.salary)}</TableCell>
-                                    {cashBonus > 0 && (
-                                      <TableCell className="text-right">{formatCurrency(yearBonus)}</TableCell>
+                                    {totalBonus > 0 && (
+                                      <TableCell className="text-right">{formatCurrency(yearTotalBonus)}</TableCell>
+                                    )}
+                                    {hasDeferred && (
+                                      <TableCell className="text-right text-muted-foreground">{formatCurrency(cashBonus)}</TableCell>
+                                    )}
+                                    {hasDeferred && (
+                                      <TableCell className="text-right text-muted-foreground">{formatCurrency(yearDeferred)}</TableCell>
                                     )}
                                     <TableCell className="text-right font-semibold">
-                                      {formatCurrency(point.salary + yearBonus + employerPension)}
+                                      {formatCurrency(point.salary + yearTotalBonus + employerPension)}
                                     </TableCell>
                                   </TableRow>
                                 );
@@ -646,41 +662,6 @@ export default function IncomePage() {
       </section>
       </CollapsibleSection>
 
-      {/* Tax Band Consumption */}
-      <CollapsibleSection title="Tax Band Consumption" summary="How income fills each tax band" storageKey="income-tax-bands">
-      <section>
-        <Card>
-          <CardContent className="pt-6">
-            <TaxBandChart
-              data={personAnalysis.map(({ person, incomeTaxResult }): TaxBandDataItem => {
-                const bands = incomeTaxResult.breakdown;
-                const getBand = (name: string) =>
-                  bands.find((b) => b.band === name)?.taxableAmount ?? 0;
-                return {
-                  name: person.name,
-                  personalAllowance: getBand("Personal Allowance"),
-                  basicRate: getBand("Basic Rate"),
-                  higherRate: getBand("Higher Rate"),
-                  additionalRate: getBand("Additional Rate"),
-                };
-              })}
-              height={Math.max(160, personAnalysis.length * 80)}
-            />
-          </CardContent>
-        </Card>
-      </section>
-      </CollapsibleSection>
-
-      {/* Effective Tax Rate Curve */}
-      <CollapsibleSection title="Effective Tax Rate Curve" summary="Marginal and effective rates vs income level" storageKey="income-tax-curve">
-      <section>
-        <Card>
-          <CardContent className="pt-6">
-            <EffectiveTaxRateChart />
-          </CardContent>
-        </Card>
-      </section>
-      </CollapsibleSection>
 
       {/* Tax Efficiency Score */}
       <CollapsibleSection title="Tax Efficiency Score" summary={`${Math.round(taxEfficiencyScore * 100)}% tax-advantaged`} storageKey="income-tax-efficiency">

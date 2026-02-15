@@ -1,40 +1,43 @@
 // ============================================================
 // Deferred Bonus — Tranche Generation
 // ============================================================
-// Generates DeferredBonusTranche[] from the simplified bonus
-// structure (annual amount + vesting years). Tranches vest in
-// January each year, starting from the next January after grant.
+// Generates DeferredBonusTranche[] from the bonus structure.
+// The deferred amount is derived: totalBonusAnnual - cashBonusAnnual.
+// Tranches vest in January each year after a configurable gap.
 
 import type { BonusStructure, DeferredBonusTranche } from "@/types";
+import { getDeferredBonus } from "@/types";
 
 /**
- * Generate deferred bonus tranches from the simplified parameters.
+ * Generate deferred bonus tranches from the bonus structure.
  *
- * Given a total annual deferred bonus and vesting period, creates
- * equal tranches vesting in January each year.
+ * The deferred amount (totalBonusAnnual - cashBonusAnnual) vests equally
+ * over `vestingYears` tranches, starting after `vestingGapYears`.
  *
- * Example: £45,000 over 3 years, granted in 2025 →
- *   - £15,000 vests Jan 2026
- *   - £15,000 vests Jan 2027
- *   - £15,000 vests Jan 2028
+ * Example: £270,000 over 3 years with 1-year gap, granted in 2025 →
+ *   - £90,000 vests Jan 2027 (gap=1, then year 1 of 3)
+ *   - £90,000 vests Jan 2028
+ *   - £90,000 vests Jan 2029
  *
- * @param bonus - Bonus structure with simplified fields
+ * @param bonus - Bonus structure
  * @param referenceDate - Optional reference date for grant (defaults to today)
  */
 export function generateDeferredTranches(
   bonus: BonusStructure,
   referenceDate: Date = new Date()
 ): DeferredBonusTranche[] {
-  if (bonus.deferredBonusAnnual <= 0 || bonus.vestingYears <= 0) return [];
+  const deferredAmount = getDeferredBonus(bonus);
+  if (deferredAmount <= 0 || bonus.vestingYears <= 0) return [];
 
-  const amountPerTranche = bonus.deferredBonusAnnual / bonus.vestingYears;
+  const amountPerTranche = deferredAmount / bonus.vestingYears;
   const grantYear = referenceDate.getFullYear();
   const grantDate = `${grantYear}-01-01`;
+  const gap = bonus.vestingGapYears ?? 0;
 
   const tranches: DeferredBonusTranche[] = [];
   for (let i = 1; i <= bonus.vestingYears; i++) {
-    // Vest in January each year, starting from the next year
-    const vestYear = grantYear + i;
+    // Vest in January: after gap + i years from grant
+    const vestYear = grantYear + gap + i;
     const vestDate = `${vestYear}-01-01`;
     tranches.push({
       grantDate,
@@ -50,7 +53,7 @@ export function generateDeferredTranches(
 /**
  * Calculate the total projected value of all deferred tranches at vesting.
  *
- * @param bonus - Bonus structure with simplified fields
+ * @param bonus - Bonus structure
  * @param referenceDate - Optional reference date for grant
  */
 export function totalProjectedDeferredValue(

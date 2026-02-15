@@ -4,25 +4,30 @@
 
 Runway is a comprehensive UK household net worth tracking and financial planning application. Built with Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, and Recharts. All data is stored client-side in localStorage — no backend.
 
+## Maintenance Rule
+
+**Always keep this index updated when things change.** When adding, renaming, or removing files, functions, types, or data flows — update the relevant section of this index in the same commit.
+
 ## Tech Stack
 
 - **Framework:** Next.js 16 (App Router, static export)
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (301 tests)
+- **Testing:** Vitest + Testing Library (410 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
 
-- `src/app/` — Pages: dashboard, accounts, projections, retirement, income, tax-planning, iht, export, settings
-- `src/components/ui/` — 26 shadcn/ui components
-- `src/components/charts/` — 15 financial visualization charts (Recharts)
+- `src/app/` — Pages: dashboard, accounts, projections, retirement, income, tax-planning, iht, cashflow, export, settings
+- `src/components/ui/` — 17 shadcn/ui components
+- `src/components/charts/` — 16 financial visualization charts (Recharts)
 - `src/components/layout/` — Navigation
-- `src/lib/` — Financial calculation engines (tax, CGT, projections, formatting)
-- `src/context/` — Global data context (localStorage persistence)
+- `src/components/retirement/` — Retirement sub-components (hero, countdown grid, pension bridge, FIRE metrics, scenario controls)
+- `src/lib/` — Financial calculation engines (tax, CGT, projections, formatting, recommendations, school fees, deferred bonus)
+- `src/context/` — Global state (data, scenario, person view, privacy)
 - `src/types/` — TypeScript type definitions
-- `data/` — Default JSON data files (household, snapshots, transactions)
+- `data/` — Default JSON data files (household, snapshots)
 
 ## Commands
 
@@ -161,3 +166,275 @@ Most calculations are now extracted to `src/lib/` with tests. The following rema
 - Tax efficiency score -> `src/lib/projections.ts:calculateTaxEfficiencyScore`
 - Deferred bonus projection -> `src/lib/projections.ts:projectDeferredBonusValue`
 - All 10 recommendation analyzers now have test coverage
+
+---
+
+## Code Index
+
+### src/lib/ — Financial Calculation Engines
+
+#### `tax-constants.ts` — UK Tax Rates & Thresholds (2024/25)
+Single source of truth. Never hardcode rates elsewhere.
+- `UK_TAX_CONSTANTS` — nested object: `personalAllowance`, `incomeTax` (basic/higher/additional rates & limits), `nationalInsurance` (thresholds, employee rates), `studentLoan` (plan1-5 + postgrad thresholds & rates), `cgt` (exemption, rates), `isaAnnualAllowance`, `pensionAnnualAllowance`, pension taper thresholds, `dividendAllowance` + rates, `iht` (NRB, RNRB, taper threshold, rate), `marriageAllowance`, `statePension` (weekly/annual amounts, qualifying years)
+
+#### `tax.ts` — Income Tax, NI, Take-Home Pay
+- `calculateIncomeTax(grossSalary, pensionContribution?, pensionMethod?) → IncomeTaxResult` — band breakdown + effective rate
+- `calculateNI(grossSalary, pensionContribution?, pensionMethod?) → NIResult` — NI bands
+- `calculateStudentLoan(grossSalary, plan) → number`
+- `calculateTakeHomePay(income: PersonIncome) → TakeHomeResult` — full net pay (gross, tax, NI, pension, monthly)
+- `calculateTakeHomePayWithStudentLoan(income, plan) → TakeHomeResult`
+- Types: `TaxBandBreakdown`, `IncomeTaxResult`, `NIResult`, `TakeHomeResult`
+
+#### `cgt.ts` — Capital Gains Tax & Bed-and-ISA
+- `getTaxYear(dateStr) → string` — e.g. "2024/25"
+- `parseTaxYearDates(taxYear) → {start, end}`
+- `getUnrealisedGains(accounts[]) → UnrealisedGain[]`
+- `determineCgtRate(grossIncome, pensionContribution?, pensionMethod?) → number`
+- `calculateBedAndISA(unrealisedGain, cgtAllowanceRemaining, cgtRate) → BedAndISAResult`
+- `calculateBedAndISABreakEven(cgtCost, giaValue, cgtRate, assumedReturn?) → number`
+
+#### `iht.ts` — Inheritance Tax
+- `calculateEffectiveNRB(nrbPerPerson, numberOfPersons, giftsWithin7Years) → number`
+- `calculateRnrbTaperReduction(estateValue, taperThreshold?) → number`
+- `calculateEffectiveRNRB(rnrbPerPerson, numberOfPersons, estateValue) → number`
+- `calculateIHT(estateValue, numberOfPersons, giftsWithin7Years, passingToDirectDescendants) → IHTResult`
+- `calculateYearsUntilIHTExceeded(currentEstateValue, combinedThreshold, annualSavingsInEstate, growthRate?) → number | null`
+- `yearsSince(dateStr, now?) → number`
+
+#### `projections.ts` — Growth Projections, Retirement, State Pension
+- **Compound growth:** `projectCompoundGrowth()`, `projectScenarios()`, `projectCompoundGrowthWithGrowingContributions()`, `projectScenariosWithGrowth()`, `projectFinalValue()`, `projectSalaryTrajectory()`
+- **Retirement:** `calculateRetirementCountdown()`, `calculateCoastFIRE()`, `calculateRequiredSavings()`, `calculatePensionBridge()`, `calculateSWR()`, `calculateRequiredPot()`, `calculateAdjustedRequiredPot()`
+- **Pension allowance:** `calculateTaperedAnnualAllowance(thresholdIncome, adjustedIncome) → number`
+- **State pension:** `calculateProRataStatePension(qualifyingYears) → number`
+- **Age:** `calculateAge(dateOfBirth, now?) → number`
+- **Efficiency:** `calculateTaxEfficiencyScore()`, `projectDeferredBonusValue()`, `getMidScenarioRate()`
+
+#### `cash-flow.ts` — 24-Month Forward Cash Flow
+- `generateCashFlowTimeline(household) → CashFlowMonth[]` — salary, bonus, deferred vesting, outgoings by month
+
+#### `lifetime-cashflow.ts` — Lifetime Year-by-Year Projection
+- `generateLifetimeCashFlow(household, growthRate, endAge?) → LifetimeCashFlowResult` — tracks employment income, pension drawdown, state pension, investment drawdown, expenditure to age 95
+- Types: `LifetimeCashFlowYear`, `LifetimeCashFlowResult`, `LifetimeCashFlowEvent`
+
+#### `school-fees.ts` — School Fee Projections
+- `calculateSchoolStartDate(child)`, `calculateSchoolEndDate(child)`, `calculateSchoolYearsRemaining(child)`, `calculateTotalSchoolFeeCost(child)`, `generateSchoolFeeOutgoing(child) → CommittedOutgoing`, `generateSchoolFeeTimeline(children[]) → SchoolFeeTimelineYear[]`, `findLastSchoolFeeYear(children[])`
+
+#### `deferred-bonus.ts` — Deferred Bonus Tranches
+- `generateDeferredTranches(bonus, referenceDate?) → DeferredBonusTranche[]` — respects `vestingGapYears`
+- `totalProjectedDeferredValue(bonus, referenceDate?) → number`
+
+#### `recommendations.ts` — Actionable Financial Recommendations
+- `generateRecommendations(household) → Recommendation[]` — master function calling 10+ analyzers
+- Individual analyzers: `analyzeSalaryTaper`, `analyzePensionAllowance` (taper), `analyzeSalaryContribution`, `analyzePensionDeficit`, `analyzeISA`, `analyzeGIA`, `analyzeBedAndISA`, `analyzeCGTAllowance`, `analyzeStudentLoan`, `analyzeEmergencyFund`
+- Types: `Recommendation`, `RecommendationPriority`, `RecommendationCategory`
+
+#### `scenario.ts` — What-If Scenario Overrides
+- `applyScenarioOverrides(household, overrides) → HouseholdData`
+- Types: `ScenarioOverrides`, `ContributionOverride`
+
+#### `format.ts` — Display Formatting
+- `formatCurrency(amount)` → "£1,234.56"
+- `formatCurrencyCompact(amount)` → "£1.2k"
+- `formatPercent(decimal)` → "7.00%"
+- `formatDate(dateStr)` → "15 Jun 2024"
+- `formatNumber(n)` → "1,234"
+- `formatCurrencyAxis(value)` — chart axis labels
+- `formatCurrencyTooltip(value)` — chart tooltip labels
+- `roundPence(amount)`
+
+#### `schemas.ts` — Zod Runtime Validation
+- `HouseholdDataSchema`, `SnapshotsDataSchema` — top-level
+- Per-entity: `PersonSchema`, `AccountSchema`, `PersonIncomeSchema`, `BonusStructureSchema`, `ContributionSchema`, `RetirementConfigSchema`, `EmergencyFundConfigSchema`, `CommittedOutgoingSchema`, `ChildSchema`, `GiftSchema`, `IHTConfigSchema`, `DashboardConfigSchema`
+
+#### `migration.ts` — localStorage Schema Migrations
+- `migrateHouseholdData(raw) → record` — 9 idempotent migrations:
+  1. `annualContributions → contributions`
+  2. `estimatedAnnualExpenses → monthlyLifestyleSpending`
+  3. Ensure `monthlyLifestyleSpending` in emergencyFund
+  4. Default `committedOutgoings[]`
+  5. Default `dashboardConfig`
+  6. Default `plannedRetirementAge` + `niQualifyingYears` on persons
+  7. `deferredTranches[] → deferredBonusAnnual` (simplified)
+  8. Default `children[]`
+  9. `deferredBonusAnnual → totalBonusAnnual` (total model)
+
+#### `utils.ts` — Tailwind Utilities
+- `cn(...inputs)` — clsx + twMerge
+
+### src/types/index.ts — Domain Type Definitions
+
+**Enums:** `AccountType`, `TaxWrapper`, `StudentLoanPlan`, `PensionContributionMethod`, `OutgoingFrequency`, `CommittedOutgoingCategory`, `ContributionTarget`, `HeroMetricType`
+
+**Core types:**
+- `Person` — id, name, relationship, dateOfBirth, plannedRetirementAge, niQualifyingYears, studentLoanPlan?
+- `Account` — id, personId, type (AccountType), provider, name, currentValue, costBasis?
+- `PersonIncome` — personId, grossSalary, employer/employeePensionContribution, pensionMethod, salaryGrowthRate, bonusGrowthRate
+- `BonusStructure` — personId, totalBonusAnnual, cashBonusAnnual, vestingYears, vestingGapYears, estimatedAnnualReturn
+- `DeferredBonusTranche` — grantDate, vestingDate, amount, estimatedAnnualReturn
+- `Contribution` — id, personId, label, target (isa|pension|gia), amount, frequency
+- `RetirementConfig` — targetAnnualIncome, withdrawalRate, includeStatePension, scenarioRates
+- `EmergencyFundConfig` — monthlyEssentialExpenses, targetMonths, monthlyLifestyleSpending
+- `Child` — id, name, dateOfBirth, schoolFeeAnnual, feeInflationRate, schoolStartAge, schoolEndAge
+- `CommittedOutgoing` — id, category, label, amount, frequency, startDate?, endDate?, inflationRate?, linkedChildId?
+- `Gift`, `IHTConfig`, `DashboardConfig`, `NetWorthSnapshot`, `HouseholdData`, `SnapshotsData`
+
+**Helper functions:**
+- `getAccountTaxWrapper(type) → TaxWrapper`
+- `isAccountAccessible(type) → boolean` — pension = inaccessible
+- `getDeferredBonus(bonus) → number` — `max(0, totalBonusAnnual - cashBonusAnnual)`
+- `annualiseContribution(amount, frequency)`, `annualiseOutgoing(amount, frequency)`
+- `getPersonContributionTotals(contributions, personId) → {isa, pension, gia}`
+
+**Label maps:** `ACCOUNT_TYPE_LABELS`, `TAX_WRAPPER_LABELS`, `CONTRIBUTION_TARGET_LABELS`, `CONTRIBUTION_FREQUENCY_LABELS`, `OUTGOING_CATEGORY_LABELS`, `OUTGOING_FREQUENCY_LABELS`, `HERO_METRIC_LABELS`
+
+### src/context/ — Global State
+
+| File | Hook | State | Persistence |
+|------|------|-------|-------------|
+| `data-context.tsx` | `useData()` | `household`, `snapshots`, `isHydrated` + mutations (`updateHousehold`, `resetToDefaults`, etc.) + computed helpers (`getTotalNetWorth`, `getNetWorthByPerson`, etc.) | localStorage: `nw-household`, `nw-snapshots` |
+| `scenario-context.tsx` | `useScenario()` | `isScenarioMode`, `overrides`, `savedScenarios[]` + `enableScenario()`, `applyOverrides()` | localStorage: `nw-saved-scenarios` |
+| `person-view-context.tsx` | `usePersonView()` | `selectedView` (household or personId), `isHouseholdView` | Session only |
+| `privacy-context.tsx` | `usePrivacy()` | `blurred`, `toggle()` — auto-blur after 5min, default blur if >24h stale, Ctrl+Shift+B | localStorage: `nw-privacy-blurred`, `nw-last-visit` |
+| `use-scenario-data.ts` | `useScenarioData()` | Composes data + scenario contexts — returns scenario-aware `household` + `baseHousehold` | — |
+
+### src/app/ — Page Routes
+
+| Route | File | Purpose | Key lib dependencies |
+|-------|------|---------|---------------------|
+| `/` (Dashboard) | `page.tsx` | Hero metrics, recommendations, net worth breakdown, school fee timeline, retirement countdown, committed outgoings list | `recommendations.ts`, `projections.ts`, `school-fees.ts`, `format.ts` |
+| `/accounts` | `accounts/page.tsx` | Account register by person & type, add/edit/delete, cost basis | `format.ts` |
+| `/income` | `income/page.tsx` | Salary, tax, NI, student loan, deferred bonus, 24-month cash flow, waterfall, school fees, income trajectory | `tax.ts`, `cash-flow.ts`, `deferred-bonus.ts`, `school-fees.ts`, `format.ts` |
+| `/retirement` | `retirement/page.tsx` | Retirement countdown, pension bridge, FIRE metrics, income timeline, scenario controls | `projections.ts`, `format.ts` |
+| `/projections` | `projections/page.tsx` | Multi-scenario net worth growth trajectories | `projections.ts` |
+| `/tax-planning` | `tax-planning/page.tsx` | CGT (Bed & ISA), pension taper, ISA/pension allowance usage, marriage allowance | `tax.ts`, `cgt.ts`, `projections.ts`, `format.ts` |
+| `/iht` | `iht/page.tsx` | Estate value, gifts within 7 years, RNRB taper, years to threshold | `iht.ts`, `format.ts` |
+| `/cashflow` | `cashflow/page.tsx` | Lifetime cash flow projection (income sources, spending, surplus/deficit), life events timeline | `lifetime-cashflow.ts`, `school-fees.ts`, `format.ts` |
+| `/export` | `export/page.tsx` | Export household data as .xlsx (multiple sheets) | `deferred-bonus.ts`, `format.ts` |
+| `/settings` | `settings/page.tsx` | Tabbed settings: Household, Planning, Children, Commitments, IHT + data reset/import | `schemas.ts`, `format.ts` |
+
+### Settings Sub-Components (`src/app/settings/components/`)
+
+| File | Tab | Edits |
+|------|-----|-------|
+| `household-tab.tsx` | Household | Persons (name, DOB, retirement age, NI years, student loan), income (salary, pension, growth rates), bonus structures (total, cash, vesting), dashboard hero metrics |
+| `planning-tab.tsx` | Planning | Target annual income, withdrawal rate, state pension toggle, scenario growth rates |
+| `children-tab.tsx` | Children | Child name, DOB, school fee, inflation rate, start/end ages |
+| `commitments-tab.tsx` | Commitments | Committed outgoings (category, label, amount, frequency, dates), auto-synced school fees |
+| `iht-tab.tsx` | IHT | Property value, direct descendants toggle, gifts register |
+| `accounts-tab.tsx` | (inline) | Account type, provider, name, balance, cost basis |
+| `field-helpers.tsx` | — | Shared form input components (currency, date, percentage fields) |
+| `field-warning.tsx` | — | Validation warning component |
+
+### src/components/ — Feature Components
+
+| File | Purpose |
+|------|---------|
+| `settings-bar.tsx` | Reusable bar surfacing settings on consuming pages (cog icon, primary-tinted bg, edit link) |
+| `privacy-toggle.tsx` | Eye/EyeOff button for blur mode |
+| `theme-toggle.tsx` | Light/dark mode toggle |
+| `person-toggle.tsx` | Dropdown: household vs per-person view |
+| `scenario-banner.tsx` | "In scenario mode" banner |
+| `scenario-panel.tsx` | Scenario control panel (enable/save/load/delete) |
+| `scenario-delta.tsx` | Before/after metric comparison |
+| `empty-state.tsx` | No-data fallback message |
+| `page-header.tsx` | Page title + subtitle |
+| `collapsible-section.tsx` | Accordion wrapper for content groups |
+| `error-boundary.tsx` | React error boundary |
+| `school-fee-summary.tsx` | School fee summary card |
+| `layout/navigation.tsx` | Sidebar + mobile nav (includes PrivacyToggle, ThemeToggle) |
+
+### src/components/charts/ — Recharts Visualizations
+
+| File | Chart Type | Used On |
+|------|-----------|---------|
+| `net-worth-trajectory.tsx` | Multi-year projection with scenario bands | Dashboard |
+| `net-worth-history.tsx` | Monthly snapshots from past data | Dashboard |
+| `allocation-pie.tsx` | Assets by wrapper (pie) | Dashboard |
+| `by-person-chart.tsx` | Net worth per person (bar) | Dashboard |
+| `wrapper-split-chart.tsx` | Wrapper breakdown over time (stacked bar) | Dashboard |
+| `liquidity-split-chart.tsx` | Accessible vs locked-in (bar) | Dashboard |
+| `projection-chart.tsx` | Growth projection (line) | Projections |
+| `retirement-progress.tsx` | FIRE progress (bar) | Retirement |
+| `retirement-drawdown-chart.tsx` | Pot depletion over years (area) | Retirement |
+| `retirement-income-timeline.tsx` | Salary → pension → state pension (stacked area) | Retirement |
+| `lifetime-cashflow-chart.tsx` | Year-by-year surplus/deficit (bar + line) | Cashflow |
+| `cash-flow-timeline.tsx` | 24-month forward (grouped bar) | Income |
+| `cash-flow-waterfall.tsx` | Tax breakdown waterfall (stacked bar) | Income |
+| `school-fee-timeline-chart.tsx` | School fees with inflation (bar) | Income, Dashboard |
+| `effective-tax-rate-chart.tsx` | Tax rate over income ranges (line) | Tax Planning |
+| `tax-band-chart.tsx` | Income by tax band (stacked bar) | Tax Planning |
+
+### src/components/retirement/ — Retirement Sub-Components
+
+| File | Purpose |
+|------|---------|
+| `retirement-hero.tsx` | Large headline card (countdown, target pot) |
+| `retirement-countdown-grid.tsx` | 3-column grid: retirement, pension access, state pension ages |
+| `pension-bridge-card.tsx` | Early retirement bridge gap analysis |
+| `fire-metrics-card.tsx` | Coast FIRE, required savings, SWR metrics |
+| `scenario-controls.tsx` | Retirement page scenario input controls |
+
+### src/components/ui/ — shadcn/ui Library
+
+`alert`, `badge`, `button`, `card`, `collapsible`, `dialog`, `dropdown-menu`, `input`, `label`, `progress`, `scroll-area`, `select`, `separator`, `sheet`, `table`, `tabs`, `tooltip`
+
+### data/ — Default JSON Data
+
+| File | Purpose |
+|------|---------|
+| `household.json` | Default example data (2 persons, 10+ accounts, income, bonuses, contributions, retirement config, outgoings) |
+| `snapshots.json` | Historical net worth snapshots (monthly, per-person, per-wrapper breakdowns) |
+
+### Test Files (`src/lib/__tests__/`)
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `tax.test.ts` | Income tax bands, NI, take-home pay, pension methods, student loan |
+| `projections.test.ts` | Compound growth, salary trajectory, retirement countdown, pension taper, state pension, age, FIRE |
+| `recommendations.test.ts` | All 10+ recommendation analyzers with scenario variations |
+| `lifetime-cashflow.test.ts` | Year-by-year cash flow, employment→pension→state pension transitions |
+| `iht.test.ts` | NRB reduction, RNRB taper, combined threshold, liability, years to IHT |
+| `cgt.test.ts` | Tax year parsing, CGT rate determination, Bed & ISA break-even |
+| `pension-flow.test.ts` | Pension contributions, employer match, lump sum, drawdown, bridge |
+| `projection-consistency.test.ts` | Cross-function consistency checks |
+| `school-fees.test.ts` | Start/end dates, years remaining, total cost, timeline generation |
+| `deferred-bonus.test.ts` | Tranche generation, vesting schedule (including vestingGapYears), projected value |
+| `scenario.test.ts` | Scenario override merging (income, contributions, retirement, accounts, market shock) |
+| `format.test.ts` | Currency, percentage, date, number formatting |
+| `cash-flow.test.ts` | 24-month timeline: salary growth, bonus months, deferred vesting, term fees |
+| `migration.test.ts` | All 9 data migrations: old formats → current schema |
+| `tax-constants.test.ts` | Constants structure validation |
+
+### Key Data Flows
+
+**Settings → Consuming Pages:**
+- Retirement config (target income, withdrawal rate, scenario rates) → Retirement page SettingsBar
+- ISA/pension allowance usage → Tax Planning page SettingsBar (progress bars)
+- Persons, income, bonuses → Income page (trajectory, waterfall, take-home)
+- Children → auto-generates `CommittedOutgoing` school fees → Dashboard, Income, Cashflow
+- Committed outgoings → Dashboard (compact list), Income (waterfall), Cashflow (lifetime)
+
+**Bidirectional navigation:**
+- Pages show `SettingsBar` linking to `/settings?tab=<tab>`
+- Settings tabs show "Shown on:" links back to consuming pages
+
+**Scenario mode:**
+- Pages use `useScenarioData()` → applies `applyScenarioOverrides()` in-memory
+- `ScenarioDelta` shows before/after comparison
+- Saved scenarios persisted to `nw-saved-scenarios` in localStorage
+
+**Recommendation engine:**
+- `generateRecommendations(household)` on Dashboard calls all analyzers
+- Each analyzer returns `Recommendation[]` with `actionUrl` linking to relevant pages
+
+**Bonus model:**
+- `totalBonusAnnual` grows at `bonusGrowthRate` per year
+- `cashBonusAnnual` stays fixed
+- Deferred = `getDeferredBonus(bonus)` = `max(0, total - cash)`
+- Tranches generated via `generateDeferredTranches()` respecting `vestingGapYears`
+- Vests in equal annual tranches: year = grantYear + gap + i
+
+**Privacy blur:**
+- `PrivacyProvider` sets `data-blurred="true"` on `<html>`
+- CSS blurs `.tabular-nums` and `[class*="recharts"]` elements
+- Auto-blur after 5min inactivity, default blur if >24h since last visit

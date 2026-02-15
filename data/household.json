@@ -143,16 +143,18 @@
   "bonusStructures": [
     {
       "personId": "person-1",
+      "totalBonusAnnual": 70000,
       "cashBonusAnnual": 25000,
-      "deferredBonusAnnual": 45000,
       "vestingYears": 3,
+      "vestingGapYears": 0,
       "estimatedAnnualReturn": 0.08
     },
     {
       "personId": "person-2",
+      "totalBonusAnnual": 5000,
       "cashBonusAnnual": 5000,
-      "deferredBonusAnnual": 0,
       "vestingYears": 3,
+      "vestingGapYears": 0,
       "estimatedAnnualReturn": 0.08
     }
   ],

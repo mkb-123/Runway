@@ -198,6 +198,24 @@
 }
 
 /* ============================================================ */
+/* Privacy Blur — hides sensitive financial numbers              */
+/* ============================================================ */
+/* Activated by data-blurred="true" on <html>.                  */
+/* Blurs tabular-nums (financial values) and chart content.      */
+
+html[data-blurred="true"] .tabular-nums,
+html[data-blurred="true"] [class*="recharts"] {
+  filter: blur(8px);
+  user-select: none;
+  transition: filter 0.3s ease;
+}
+
+html[data-blurred="true"] .tabular-nums:hover,
+html[data-blurred="true"] [class*="recharts"]:hover {
+  filter: blur(8px); /* Stay blurred even on hover */
+}
+
+/* ============================================================ */
 /* Print Styles — Financial Report                              */
 /* ============================================================ */
 

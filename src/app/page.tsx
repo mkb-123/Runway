@@ -44,7 +44,7 @@ import {
   type RecommendationPriority,
   type Recommendation,
 } from "@/lib/recommendations";
-import { annualiseOutgoing, annualiseContribution } from "@/types";
+import { annualiseOutgoing, annualiseContribution, OUTGOING_CATEGORY_LABELS, OUTGOING_FREQUENCY_LABELS } from "@/types";
 import { TAX_WRAPPER_LABELS } from "@/types";
 import type { TaxWrapper, HeroMetricType } from "@/types";
 
@@ -877,24 +877,31 @@ export default function Home() {
           summary={`${formatCurrencyCompact(totalAnnualCommitments)}/yr across ${household.committedOutgoings.length} items`}
           storageKey="commitments"
         >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {household.committedOutgoings.map((o) => (
-              <Card key={o.id}>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{o.label || o.category}</span>
-                    <Badge variant="secondary" className="text-[10px]">
-                      {o.frequency}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-lg font-bold tabular-nums">{formatCurrency(o.amount)}</p>
-                  <p className="text-xs text-muted-foreground tabular-nums">
-                    {formatCurrencyCompact(annualiseOutgoing(o.amount, o.frequency))}/yr
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <Card>
+            <CardContent className="pt-4 pb-2">
+              <div className="space-y-1">
+                {[...household.committedOutgoings]
+                  .sort((a, b) => annualiseOutgoing(b.amount, b.frequency) - annualiseOutgoing(a.amount, a.frequency))
+                  .map((o) => {
+                    const annual = annualiseOutgoing(o.amount, o.frequency);
+                    return (
+                      <div key={o.id} className="flex items-center gap-3 py-1.5 border-b last:border-0">
+                        <Badge variant="outline" className="text-[10px] shrink-0 w-20 justify-center">
+                          {OUTGOING_CATEGORY_LABELS[o.category]}
+                        </Badge>
+                        <span className="text-sm flex-1 truncate">{o.label || OUTGOING_CATEGORY_LABELS[o.category]}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {OUTGOING_FREQUENCY_LABELS[o.frequency]}
+                        </span>
+                        <span className="text-sm font-medium tabular-nums shrink-0 w-20 text-right">
+                          {formatCurrencyCompact(annual)}/yr
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </CardContent>
+          </Card>
         </CollapsibleSection>
       )}
     </div>
