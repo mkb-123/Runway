@@ -21,7 +21,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 
 - `src/app/` — Pages: dashboard, accounts, projections, retirement, income, tax-planning, iht, cashflow, export, settings
 - `src/components/ui/` — 17 shadcn/ui components
-- `src/components/charts/` — 16 financial visualization charts (Recharts)
+- `src/components/charts/` — 15 financial visualization charts (Recharts)
 - `src/components/layout/` — Navigation
 - `src/components/retirement/` — Retirement sub-components (hero, countdown grid, pension bridge, FIRE metrics, scenario controls)
 - `src/lib/` — Financial calculation engines (tax, CGT, projections, formatting, recommendations, school fees, deferred bonus)
@@ -310,7 +310,7 @@ Single source of truth. Never hardcode rates elsewhere.
 |-------|------|---------|---------------------|
 | `/` (Dashboard) | `page.tsx` | Hero metrics, recommendations, net worth breakdown, school fee timeline, retirement countdown, committed outgoings list | `recommendations.ts`, `projections.ts`, `school-fees.ts`, `format.ts` |
 | `/accounts` | `accounts/page.tsx` | Account register by person & type, add/edit/delete, cost basis | `format.ts` |
-| `/income` | `income/page.tsx` | Salary, tax, NI, student loan, deferred bonus, 24-month cash flow, waterfall, school fees, income trajectory | `tax.ts`, `cash-flow.ts`, `deferred-bonus.ts`, `school-fees.ts`, `format.ts` |
+| `/income` | `income/page.tsx` | Salary, tax, NI, student loan, deferred bonus, 24-month cash flow, school fees, income trajectory | `tax.ts`, `cash-flow.ts`, `deferred-bonus.ts`, `school-fees.ts`, `format.ts` |
 | `/retirement` | `retirement/page.tsx` | Retirement countdown, pension bridge, FIRE metrics, income timeline, scenario controls | `projections.ts`, `format.ts` |
 | `/projections` | `projections/page.tsx` | Multi-scenario net worth growth trajectories | `projections.ts` |
 | `/tax-planning` | `tax-planning/page.tsx` | CGT (Bed & ISA), pension taper, ISA/pension allowance usage, marriage allowance | `tax.ts`, `cgt.ts`, `projections.ts`, `format.ts` |
@@ -367,7 +367,6 @@ Single source of truth. Never hardcode rates elsewhere.
 | `retirement-income-timeline.tsx` | Salary → pension → state pension (stacked area) | Retirement |
 | `lifetime-cashflow-chart.tsx` | Year-by-year surplus/deficit (bar + line) | Cashflow |
 | `cash-flow-timeline.tsx` | 24-month forward (grouped bar) | Income |
-| `cash-flow-waterfall.tsx` | Tax breakdown waterfall (stacked bar) | Income |
 | `school-fee-timeline-chart.tsx` | School fees with inflation (bar) | Income, Dashboard |
 | `effective-tax-rate-chart.tsx` | Tax rate over income ranges (line) | Tax Planning |
 | `tax-band-chart.tsx` | Income by tax band (stacked bar) | Tax Planning |
@@ -419,9 +418,9 @@ Single source of truth. Never hardcode rates elsewhere.
 **Settings → Consuming Pages:**
 - Retirement config (target income, withdrawal rate, scenario rates) → Retirement page SettingsBar
 - ISA/pension allowance usage → Tax Planning page SettingsBar (progress bars)
-- Persons, income, bonuses → Income page (trajectory, waterfall, take-home)
+- Persons, income, bonuses → Income page (trajectory, take-home)
 - Children → auto-generates `CommittedOutgoing` school fees → Dashboard, Income, Cashflow
-- Committed outgoings → Dashboard (compact list), Income (waterfall), Cashflow (lifetime)
+- Committed outgoings → Dashboard (compact list), Cashflow (lifetime)
 
 **Bidirectional navigation:**
 - Pages show `SettingsBar` linking to `/settings?tab=<tab>`
