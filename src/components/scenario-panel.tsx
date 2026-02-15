@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/sheet";
 import { useScenario, type ScenarioOverrides } from "@/context/scenario-context";
 import { useData } from "@/context/data-context";
-import { getPersonContributionTotals, isAccountAccessible } from "@/types";
+import { getPersonContributionTotals, getPersonGrossIncome, isAccountAccessible } from "@/types";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/format";
 import { calculateIncomeTax, calculateNI } from "@/lib/tax";
 import { calculateAge, projectFinalValue, calculateSWR, calculateProRataStatePension } from "@/lib/projections";
@@ -276,7 +276,7 @@ function RangeInput({
         className="h-2 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
       />
       {changed && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground tabular-nums">
           Currently {format(current)}
         </p>
       )}
@@ -313,8 +313,7 @@ export function ScenarioPanel() {
     const byPerson: Record<string, { isa: number; pension: number; gia: number; total: number }> = {};
 
     for (const person of household.persons) {
-      const income = household.income.find((i) => i.personId === person.id);
-      const gross = income?.grossSalary ?? 0;
+      const gross = getPersonGrossIncome(household.income, household.bonusStructures, person.id);
       totalGross += gross;
 
       const totals = getPersonContributionTotals(household.contributions, person.id);
@@ -543,13 +542,13 @@ export function ScenarioPanel() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs text-muted-foreground">Tax + NI Saved</p>
-                    <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                    <p className="text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
                       +{formatCurrencyCompact(totalImpact.totalSaved)}/yr
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Take-Home Change</p>
-                    <p className={`text-lg font-bold ${totalImpact.totalTakeHomeChange >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                    <p className={`text-lg font-bold tabular-nums ${totalImpact.totalTakeHomeChange >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
                       {totalImpact.totalTakeHomeChange >= 0 ? "+" : ""}
                       {formatCurrencyCompact(totalImpact.totalTakeHomeChange)}/yr
                     </p>
@@ -622,7 +621,7 @@ export function ScenarioPanel() {
                       }
                     />
                     {impact && impact.totalSaved !== 0 && (
-                      <div className="flex gap-3 rounded-md bg-muted/50 px-2 py-1.5">
+                      <div className="flex gap-3 rounded-md bg-muted/50 px-2 py-1.5 tabular-nums">
                         <span className="text-xs text-emerald-600 dark:text-emerald-400">
                           Tax: +{formatCurrencyCompact(impact.taxSaved)}
                         </span>
@@ -729,6 +728,11 @@ export function ScenarioPanel() {
                         </p>
                         {yearsToRetirement > 0 && (
                           <>
+                            {sliderValue < person.pensionAccessAge && (
+                              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                                Pension locked until age {person.pensionAccessAge} ({person.pensionAccessAge - sliderValue}yr gap — need accessible savings to bridge)
+                              </p>
+                            )}
                             <p className="text-xs text-muted-foreground">
                               Projected pot: <span className="tabular-nums font-medium text-foreground">{formatCurrencyCompact(projectedPot)}</span>
                               <span className="text-muted-foreground/60"> at {(growthRate * 100).toFixed(0)}% growth</span>
@@ -825,7 +829,7 @@ export function ScenarioPanel() {
                               ...prev,
                               [person.id]: {
                                 ...prev[person.id],
-                                isa: parseFloat(e.target.value) || undefined,
+                                isa: e.target.value === "" ? undefined : parseFloat(e.target.value),
                               },
                             }))
                           }
@@ -844,7 +848,7 @@ export function ScenarioPanel() {
                               ...prev,
                               [person.id]: {
                                 ...prev[person.id],
-                                pension: parseFloat(e.target.value) || undefined,
+                                pension: e.target.value === "" ? undefined : parseFloat(e.target.value),
                               },
                             }))
                           }
@@ -863,7 +867,7 @@ export function ScenarioPanel() {
                               ...prev,
                               [person.id]: {
                                 ...prev[person.id],
-                                gia: parseFloat(e.target.value) || undefined,
+                                gia: e.target.value === "" ? undefined : parseFloat(e.target.value),
                               },
                             }))
                           }
