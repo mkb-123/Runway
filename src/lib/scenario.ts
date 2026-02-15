@@ -4,9 +4,15 @@
 // Extracted from scenario-context.tsx for testability.
 // Each override type has explicit merge semantics.
 
-import type { HouseholdData, PersonIncome, Contribution } from "@/types";
+import type { HouseholdData, Person, PersonIncome, Contribution, BonusStructure } from "@/types";
+import { getPersonContributionTotals, getPersonGrossIncome } from "@/types";
+import { calculateIncomeTax, calculateNI } from "@/lib/tax";
+import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 
 // --- Override types ---
+
+/** Person override that requires an id for matching, with all other fields optional */
+export type PersonOverride = Pick<Person, "id"> & Partial<Omit<Person, "id">>;
 
 export interface ContributionOverride {
   personId: string;
@@ -16,6 +22,8 @@ export interface ContributionOverride {
 }
 
 export interface ScenarioOverrides {
+  /** Partial person-level overrides (e.g. plannedRetirementAge), merged by personId */
+  personOverrides?: PersonOverride[];
   income?: Partial<PersonIncome>[];
   contributionOverrides?: ContributionOverride[];
   retirement?: Partial<HouseholdData["retirement"]>;
@@ -32,6 +40,7 @@ export interface ScenarioOverrides {
  * with overridden values. The original data is not mutated.
  *
  * Override merge semantics:
+ * - personOverrides: spread-merge by personId (e.g. retirement age)
  * - income: spread-merge by personId (partial override)
  * - contributionOverrides: full replacement per person (synthetic contributions)
  * - retirement: spread-merge on top of existing config
@@ -44,6 +53,7 @@ export function applyScenarioOverrides(
 ): HouseholdData {
   let result = { ...household };
 
+  result = applyPersonOverrides(result, overrides.personOverrides);
   result = applyIncomeOverrides(result, overrides.income);
   result = applyContributionOverrides(result, overrides.contributionOverrides);
   result = applyRetirementOverrides(result, overrides.retirement);
@@ -53,6 +63,24 @@ export function applyScenarioOverrides(
 }
 
 // --- Individual override applicators ---
+
+function applyPersonOverrides(
+  household: HouseholdData,
+  personOverrides?: PersonOverride[]
+): HouseholdData {
+  if (!personOverrides || personOverrides.length === 0) return household;
+
+  return {
+    ...household,
+    persons: household.persons.map((person) => {
+      const override = personOverrides.find((o) => o.id === person.id);
+      if (override) {
+        return { ...person, ...override } as Person;
+      }
+      return person;
+    }),
+  };
+}
 
 function applyIncomeOverrides(
   household: HouseholdData,
@@ -160,4 +188,170 @@ function applyAccountOverrides(
       return acc;
     }),
   };
+}
+
+// --- Extracted pure functions (scenario panel helpers) ---
+
+/**
+ * Scale household contributions to achieve a target savings rate.
+ * Distributes contributions proportionally to each person's income share,
+ * maintaining existing ISA/pension/GIA ratio for persons with contributions.
+ * Persons with zero contributions receive allocation to ISA.
+ */
+export function scaleSavingsRateContributions(
+  persons: Person[],
+  income: PersonIncome[],
+  bonusStructures: BonusStructure[],
+  contributions: Contribution[],
+  targetSavingsRatePercent: number
+): ContributionOverride[] {
+  let totalGrossIncome = 0;
+  const contribsByPerson: Record<string, { isa: number; pension: number; gia: number; total: number }> = {};
+
+  for (const person of persons) {
+    const gross = getPersonGrossIncome(income, bonusStructures, person.id);
+    totalGrossIncome += gross;
+    const totals = getPersonContributionTotals(contributions, person.id);
+    const personTotal = totals.isaContribution + totals.pensionContribution + totals.giaContribution;
+    contribsByPerson[person.id] = {
+      isa: totals.isaContribution,
+      pension: totals.pensionContribution,
+      gia: totals.giaContribution,
+      total: personTotal,
+    };
+  }
+
+  if (totalGrossIncome <= 0) return [];
+
+  const targetTotalContribs = (targetSavingsRatePercent / 100) * totalGrossIncome;
+
+  return persons.map((person) => {
+    const current = contribsByPerson[person.id] ?? { isa: 0, pension: 0, gia: 0, total: 0 };
+    const personGross = getPersonGrossIncome(income, bonusStructures, person.id);
+    const personShare = totalGrossIncome > 0 ? personGross / totalGrossIncome : 0;
+    const personTarget = targetTotalContribs * personShare;
+
+    if (current.total > 0) {
+      // Scale maintaining existing ISA/pension/GIA ratio
+      const scale = personTarget / current.total;
+      return {
+        personId: person.id,
+        isaContribution: Math.round(current.isa * scale),
+        pensionContribution: Math.round(current.pension * scale),
+        giaContribution: Math.round(current.gia * scale),
+      };
+    }
+    // No existing contributions — allocate to ISA based on income share
+    return {
+      personId: person.id,
+      isaContribution: Math.round(personTarget),
+    };
+  });
+}
+
+/**
+ * Calculate the tax/NI impact of changing pension contributions.
+ * Returns a map of personId → impact preview.
+ */
+export interface ImpactPreview {
+  taxSaved: number;
+  niSaved: number;
+  totalSaved: number;
+  newTakeHome: number;
+  takeHomeChange: number;
+}
+
+export function calculateScenarioImpact(
+  persons: Person[],
+  income: PersonIncome[],
+  pensionOverrides: Record<string, number>
+): Map<string, ImpactPreview> {
+  const results = new Map<string, ImpactPreview>();
+
+  for (const person of persons) {
+    const personIncome = income.find((i) => i.personId === person.id);
+    if (!personIncome) continue;
+
+    const newPension = pensionOverrides[person.id] ?? personIncome.employeePensionContribution;
+
+    const currentTax = calculateIncomeTax(
+      personIncome.grossSalary,
+      personIncome.employeePensionContribution,
+      personIncome.pensionContributionMethod
+    );
+    const newTax = calculateIncomeTax(
+      personIncome.grossSalary,
+      newPension,
+      personIncome.pensionContributionMethod
+    );
+
+    const currentNI = calculateNI(
+      personIncome.grossSalary,
+      personIncome.employeePensionContribution,
+      personIncome.pensionContributionMethod
+    );
+    const newNI = calculateNI(
+      personIncome.grossSalary,
+      newPension,
+      personIncome.pensionContributionMethod
+    );
+
+    const taxSaved = currentTax.tax - newTax.tax;
+    const niSaved = currentNI.ni - newNI.ni;
+
+    const currentTakeHome =
+      personIncome.grossSalary - personIncome.employeePensionContribution - currentTax.tax - currentNI.ni;
+    const newTakeHome =
+      personIncome.grossSalary - newPension - newTax.tax - newNI.ni;
+
+    results.set(person.id, {
+      taxSaved: Math.round(taxSaved),
+      niSaved: Math.round(niSaved),
+      totalSaved: Math.round(taxSaved + niSaved),
+      newTakeHome: Math.round(newTakeHome),
+      takeHomeChange: Math.round(newTakeHome - currentTakeHome),
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Build scenario overrides that salary-sacrifice enough to bring income
+ * below the £100k personal allowance taper threshold.
+ */
+export function buildAvoidTaperPreset(
+  persons: Person[],
+  income: PersonIncome[],
+  contributions: Contribution[]
+): ScenarioOverrides {
+  const overrides: ScenarioOverrides = { income: [] };
+  for (const person of persons) {
+    const personIncome = income.find((i) => i.personId === person.id);
+    if (!personIncome) continue;
+
+    const adjustedGross =
+      personIncome.pensionContributionMethod === "salary_sacrifice" || personIncome.pensionContributionMethod === "net_pay"
+        ? personIncome.grossSalary - personIncome.employeePensionContribution
+        : personIncome.grossSalary;
+
+    if (adjustedGross > UK_TAX_CONSTANTS.personalAllowanceTaperThreshold && adjustedGross <= UK_TAX_CONSTANTS.incomeTax.higherRateUpperLimit) {
+      const excess = adjustedGross - UK_TAX_CONSTANTS.personalAllowanceTaperThreshold;
+      const contribs = getPersonContributionTotals(contributions, person.id);
+      const pensionUsed = personIncome.employeePensionContribution + personIncome.employerPensionContribution + contribs.pensionContribution;
+      const headroom = UK_TAX_CONSTANTS.pensionAnnualAllowance - pensionUsed;
+      const additionalSacrifice = Math.min(excess, headroom);
+
+      if (additionalSacrifice > 0) {
+        overrides.income!.push({
+          personId: person.id,
+          grossSalary: personIncome.grossSalary,
+          employeePensionContribution: personIncome.employeePensionContribution + additionalSacrifice,
+          employerPensionContribution: personIncome.employerPensionContribution,
+          pensionContributionMethod: personIncome.pensionContributionMethod,
+        });
+      }
+    }
+  }
+  return overrides;
 }

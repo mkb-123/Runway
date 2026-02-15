@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
@@ -44,8 +44,7 @@ export default function RetirementPage() {
   // Scenario-aware data
   const scenarioData = useScenarioData();
   const { selectedView } = usePersonView();
-  const household = scenarioData.household;
-  const baseHousehold = scenarioData.baseHousehold;
+  const { household, baseHousehold, isScenarioMode } = scenarioData;
 
   const accounts = useMemo(() => {
     if (selectedView === "household") return household.accounts;
@@ -225,6 +224,12 @@ export default function RetirementPage() {
     number | null
   >(null);
   const effectiveRetirementAge = retirementAgeOverride ?? plannedRetirementAge;
+
+  // Reset local slider when scenario mode changes (prevents stale local state
+  // conflicting with scenario panel retirement age overrides)
+  useEffect(() => {
+    setRetirementAgeOverride(null);
+  }, [isScenarioMode]);
 
   // Growth rate toggle (index into scenarioRates)
   const [selectedRateIndex, setSelectedRateIndex] = useState<number>(

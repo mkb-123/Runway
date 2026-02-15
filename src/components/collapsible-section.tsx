@@ -56,7 +56,7 @@ export function CollapsibleSection({
           <span className="font-semibold text-sm">{title}</span>
         </div>
         {!isOpen && summary && (
-          <span className="text-xs text-muted-foreground truncate ml-4 max-w-[60%] text-right">
+          <span className="text-xs text-muted-foreground truncate ml-4 max-w-[60%] text-right tabular-nums" data-sensitive>
             {summary}
           </span>
         )}

@@ -576,7 +576,7 @@ export default function Home() {
           Generated{" "}
           {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(new Date())}
           {" | "}
-          Household net worth: {formatCurrency(totalNetWorth)}
+          Household net worth: <span className="tabular-nums">{formatCurrency(totalNetWorth)}</span>
         </p>
       </div>
 
@@ -690,7 +690,7 @@ export default function Home() {
                         style={{ width: `${Math.min(heroData.fireProgress, 100)}%` }}
                       />
                     </div>
-                    <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
+                    <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground tabular-nums">
                       <span>{formatCurrencyCompact(heroData.totalNetWorth)} saved</span>
                       <span>
                         Target: {formatCurrencyCompact(

@@ -34,7 +34,7 @@ export function ScenarioDelta({
   const isDifferent = Math.abs(scenario - base) > epsilon;
 
   if (!isScenarioMode || !isDifferent) {
-    return <>{format(scenario)}</>;
+    return <span className="tabular-nums">{format(scenario)}</span>;
   }
 
   const diff = scenario - base;
@@ -42,12 +42,12 @@ export function ScenarioDelta({
   const isPositive = diff > 0;
 
   return (
-    <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
-      <span className="text-[0.8em] text-muted-foreground line-through decoration-muted-foreground/40">
+    <span className="inline-flex flex-wrap items-baseline gap-x-1.5 tabular-nums">
+      <span className="text-[0.8em] text-muted-foreground line-through decoration-muted-foreground/40 tabular-nums">
         {format(base)}
       </span>
       <span className="text-[0.7em] text-muted-foreground/60" aria-hidden="true">{"\u2192"}</span>
-      <span>{format(scenario)}</span>
+      <span className="tabular-nums">{format(scenario)}</span>
       {showPercent && base !== 0 && (
         <span
           className={`text-[0.75em] font-medium rounded-full px-1.5 py-0.5 ${

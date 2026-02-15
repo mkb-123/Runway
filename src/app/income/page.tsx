@@ -261,7 +261,7 @@ export default function IncomePage() {
                 {/* Monthly take-home highlight */}
                 <div className="mt-4 flex items-baseline justify-between border-t pt-3">
                   <span className="text-sm text-muted-foreground">Monthly take-home</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                     <ScenarioDelta base={base?.monthlyTakeHome ?? takeHome.monthlyTakeHome} scenario={takeHome.monthlyTakeHome} format={formatCurrency} />
                   </span>
                 </div>
@@ -276,21 +276,21 @@ export default function IncomePage() {
                   <div className="space-y-2">
                     <div className="flex items-baseline justify-between">
                       <span className="text-muted-foreground">Income tax</span>
-                      <span className="font-medium text-red-600 dark:text-red-400">
+                      <span className="font-medium tabular-nums text-red-600 dark:text-red-400">
                         <ScenarioDelta base={base?.incomeTax ?? takeHome.incomeTax} scenario={takeHome.incomeTax} format={formatCurrency} />
                         <span className="ml-2 text-xs text-muted-foreground">({formatPercent(incomeTaxResult.effectiveRate)} eff.)</span>
                       </span>
                     </div>
                     <div className="flex items-baseline justify-between">
                       <span className="text-muted-foreground">National Insurance</span>
-                      <span className="font-medium text-red-600 dark:text-red-400">
+                      <span className="font-medium tabular-nums text-red-600 dark:text-red-400">
                         <ScenarioDelta base={base?.ni ?? takeHome.ni} scenario={takeHome.ni} format={formatCurrency} />
                       </span>
                     </div>
                     {studentLoan > 0 && (
                       <div className="flex items-baseline justify-between">
                         <span className="text-muted-foreground">Student loan <Badge variant="secondary" className="ml-1 text-[10px]">{studentLoanLabel(person.studentLoanPlan)}</Badge></span>
-                        <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(studentLoan)}</span>
+                        <span className="font-medium tabular-nums text-red-600 dark:text-red-400">{formatCurrency(studentLoan)}</span>
                       </div>
                     )}
                     <div className="flex items-baseline justify-between">
@@ -300,9 +300,9 @@ export default function IncomePage() {
                           {personIncome.pensionContributionMethod === "salary_sacrifice" ? "Sal. Sac." : personIncome.pensionContributionMethod === "net_pay" ? "Net Pay" : "RAS"}
                         </Badge>
                       </span>
-                      <span className="font-medium text-red-600 dark:text-red-400">
+                      <span className="font-medium tabular-nums text-red-600 dark:text-red-400">
                         <ScenarioDelta base={base?.pensionDeduction ?? takeHome.pensionDeduction} scenario={takeHome.pensionDeduction} format={formatCurrency} />
-                        <span className="ml-2 text-xs text-muted-foreground">+ {formatCurrency(personIncome.employerPensionContribution)} employer</span>
+                        <span className="ml-2 text-xs text-muted-foreground tabular-nums">+ {formatCurrency(personIncome.employerPensionContribution)} employer</span>
                       </span>
                     </div>
                   </div>
@@ -378,16 +378,16 @@ export default function IncomePage() {
                     {cashBonus > 0 && (
                       <div className="flex items-baseline justify-between">
                         <span className="text-muted-foreground">Cash bonus</span>
-                        <span className="font-semibold">{formatCurrency(cashBonus)}</span>
+                        <span className="font-semibold tabular-nums">{formatCurrency(cashBonus)}</span>
                       </div>
                     )}
                     {bonus && deferredBonus > 0 && (
                       <>
                         <div className="flex items-baseline justify-between">
                           <span className="text-muted-foreground">Deferred bonus</span>
-                          <span className="font-semibold">{formatCurrency(deferredBonus)}</span>
+                          <span className="font-semibold tabular-nums">{formatCurrency(deferredBonus)}</span>
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-muted-foreground tabular-nums">
                           {formatCurrency(deferredBonus / bonus.vestingYears)}/tranche over {bonus.vestingYears} years · {formatPercent(bonus.estimatedAnnualReturn)} est. return
                         </div>
                         <div className="overflow-x-auto">
@@ -450,27 +450,27 @@ export default function IncomePage() {
                   <div className="space-y-3">
                     <div className="flex items-baseline justify-between">
                       <span className="text-muted-foreground">Base salary</span>
-                      <span className="font-medium">{formatCurrency(salary)}</span>
+                      <span className="font-medium tabular-nums">{formatCurrency(salary)}</span>
                     </div>
                     <div className="flex items-baseline justify-between">
                       <span className="text-muted-foreground">Employer pension</span>
-                      <span className="font-medium">{formatCurrency(employerPension)}</span>
+                      <span className="font-medium tabular-nums">{formatCurrency(employerPension)}</span>
                     </div>
                     {cashBonus > 0 && (
                       <div className="flex items-baseline justify-between">
                         <span className="text-muted-foreground">Cash bonus</span>
-                        <span className="font-medium">{formatCurrency(cashBonus)}</span>
+                        <span className="font-medium tabular-nums">{formatCurrency(cashBonus)}</span>
                       </div>
                     )}
                     {deferredBonus > 0 && (
                       <div className="flex items-baseline justify-between">
                         <span className="text-muted-foreground">Deferred bonus</span>
-                        <span className="font-medium">{formatCurrency(deferredBonus)}</span>
+                        <span className="font-medium tabular-nums">{formatCurrency(deferredBonus)}</span>
                       </div>
                     )}
                     <div className="border-t pt-3 flex items-baseline justify-between">
                       <span className="text-lg font-semibold">Total compensation</span>
-                      <span className="text-lg font-bold">{formatCurrency(totalComp)}</span>
+                      <span className="text-lg font-bold tabular-nums">{formatCurrency(totalComp)}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -600,19 +600,19 @@ export default function IncomePage() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border p-3">
                   <div className="text-sm text-muted-foreground">ISA + Pension (tax-advantaged)</div>
-                  <div className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                  <div className="text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(taxAdvantagedSavings)}
                   </div>
                 </div>
                 <div className="rounded-lg border p-3">
                   <div className="text-sm text-muted-foreground">GIA (taxable)</div>
-                  <div className="text-lg font-semibold text-amber-600">
+                  <div className="text-lg font-semibold tabular-nums text-amber-600">
                     {formatCurrency(totalSavings - taxAdvantagedSavings)}
                   </div>
                 </div>
                 <div className="rounded-lg border p-3">
                   <div className="text-sm text-muted-foreground">Total annual savings</div>
-                  <div className="text-lg font-semibold">{formatCurrency(totalSavings)}</div>
+                  <div className="text-lg font-semibold tabular-nums">{formatCurrency(totalSavings)}</div>
                 </div>
               </div>
             </div>

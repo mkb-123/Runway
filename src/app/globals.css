@@ -204,6 +204,8 @@
 /* Blurs tabular-nums (financial values) and chart content.      */
 
 html[data-blurred="true"] .tabular-nums,
+html[data-blurred="true"] .font-mono,
+html[data-blurred="true"] [data-sensitive],
 html[data-blurred="true"] [class*="recharts"] {
   filter: blur(8px);
   user-select: none;
@@ -211,6 +213,8 @@ html[data-blurred="true"] [class*="recharts"] {
 }
 
 html[data-blurred="true"] .tabular-nums:hover,
+html[data-blurred="true"] .font-mono:hover,
+html[data-blurred="true"] [data-sensitive]:hover,
 html[data-blurred="true"] [class*="recharts"]:hover {
   filter: blur(8px); /* Stay blurred even on hover */
 }

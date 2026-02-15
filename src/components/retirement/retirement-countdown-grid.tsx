@@ -25,7 +25,7 @@ export function RetirementCountdownGrid({
   return (
     <Card>
       <CardContent className="pt-6">
-        <p className="text-sm text-muted-foreground mb-4">
+        <p className="text-sm text-muted-foreground mb-4 tabular-nums">
           Estimated time to reach {formatCurrencyCompact(requiredPot)} target
         </p>
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">

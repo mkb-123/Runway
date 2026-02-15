@@ -73,7 +73,7 @@ export function SchoolFeeSummary({ childrenList, showSettingsLink = true, compac
           <p className="text-xs text-muted-foreground mt-0.5">
             remaining commitment
           </p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[11px] text-muted-foreground">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[11px] text-muted-foreground tabular-nums">
             <span>{formatCurrencyCompact(totalAnnualFees)}/yr current</span>
             {yearsUntilFree !== null && yearsUntilFree > 0 && (
               <span>{yearsUntilFree}yr until free</span>
@@ -159,7 +159,7 @@ export function SchoolFeeSummary({ childrenList, showSettingsLink = true, compac
               <Badge
                 key={child.id}
                 variant={inSchool ? "default" : "secondary"}
-                className="text-xs"
+                className="text-xs tabular-nums"
               >
                 {child.name || "Child"}: {formatCurrencyCompact(child.schoolFeeAnnual)}/yr
                 {remaining > 0 ? ` (${remaining}yr left)` : " (done)"}
