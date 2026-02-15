@@ -20,6 +20,7 @@ import {
   PiggyBank,
   ChevronDown,
   ChevronUp,
+  Percent,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -300,6 +301,37 @@ export function ScenarioPanel() {
     Record<string, { isa?: number; pension?: number; gia?: number }>
   >({});
   const [marketShock, setMarketShock] = useState<string>("");
+  const [savingsRateOverride, setSavingsRateOverride] = useState<number | null>(null);
+
+  // Current savings rate calculation
+  const { currentSavingsRate, totalGrossIncome, contribsByPerson } = useMemo(() => {
+    let totalContribs = 0;
+    let totalGross = 0;
+    const byPerson: Record<string, { isa: number; pension: number; gia: number; total: number }> = {};
+
+    for (const person of household.persons) {
+      const income = household.income.find((i) => i.personId === person.id);
+      const gross = income?.grossSalary ?? 0;
+      totalGross += gross;
+
+      const totals = getPersonContributionTotals(household.contributions, person.id);
+      const personTotal = totals.isaContribution + totals.pensionContribution + totals.giaContribution;
+      totalContribs += personTotal;
+
+      byPerson[person.id] = {
+        isa: totals.isaContribution,
+        pension: totals.pensionContribution,
+        gia: totals.giaContribution,
+        total: personTotal,
+      };
+    }
+
+    return {
+      currentSavingsRate: totalGross > 0 ? (totalContribs / totalGross) * 100 : 0,
+      totalGrossIncome: totalGross,
+      contribsByPerson: byPerson,
+    };
+  }, [household]);
 
   // Reset form state when panel closes (if not in scenario mode)
   const handleOpenChange = useCallback(
@@ -310,6 +342,7 @@ export function ScenarioPanel() {
         setIncomeOverrides({});
         setContributionOverrides({});
         setMarketShock("");
+        setSavingsRateOverride(null);
       }
     },
     [isScenarioMode]
@@ -329,9 +362,10 @@ export function ScenarioPanel() {
         return personIncome !== undefined && incomeOverrides[k] !== personIncome.grossSalary;
       }) ||
       Object.keys(contributionOverrides).length > 0 ||
-      marketShock !== ""
+      marketShock !== "" ||
+      savingsRateOverride !== null
     );
-  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock, household.income]);
+  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, household.income]);
 
   const applyCustomScenario = useCallback(() => {
     const newOverrides: ScenarioOverrides = {};
@@ -364,17 +398,43 @@ export function ScenarioPanel() {
       newOverrides.income = Array.from(incomeByPerson.values());
     }
 
-    // Contribution overrides
-    const contribChanges = Object.entries(contributionOverrides).filter(
-      ([, val]) => val.isa !== undefined || val.pension !== undefined || val.gia !== undefined
-    );
-    if (contribChanges.length > 0) {
-      newOverrides.contributionOverrides = contribChanges.map(([personId, vals]) => ({
-        personId,
-        ...(vals.isa !== undefined ? { isaContribution: vals.isa } : {}),
-        ...(vals.pension !== undefined ? { pensionContribution: vals.pension } : {}),
-        ...(vals.gia !== undefined ? { giaContribution: vals.gia } : {}),
-      }));
+    // Contribution overrides — savings rate slider takes priority over manual contribution inputs
+    if (savingsRateOverride !== null && totalGrossIncome > 0) {
+      // Scale each person's contributions proportionally to achieve the new savings rate
+      const targetTotalContribs = (savingsRateOverride / 100) * totalGrossIncome;
+      const currentTotalContribs = Object.values(contribsByPerson).reduce((s, c) => s + c.total, 0);
+      const scale = currentTotalContribs > 0 ? targetTotalContribs / currentTotalContribs : 0;
+
+      newOverrides.contributionOverrides = household.persons.map((person) => {
+        const current = contribsByPerson[person.id] ?? { isa: 0, pension: 0, gia: 0, total: 0 };
+        if (currentTotalContribs > 0) {
+          return {
+            personId: person.id,
+            isaContribution: Math.round(current.isa * scale),
+            pensionContribution: Math.round(current.pension * scale),
+            giaContribution: Math.round(current.gia * scale),
+          };
+        }
+        // No existing contributions — allocate evenly to ISA
+        const personGross = household.income.find((i) => i.personId === person.id)?.grossSalary ?? 0;
+        const personShare = totalGrossIncome > 0 ? personGross / totalGrossIncome : 0;
+        return {
+          personId: person.id,
+          isaContribution: Math.round(targetTotalContribs * personShare),
+        };
+      });
+    } else {
+      const contribChanges = Object.entries(contributionOverrides).filter(
+        ([, val]) => val.isa !== undefined || val.pension !== undefined || val.gia !== undefined
+      );
+      if (contribChanges.length > 0) {
+        newOverrides.contributionOverrides = contribChanges.map(([personId, vals]) => ({
+          personId,
+          ...(vals.isa !== undefined ? { isaContribution: vals.isa } : {}),
+          ...(vals.pension !== undefined ? { pensionContribution: vals.pension } : {}),
+          ...(vals.gia !== undefined ? { giaContribution: vals.gia } : {}),
+        }));
+      }
     }
 
     // Market shock
@@ -384,7 +444,7 @@ export function ScenarioPanel() {
     }
 
     enableScenario("Custom Scenario", newOverrides);
-  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, enableScenario]);
+  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, totalGrossIncome, contribsByPerson, enableScenario]);
 
   const applyPreset = useCallback(
     (preset: SmartPreset) => {
@@ -403,6 +463,7 @@ export function ScenarioPanel() {
       setPensionOverrides(newPensionOverrides);
       setIncomeOverrides({});
       setContributionOverrides({});
+      setSavingsRateOverride(null);
       setMarketShock(
         overrides.marketShockPercent !== undefined
           ? String(overrides.marketShockPercent * 100)
@@ -418,6 +479,7 @@ export function ScenarioPanel() {
     setIncomeOverrides({});
     setContributionOverrides({});
     setMarketShock("");
+    setSavingsRateOverride(null);
   }, [disableScenario]);
 
   // Total impact summary
@@ -562,6 +624,41 @@ export function ScenarioPanel() {
                   </div>
                 );
               })}
+            </div>
+          </Section>
+
+          {/* Savings Rate Slider */}
+          <Section title="Savings Rate" icon={Percent} defaultOpen={true}>
+            <div className="space-y-3">
+              <RangeInput
+                label="Household savings rate"
+                value={savingsRateOverride ?? Math.round(currentSavingsRate * 10) / 10}
+                min={0}
+                max={50}
+                step={0.5}
+                current={Math.round(currentSavingsRate * 10) / 10}
+                format={(v) => `${v.toFixed(1)}%`}
+                onChange={(v) => setSavingsRateOverride(v)}
+              />
+              {savingsRateOverride !== null && totalGrossIncome > 0 && (
+                <div className="rounded-md bg-muted/50 px-2 py-1.5 space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    Total contributions: <span className="tabular-nums font-medium text-foreground">{formatCurrencyCompact(Math.round((savingsRateOverride / 100) * totalGrossIncome))}/yr</span>
+                    <span className="text-muted-foreground/60"> (was {formatCurrencyCompact(Math.round((currentSavingsRate / 100) * totalGrossIncome))})</span>
+                  </p>
+                  {household.persons.map((person) => {
+                    const current = contribsByPerson[person.id];
+                    if (!current) return null;
+                    const currentTotal = Object.values(contribsByPerson).reduce((s, c) => s + c.total, 0);
+                    const scale = currentTotal > 0 ? ((savingsRateOverride / 100) * totalGrossIncome) / currentTotal : 0;
+                    return (
+                      <p key={person.id} className="text-xs text-muted-foreground tabular-nums">
+                        {person.name}: ISA {formatCurrencyCompact(Math.round(current.isa * scale))} · Pension {formatCurrencyCompact(Math.round(current.pension * scale))} · GIA {formatCurrencyCompact(Math.round(current.gia * scale))}
+                      </p>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </Section>
 
