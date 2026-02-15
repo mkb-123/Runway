@@ -105,7 +105,6 @@ function buildIncomeTimeline(
       .map((p) => ({ p, available: p.pensionPot }));
     const totalAvailablePension = availablePensionPots.reduce((s, x) => s + x.available, 0);
 
-    let pensionDrawnTotal = 0;
     for (const p of pots) {
       const key = `${p.name} Pension`;
       if (age >= p.pensionAccessAge && p.pensionPot > 0) {
@@ -119,7 +118,6 @@ function buildIncomeTimeline(
         p.pensionPot *= 1 + growthRate;
         point[key] = Math.round(draw);
         totalIncome += draw;
-        pensionDrawnTotal += draw;
       } else {
         // Grow even if not drawing
         if (p.pensionPot > 0) {
@@ -239,7 +237,6 @@ export function RetirementIncomeTimeline({
   );
 
   // BUG-015: Build accessible summary
-  const lastDataPoint = data[data.length - 1];
   const accessibleSummary = `Retirement income timeline from age ${retirementAge} to ${endAge}. ${
     hasShortfall
       ? `Income falls short of the ${formatCurrencyAxis(targetAnnualIncome)} annual target in some years.`
