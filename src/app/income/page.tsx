@@ -268,354 +268,216 @@ export default function IncomePage() {
           niResult,
           studentLoan,
           takeHome,
-        }) => (
-          <section key={person.id} className="space-y-6">
+        }) => {
+          const base = baseIncomeLookup.get(person.id);
+          const totalPension = personIncome.employeePensionContribution + personIncome.employerPensionContribution;
+          const cashBonus = bonus?.cashBonusAnnual ?? 0;
+          const deferredBonus = bonus?.deferredBonusAnnual ?? 0;
+          const hasBonus = cashBonus > 0 || deferredBonus > 0;
+
+          return (
+          <section key={person.id} className="space-y-4">
             <h2 className="text-2xl font-semibold">{person.name}</h2>
 
-            {/* Gross Salary */}
+            {/* Compact Pay Summary — key numbers at a glance */}
             <Card>
-              <CardHeader>
-                <CardTitle>Gross Salary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-muted-foreground">Annual gross salary</span>
-                  <span className="text-2xl font-bold">
-                    <ScenarioDelta
-                      base={baseIncomeLookup.get(person.id)?.grossSalary ?? personIncome.grossSalary}
-                      scenario={personIncome.grossSalary}
-                      format={formatCurrency}
-                    />
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider">Gross</div>
+                    <div className="text-lg font-bold tabular-nums">
+                      <ScenarioDelta base={base?.grossSalary ?? personIncome.grossSalary} scenario={personIncome.grossSalary} format={formatCurrency} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider">Take-Home</div>
+                    <div className="text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                      <ScenarioDelta base={base?.takeHome ?? takeHome.takeHome} scenario={takeHome.takeHome} format={formatCurrency} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider">Tax + NI</div>
+                    <div className="text-lg font-bold tabular-nums text-red-600 dark:text-red-400">
+                      {formatCurrency(incomeTaxResult.tax + niResult.ni)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider">Pension</div>
+                    <div className="text-lg font-bold tabular-nums">
+                      {formatCurrency(totalPension)}
+                    </div>
+                  </div>
+                </div>
+                {/* Monthly take-home highlight */}
+                <div className="mt-4 flex items-baseline justify-between border-t pt-3">
+                  <span className="text-sm text-muted-foreground">Monthly take-home</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    <ScenarioDelta base={base?.monthlyTakeHome ?? takeHome.monthlyTakeHome} scenario={takeHome.monthlyTakeHome} format={formatCurrency} />
                   </span>
                 </div>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-sm text-muted-foreground">Monthly gross</span>
-                  <span className="text-sm font-medium">
-                    <ScenarioDelta
-                      base={(baseIncomeLookup.get(person.id)?.grossSalary ?? personIncome.grossSalary) / 12}
-                      scenario={personIncome.grossSalary / 12}
-                      format={formatCurrency}
-                    />
-                  </span>
-                </div>
               </CardContent>
             </Card>
 
-            {/* Income Tax Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Income Tax Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Band</TableHead>
-                        <TableHead className="text-right">Rate</TableHead>
-                        <TableHead className="text-right">Taxable Amount</TableHead>
-                        <TableHead className="text-right">Tax</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {incomeTaxResult.breakdown.map((band) => (
-                        <TableRow key={band.band}>
-                          <TableCell className="font-medium">{band.band}</TableCell>
-                          <TableCell className="text-right">
-                            {formatPercent(band.rate)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(band.taxableAmount)}
-                          </TableCell>
-                          <TableCell className="text-right">{formatCurrency(band.tax)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    <TableFooter>
-                      <TableRow>
-                        <TableCell colSpan={2} className="font-semibold">
-                          Total Income Tax
-                        </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">
-                          Effective: {formatPercent(incomeTaxResult.effectiveRate)}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          <ScenarioDelta
-                            base={baseIncomeLookup.get(person.id)?.incomeTax ?? incomeTaxResult.tax}
-                            scenario={incomeTaxResult.tax}
-                            format={formatCurrency}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    </TableFooter>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* National Insurance Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle>National Insurance Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Band</TableHead>
-                        <TableHead className="text-right">Rate</TableHead>
-                        <TableHead className="text-right">Earnings</TableHead>
-                        <TableHead className="text-right">NI</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {niResult.breakdown.map((band) => (
-                        <TableRow key={band.band}>
-                          <TableCell className="font-medium">{band.band}</TableCell>
-                          <TableCell className="text-right">{formatPercent(band.rate)}</TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(band.earnings)}
-                          </TableCell>
-                          <TableCell className="text-right">{formatCurrency(band.ni)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    <TableFooter>
-                      <TableRow>
-                        <TableCell colSpan={3} className="font-semibold">
-                          Total National Insurance
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          <ScenarioDelta
-                            base={baseIncomeLookup.get(person.id)?.ni ?? niResult.ni}
-                            scenario={niResult.ni}
-                            format={formatCurrency}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    </TableFooter>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Student Loan */}
-            {person.studentLoanPlan !== "none" && (
+            {/* Deductions detail — collapsed by default */}
+            <CollapsibleSection title="Deductions Breakdown" summary={`Tax ${formatCurrency(incomeTaxResult.tax)} · NI ${formatCurrency(niResult.ni)}`} storageKey={`income-deductions-${person.id}`}>
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    Student Loan Repayment
-                    <Badge variant="secondary">{studentLoanLabel(person.studentLoanPlan)}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-muted-foreground">Annual repayment</span>
-                    <span className="text-lg font-semibold">{formatCurrency(studentLoan)}</span>
-                  </div>
-                  <div className="mt-2 flex items-baseline justify-between">
-                    <span className="text-sm text-muted-foreground">Monthly repayment</span>
-                    <span className="text-sm font-medium">
-                      {formatCurrency(studentLoan / 12)}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Pension Contributions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Pension Contributions
-                  <Badge variant="outline">
-                    {personIncome.pensionContributionMethod === "salary_sacrifice"
-                      ? "Salary Sacrifice"
-                      : personIncome.pensionContributionMethod === "net_pay"
-                        ? "Net Pay"
-                        : "Relief at Source"}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-muted-foreground">Employee contribution (annual)</span>
-                    <span className="font-medium">
-                      <ScenarioDelta
-                        base={baseIncomeLookup.get(person.id)?.employeePension ?? personIncome.employeePensionContribution}
-                        scenario={personIncome.employeePensionContribution}
-                        format={formatCurrency}
-                      />
-                    </span>
-                  </div>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-muted-foreground">Employer contribution (annual)</span>
-                    <span className="font-medium">
-                      <ScenarioDelta
-                        base={baseIncomeLookup.get(person.id)?.employerPension ?? personIncome.employerPensionContribution}
-                        scenario={personIncome.employerPensionContribution}
-                        format={formatCurrency}
-                      />
-                    </span>
-                  </div>
-                  <div className="border-t pt-3 flex items-baseline justify-between">
-                    <span className="font-semibold">Total pension (annual)</span>
-                    <span className="font-semibold">
-                      <ScenarioDelta
-                        base={(baseIncomeLookup.get(person.id)?.employeePension ?? 0) + (baseIncomeLookup.get(person.id)?.employerPension ?? 0)}
-                        scenario={personIncome.employeePensionContribution + personIncome.employerPensionContribution}
-                        format={formatCurrency}
-                      />
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Take-Home Pay */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Take-Home Pay</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {(() => {
-                  const base = baseIncomeLookup.get(person.id);
-                  return (
-                    <div className="space-y-3">
+                <CardContent className="pt-6 space-y-4">
+                  {/* Compact deduction lines */}
+                  <div className="space-y-2">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-muted-foreground">Income tax</span>
+                      <span className="font-medium text-red-600 dark:text-red-400">
+                        <ScenarioDelta base={base?.incomeTax ?? takeHome.incomeTax} scenario={takeHome.incomeTax} format={formatCurrency} />
+                        <span className="ml-2 text-xs text-muted-foreground">({formatPercent(incomeTaxResult.effectiveRate)} eff.)</span>
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-muted-foreground">National Insurance</span>
+                      <span className="font-medium text-red-600 dark:text-red-400">
+                        <ScenarioDelta base={base?.ni ?? takeHome.ni} scenario={takeHome.ni} format={formatCurrency} />
+                      </span>
+                    </div>
+                    {studentLoan > 0 && (
                       <div className="flex items-baseline justify-between">
-                        <span className="text-muted-foreground">Gross salary</span>
-                        <span className="font-medium">
-                          <ScenarioDelta base={base?.grossSalary ?? takeHome.gross} scenario={takeHome.gross} format={formatCurrency} />
-                        </span>
+                        <span className="text-muted-foreground">Student loan <Badge variant="secondary" className="ml-1 text-[10px]">{studentLoanLabel(person.studentLoanPlan)}</Badge></span>
+                        <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(studentLoan)}</span>
                       </div>
-                      {takeHome.adjustedGross !== takeHome.gross && (
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-muted-foreground">Adjusted gross (after pension)</span>
-                          <span className="font-medium">
-                            <ScenarioDelta base={base?.adjustedGross ?? takeHome.adjustedGross} scenario={takeHome.adjustedGross} format={formatCurrency} />
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-baseline justify-between text-red-600 dark:text-red-400">
-                        <span>Income tax</span>
-                        <span>-<ScenarioDelta base={base?.incomeTax ?? takeHome.incomeTax} scenario={takeHome.incomeTax} format={formatCurrency} /></span>
-                      </div>
-                      <div className="flex items-baseline justify-between text-red-600 dark:text-red-400">
-                        <span>National Insurance</span>
-                        <span>-<ScenarioDelta base={base?.ni ?? takeHome.ni} scenario={takeHome.ni} format={formatCurrency} /></span>
-                      </div>
-                      {takeHome.studentLoan > 0 && (
-                        <div className="flex items-baseline justify-between text-red-600 dark:text-red-400">
-                          <span>Student loan</span>
-                          <span>-<ScenarioDelta base={base?.studentLoan ?? takeHome.studentLoan} scenario={takeHome.studentLoan} format={formatCurrency} /></span>
-                        </div>
-                      )}
-                      <div className="flex items-baseline justify-between text-red-600 dark:text-red-400">
-                        <span>Pension deduction</span>
-                        <span>-<ScenarioDelta base={base?.pensionDeduction ?? takeHome.pensionDeduction} scenario={takeHome.pensionDeduction} format={formatCurrency} /></span>
-                      </div>
-                      <div className="border-t pt-3">
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-lg font-semibold">Annual take-home</span>
-                          <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                            <ScenarioDelta base={base?.takeHome ?? takeHome.takeHome} scenario={takeHome.takeHome} format={formatCurrency} />
-                          </span>
-                        </div>
-                        <div className="mt-1 flex items-baseline justify-between">
-                          <span className="text-muted-foreground">Monthly take-home</span>
-                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                            <ScenarioDelta base={base?.monthlyTakeHome ?? takeHome.monthlyTakeHome} scenario={takeHome.monthlyTakeHome} format={formatCurrency} />
-                          </span>
-                        </div>
-                      </div>
+                    )}
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-muted-foreground">
+                        Pension
+                        <Badge variant="outline" className="ml-1 text-[10px]">
+                          {personIncome.pensionContributionMethod === "salary_sacrifice" ? "Sal. Sac." : personIncome.pensionContributionMethod === "net_pay" ? "Net Pay" : "RAS"}
+                        </Badge>
+                      </span>
+                      <span className="font-medium text-red-600 dark:text-red-400">
+                        <ScenarioDelta base={base?.pensionDeduction ?? takeHome.pensionDeduction} scenario={takeHome.pensionDeduction} format={formatCurrency} />
+                        <span className="ml-2 text-xs text-muted-foreground">+ {formatCurrency(personIncome.employerPensionContribution)} employer</span>
+                      </span>
                     </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-
-            {/* Bonus Structure Section */}
-            {bonus && (bonus.cashBonusAnnual > 0 || bonus.deferredBonusAnnual > 0) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Bonus Structure</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Cash Bonus */}
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-muted-foreground">Cash bonus (annual)</span>
-                    <span className="text-lg font-semibold">
-                      {formatCurrency(bonus.cashBonusAnnual)}
-                    </span>
                   </div>
-
-                  {/* Deferred Bonus — simplified display */}
-                  {bonus.deferredBonusAnnual > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="font-medium">Deferred Bonus</h4>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-muted-foreground">Annual deferred</span>
-                          <span className="font-medium">{formatCurrency(bonus.deferredBonusAnnual)}</span>
-                        </div>
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-muted-foreground">Vesting period</span>
-                          <span className="font-medium">{bonus.vestingYears} year{bonus.vestingYears !== 1 ? "s" : ""} (equal)</span>
-                        </div>
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-muted-foreground">Per-tranche amount</span>
-                          <span className="font-medium">{formatCurrency(bonus.deferredBonusAnnual / bonus.vestingYears)}</span>
-                        </div>
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-muted-foreground">Est. annual return</span>
-                          <span className="font-medium">{formatPercent(bonus.estimatedAnnualReturn)}</span>
-                        </div>
-                      </div>
-                      {/* Generated tranches table */}
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Vesting</TableHead>
-                              <TableHead className="text-right">Amount</TableHead>
-                              <TableHead className="text-right">Projected Value</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {generateDeferredTranches(bonus).map((tranche, idx) => (
-                              <TableRow key={idx}>
-                                <TableCell>{formatDate(tranche.vestingDate)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(tranche.amount)}</TableCell>
-                                <TableCell className="text-right font-medium">
-                                  {formatCurrency(
-                                    tranche.amount * Math.pow(1 + tranche.estimatedAnnualReturn, idx + 1)
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                          <TableFooter>
-                            <TableRow>
-                              <TableCell className="font-semibold">Total</TableCell>
-                              <TableCell className="text-right font-semibold">
-                                {formatCurrency(bonus.deferredBonusAnnual)}
-                              </TableCell>
-                              <TableCell className="text-right font-semibold">
-                                {formatCurrency(totalProjectedDeferredValue(bonus))}
-                              </TableCell>
-                            </TableRow>
-                          </TableFooter>
-                        </Table>
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
+            </CollapsibleSection>
+
+            {/* Income Tax bands — collapsed by default */}
+            <CollapsibleSection title="Income Tax Bands" summary={`${incomeTaxResult.breakdown.length} bands · ${formatPercent(incomeTaxResult.effectiveRate)} effective`} storageKey={`income-tax-bands-${person.id}`}>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Band</TableHead>
+                          <TableHead className="text-right">Rate</TableHead>
+                          <TableHead className="text-right">Taxable</TableHead>
+                          <TableHead className="text-right">Tax</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {incomeTaxResult.breakdown.map((band) => (
+                          <TableRow key={band.band}>
+                            <TableCell className="font-medium">{band.band}</TableCell>
+                            <TableCell className="text-right">{formatPercent(band.rate)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(band.taxableAmount)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(band.tax)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </CollapsibleSection>
+
+            {/* NI bands — collapsed by default */}
+            <CollapsibleSection title="NI Bands" summary={formatCurrency(niResult.ni)} storageKey={`income-ni-bands-${person.id}`}>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Band</TableHead>
+                          <TableHead className="text-right">Rate</TableHead>
+                          <TableHead className="text-right">Earnings</TableHead>
+                          <TableHead className="text-right">NI</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {niResult.breakdown.map((band) => (
+                          <TableRow key={band.band}>
+                            <TableCell className="font-medium">{band.band}</TableCell>
+                            <TableCell className="text-right">{formatPercent(band.rate)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(band.earnings)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(band.ni)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </CollapsibleSection>
+
+            {/* Bonus — compact, only when present */}
+            {hasBonus && (
+              <CollapsibleSection title="Bonus" summary={`${formatCurrency(cashBonus + deferredBonus)} total`} storageKey={`income-bonus-${person.id}`}>
+                <Card>
+                  <CardContent className="pt-4 space-y-3">
+                    {cashBonus > 0 && (
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-muted-foreground">Cash bonus</span>
+                        <span className="font-semibold">{formatCurrency(cashBonus)}</span>
+                      </div>
+                    )}
+                    {bonus && deferredBonus > 0 && (
+                      <>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-muted-foreground">Deferred bonus</span>
+                          <span className="font-semibold">{formatCurrency(deferredBonus)}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatCurrency(deferredBonus / bonus.vestingYears)}/tranche over {bonus.vestingYears} years · {formatPercent(bonus.estimatedAnnualReturn)} est. return
+                        </div>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Vesting</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                                <TableHead className="text-right">Projected</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {generateDeferredTranches(bonus).map((tranche, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell>{formatDate(tranche.vestingDate)}</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(tranche.amount)}</TableCell>
+                                  <TableCell className="text-right font-medium">
+                                    {formatCurrency(tranche.amount * Math.pow(1 + tranche.estimatedAnnualReturn, idx + 1))}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                            <TableFooter>
+                              <TableRow>
+                                <TableCell className="font-semibold">Total</TableCell>
+                                <TableCell className="text-right font-semibold">{formatCurrency(deferredBonus)}</TableCell>
+                                <TableCell className="text-right font-semibold">{formatCurrency(totalProjectedDeferredValue(bonus))}</TableCell>
+                              </TableRow>
+                            </TableFooter>
+                          </Table>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </CollapsibleSection>
             )}
           </section>
-        )
+          );
+        }
       )}
 
       {/* Total Compensation Overview */}
@@ -673,10 +535,6 @@ export default function IncomePage() {
       {personAnalysis.some(({ personIncome }) => (personIncome.salaryGrowthRate ?? 0) > 0 || (personIncome.bonusGrowthRate ?? 0) > 0) && (
         <CollapsibleSection title="Income Trajectory" summary="Projected salary and bonus growth over time" storageKey="income-trajectory">
           <section className="space-y-4">
-            <p className="text-muted-foreground">
-              How salary and total compensation evolve based on configured annual growth rates.
-              These projections feed into the portfolio growth model on the Projections page.
-            </p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {personAnalysis
                 .filter(({ personIncome }) => (personIncome.salaryGrowthRate ?? 0) > 0 || (personIncome.bonusGrowthRate ?? 0) > 0)
@@ -742,10 +600,7 @@ export default function IncomePage() {
 
       {/* Cash Flow Waterfall */}
       <CollapsibleSection title="Cash Flow Waterfall" summary="Gross income through deductions to savings" defaultOpen storageKey="income-waterfall">
-      <section className="space-y-4">
-        <p className="text-muted-foreground">
-          Combined household cash flow from gross income through deductions to savings allocation.
-        </p>
+      <section>
         <Card>
           <CardContent className="pt-6">
             <CashFlowWaterfall data={waterfallData} />
@@ -756,11 +611,7 @@ export default function IncomePage() {
 
       {/* Cash Flow Timeline */}
       <CollapsibleSection title="Cash Flow Timeline" summary="Monthly income vs outgoings over 24 months" storageKey="income-cashflow-timeline">
-      <section className="space-y-4">
-        <p className="text-muted-foreground">
-          Monthly income (salary, bonuses, deferred vesting) vs total outgoings over the next 24 months.
-          Shows seasonal crunches when school fees, insurance, and bonuses collide.
-        </p>
+      <section>
         <Card>
           <CardContent className="pt-6">
             <CashFlowTimeline data={generateCashFlowTimeline(household)} />
@@ -771,10 +622,7 @@ export default function IncomePage() {
 
       {/* Tax Band Consumption */}
       <CollapsibleSection title="Tax Band Consumption" summary="How income fills each tax band" storageKey="income-tax-bands">
-      <section className="space-y-4">
-        <p className="text-muted-foreground">
-          How each person&apos;s income fills the tax bands from Personal Allowance through to Additional Rate.
-        </p>
+      <section>
         <Card>
           <CardContent className="pt-6">
             <TaxBandChart
@@ -799,10 +647,7 @@ export default function IncomePage() {
 
       {/* Effective Tax Rate Curve */}
       <CollapsibleSection title="Effective Tax Rate Curve" summary="Marginal and effective rates vs income level" storageKey="income-tax-curve">
-      <section className="space-y-4">
-        <p className="text-muted-foreground">
-          Combined marginal and effective tax + NI rate across income levels. The red area shows the marginal rate — note the 60% trap between £100k and £125k where the personal allowance tapers away.
-        </p>
+      <section>
         <Card>
           <CardContent className="pt-6">
             <EffectiveTaxRateChart />
@@ -813,18 +658,13 @@ export default function IncomePage() {
 
       {/* Tax Efficiency Score */}
       <CollapsibleSection title="Tax Efficiency Score" summary={`${Math.round(taxEfficiencyScore * 100)}% tax-advantaged`} storageKey="income-tax-efficiency">
-      <section className="space-y-4">
+      <section>
         <Card>
-          <CardHeader>
-            <CardTitle>Savings Tax Efficiency</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <div className="text-4xl font-bold">{formatPercent(taxEfficiencyScore)}</div>
-                <div className="text-muted-foreground">
-                  of total savings goes into tax-advantaged wrappers (ISA + Pension)
-                </div>
+                <div className="text-3xl font-bold">{formatPercent(taxEfficiencyScore)}</div>
+                <div className="text-sm text-muted-foreground">tax-advantaged (ISA + Pension)</div>
               </div>
               <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
                 <div

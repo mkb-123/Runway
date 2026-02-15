@@ -5,7 +5,8 @@ import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { formatCurrency } from "@/lib/format";
-import { ACCOUNT_TYPE_LABELS } from "@/types";
+import { ACCOUNT_TYPE_LABELS, getAccountTaxWrapper, TAX_WRAPPER_LABELS } from "@/types";
+import type { TaxWrapper } from "@/types";
 import {
   Table,
   TableHeader,
@@ -16,9 +17,10 @@ import {
   TableFooter,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { ScenarioDelta } from "@/components/scenario-delta";
 
 export default function AccountsPage() {
@@ -70,6 +72,18 @@ export default function AccountsPage() {
     [filteredAccounts, baseAccountValues]
   );
 
+  // Summary totals by tax wrapper type
+  const wrapperSummary = useMemo(() => {
+    const map = new Map<TaxWrapper, number>();
+    for (const a of filteredAccounts) {
+      const wrapper = getAccountTaxWrapper(a.type);
+      map.set(wrapper, (map.get(wrapper) ?? 0) + a.currentValue);
+    }
+    // Sort by value descending
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1]);
+  }, [filteredAccounts]);
+
   return (
     <div className="space-y-6 p-4 md:p-8">
       <PageHeader title="Accounts" description="Overview of all accounts grouped by person.">
@@ -80,40 +94,57 @@ export default function AccountsPage() {
         <EmptyState message="No accounts yet. Add your ISAs, pensions, and savings accounts to get started." settingsTab="accounts" />
       )}
 
-      {accountsByPerson.map(({ person, accounts: personAccounts, totalValue, baseTotalValue }) => (
-        <section key={person.id} className="space-y-4">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-xl font-semibold">{person.name}</h2>
-            <span className="text-lg font-medium text-muted-foreground">
-              Total: <ScenarioDelta base={baseTotalValue} scenario={totalValue} format={formatCurrency} />
-            </span>
-          </div>
+      {/* Summary by wrapper type + grand total */}
+      {filteredAccounts.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+          {wrapperSummary.map(([wrapper, total]) => (
+            <Card key={wrapper}>
+              <CardContent className="pt-4 pb-3 px-4">
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">{TAX_WRAPPER_LABELS[wrapper]}</div>
+                <div className="text-lg font-bold tabular-nums mt-1">{formatCurrency(total)}</div>
+              </CardContent>
+            </Card>
+          ))}
+          <Card className="bg-gradient-to-br from-primary/8 via-primary/4 to-card">
+            <CardContent className="pt-4 pb-3 px-4">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Total</div>
+              <div className="text-lg font-bold tabular-nums mt-1">
+                <ScenarioDelta base={baseGrandTotal} scenario={grandTotal} format={formatCurrency} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
+      {accountsByPerson.map(({ person, accounts: personAccounts, totalValue, baseTotalValue }) => (
+        <CollapsibleSection
+          key={person.id}
+          title={person.name}
+          summary={formatCurrency(totalValue)}
+          defaultOpen
+          storageKey={`accounts-${person.id}`}
+        >
           {/* Desktop table view */}
           <div className="hidden md:block">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Account Name</TableHead>
+                    <TableHead>Account</TableHead>
                     <TableHead>Provider</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Current Value</TableHead>
+                    <TableHead className="text-right">Value</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {personAccounts.map((account) => (
                     <TableRow key={account.id}>
-                      <TableCell className="font-medium">
-                        {account.name}
-                      </TableCell>
-                      <TableCell>{account.provider}</TableCell>
+                      <TableCell className="font-medium">{account.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{account.provider}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">
-                          {ACCOUNT_TYPE_LABELS[account.type]}
-                        </Badge>
+                        <Badge variant="secondary">{ACCOUNT_TYPE_LABELS[account.type]}</Badge>
                       </TableCell>
-                      <TableCell className="text-right font-medium">
+                      <TableCell className="text-right font-medium tabular-nums">
                         <ScenarioDelta
                           base={baseAccountValues.get(account.id) ?? account.currentValue}
                           scenario={account.currentValue}
@@ -125,10 +156,8 @@ export default function AccountsPage() {
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={3} className="font-semibold">
-                      Subtotal
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
+                    <TableCell colSpan={3} className="font-semibold">Subtotal</TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
                       <ScenarioDelta base={baseTotalValue} scenario={totalValue} format={formatCurrency} />
                     </TableCell>
                   </TableRow>
@@ -140,51 +169,23 @@ export default function AccountsPage() {
           {/* Mobile card view */}
           <div className="grid grid-cols-1 gap-3 md:hidden">
             {personAccounts.map((account) => (
-              <Card key={account.id}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{account.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      Provider
-                    </span>
-                    <span className="text-sm font-medium">
-                      {account.provider}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Type</span>
-                    <Badge variant="secondary">
-                      {ACCOUNT_TYPE_LABELS[account.type]}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Value</span>
-                    <span className="text-base font-semibold">
-                      <ScenarioDelta
-                        base={baseAccountValues.get(account.id) ?? account.currentValue}
-                        scenario={account.currentValue}
-                        format={formatCurrency}
-                      />
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+              <div key={account.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
+                <div>
+                  <div className="font-medium text-sm">{account.name}</div>
+                  <div className="text-xs text-muted-foreground">{account.provider} · {ACCOUNT_TYPE_LABELS[account.type]}</div>
+                </div>
+                <div className="font-semibold tabular-nums">
+                  <ScenarioDelta
+                    base={baseAccountValues.get(account.id) ?? account.currentValue}
+                    scenario={account.currentValue}
+                    format={formatCurrency}
+                  />
+                </div>
+              </div>
             ))}
           </div>
-        </section>
+        </CollapsibleSection>
       ))}
-
-      {/* Grand total */}
-      <div className="rounded-xl border-0 bg-gradient-to-br from-primary/8 via-primary/4 to-card p-6 shadow-sm">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Grand Total</span>
-          <span className="text-3xl font-bold tracking-tight tabular-nums">
-            <ScenarioDelta base={baseGrandTotal} scenario={grandTotal} format={formatCurrency} />
-          </span>
-        </div>
-      </div>
     </div>
   );
 }
