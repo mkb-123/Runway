@@ -14,7 +14,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (459 tests)
+- **Testing:** Vitest + Testing Library (481 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
@@ -237,7 +237,10 @@ Single source of truth. Never hardcode rates elsewhere.
 
 #### `scenario.ts` — What-If Scenario Overrides
 - `applyScenarioOverrides(household, overrides) → HouseholdData`
-- Types: `ScenarioOverrides`, `ContributionOverride`
+- `scaleSavingsRateContributions(persons, income, bonusStructures, contributions, targetRate) → ContributionOverride[]` — income-proportional scaling with existing ISA/pension/GIA ratio preserved
+- `calculateScenarioImpact(persons, income, pensionOverrides) → Map<string, ImpactPreview>` — tax/NI impact of pension sacrifice changes
+- `buildAvoidTaperPreset(persons, income, contributions) → ScenarioOverrides` — salary sacrifice to avoid £100k PA taper
+- Types: `ScenarioOverrides`, `ContributionOverride`, `PersonOverride`, `ImpactPreview`
 
 #### `format.ts` — Display Formatting
 - `formatCurrency(amount)` → "£1,234.56"
@@ -406,7 +409,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | `projection-consistency.test.ts` | Cross-function consistency checks |
 | `school-fees.test.ts` | Start/end dates, years remaining, total cost, timeline generation |
 | `deferred-bonus.test.ts` | Tranche generation, vesting schedule (including vestingGapYears), projected value |
-| `scenario.test.ts` | Scenario override merging (income, contributions, retirement, accounts, market shock) |
+| `scenario.test.ts` | Scenario override merging (income, contributions, retirement, accounts, market shock), savings rate scaling, impact calculation, avoid-taper preset, combined integration |
 | `format.test.ts` | Currency, percentage, date, number formatting |
 | `cash-flow.test.ts` | 24-month timeline: salary growth, bonus months, deferred vesting, term fees |
 | `migration.test.ts` | All 9 data migrations: old formats → current schema |

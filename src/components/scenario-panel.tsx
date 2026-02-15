@@ -38,19 +38,14 @@ import { useScenario, type ScenarioOverrides } from "@/context/scenario-context"
 import { useData } from "@/context/data-context";
 import { getPersonContributionTotals, getPersonGrossIncome, isAccountAccessible } from "@/types";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/format";
-import { calculateIncomeTax, calculateNI } from "@/lib/tax";
 import { calculateAge, projectFinalValue, calculateSWR, calculateProRataStatePension } from "@/lib/projections";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
-
-// --- Types ---
-
-interface ImpactPreview {
-  taxSaved: number;
-  niSaved: number;
-  totalSaved: number;
-  newTakeHome: number;
-  takeHomeChange: number;
-}
+import {
+  scaleSavingsRateContributions,
+  calculateScenarioImpact,
+  buildAvoidTaperPreset,
+  type ImpactPreview,
+} from "@/lib/scenario";
 
 // --- Smart Presets ---
 
@@ -62,45 +57,13 @@ interface SmartPreset {
   getOverrides: (household: ReturnType<typeof useData>["household"]) => ScenarioOverrides;
 }
 
-function buildAvoidTaperPreset(household: ReturnType<typeof useData>["household"]): ScenarioOverrides {
-  const overrides: ScenarioOverrides = { income: [] };
-  for (const person of household.persons) {
-    const income = household.income.find((i) => i.personId === person.id);
-    if (!income) continue;
-
-    const adjustedGross =
-      income.pensionContributionMethod === "salary_sacrifice" || income.pensionContributionMethod === "net_pay"
-        ? income.grossSalary - income.employeePensionContribution
-        : income.grossSalary;
-
-    if (adjustedGross > UK_TAX_CONSTANTS.personalAllowanceTaperThreshold && adjustedGross <= UK_TAX_CONSTANTS.incomeTax.higherRateUpperLimit) {
-      const excess = adjustedGross - UK_TAX_CONSTANTS.personalAllowanceTaperThreshold;
-      const contribs = getPersonContributionTotals(household.contributions, person.id);
-      const pensionUsed = income.employeePensionContribution + income.employerPensionContribution + contribs.pensionContribution;
-      const headroom = UK_TAX_CONSTANTS.pensionAnnualAllowance - pensionUsed;
-      const additionalSacrifice = Math.min(excess, headroom);
-
-      if (additionalSacrifice > 0) {
-        overrides.income!.push({
-          personId: person.id,
-          grossSalary: income.grossSalary,
-          employeePensionContribution: income.employeePensionContribution + additionalSacrifice,
-          employerPensionContribution: income.employerPensionContribution,
-          pensionContributionMethod: income.pensionContributionMethod,
-        });
-      }
-    }
-  }
-  return overrides;
-}
-
 const SMART_PRESETS: SmartPreset[] = [
   {
     id: "avoid-taper",
     label: "Avoid 60% Tax Trap",
     description: "Salary sacrifice to bring income below £100k",
     icon: ShieldCheck,
-    getOverrides: buildAvoidTaperPreset,
+    getOverrides: (household) => buildAvoidTaperPreset(household.persons, household.income, household.contributions),
   },
   {
     id: "max-pension",
@@ -140,62 +103,6 @@ const SMART_PRESETS: SmartPreset[] = [
     getOverrides: () => ({ marketShockPercent: -0.5 }),
   },
 ];
-
-// --- Impact Calculator ---
-
-function calculateImpact(
-  household: ReturnType<typeof useData>["household"],
-  pensionOverrides: Record<string, number>
-): Map<string, ImpactPreview> {
-  const results = new Map<string, ImpactPreview>();
-
-  for (const person of household.persons) {
-    const income = household.income.find((i) => i.personId === person.id);
-    if (!income) continue;
-
-    const newPension = pensionOverrides[person.id] ?? income.employeePensionContribution;
-
-    const currentTax = calculateIncomeTax(
-      income.grossSalary,
-      income.employeePensionContribution,
-      income.pensionContributionMethod
-    );
-    const newTax = calculateIncomeTax(
-      income.grossSalary,
-      newPension,
-      income.pensionContributionMethod
-    );
-
-    const currentNI = calculateNI(
-      income.grossSalary,
-      income.employeePensionContribution,
-      income.pensionContributionMethod
-    );
-    const newNI = calculateNI(
-      income.grossSalary,
-      newPension,
-      income.pensionContributionMethod
-    );
-
-    const taxSaved = currentTax.tax - newTax.tax;
-    const niSaved = currentNI.ni - newNI.ni;
-
-    const currentTakeHome =
-      income.grossSalary - income.employeePensionContribution - currentTax.tax - currentNI.ni;
-    const newTakeHome =
-      income.grossSalary - newPension - newTax.tax - newNI.ni;
-
-    results.set(person.id, {
-      taxSaved: Math.round(taxSaved),
-      niSaved: Math.round(niSaved),
-      totalSaved: Math.round(taxSaved + niSaved),
-      newTakeHome: Math.round(newTakeHome),
-      takeHomeChange: Math.round(newTakeHome - currentTakeHome),
-    });
-  }
-
-  return results;
-}
 
 // --- Collapsible Section ---
 
@@ -353,8 +260,8 @@ export function ScenarioPanel() {
 
   // Live impact preview
   const impactByPerson = useMemo(
-    () => calculateImpact(household, pensionOverrides),
-    [household, pensionOverrides]
+    () => calculateScenarioImpact(household.persons, household.income, pensionOverrides),
+    [household.persons, household.income, pensionOverrides]
   );
 
   const hasAnyChange = useMemo(() => {
@@ -404,29 +311,13 @@ export function ScenarioPanel() {
 
     // Contribution overrides — savings rate slider takes priority over manual contribution inputs
     if (savingsRateOverride !== null && totalGrossIncome > 0) {
-      // Scale each person's contributions proportionally to achieve the new savings rate
-      const targetTotalContribs = (savingsRateOverride / 100) * totalGrossIncome;
-      const currentTotalContribs = Object.values(contribsByPerson).reduce((s, c) => s + c.total, 0);
-      const scale = currentTotalContribs > 0 ? targetTotalContribs / currentTotalContribs : 0;
-
-      newOverrides.contributionOverrides = household.persons.map((person) => {
-        const current = contribsByPerson[person.id] ?? { isa: 0, pension: 0, gia: 0, total: 0 };
-        if (currentTotalContribs > 0) {
-          return {
-            personId: person.id,
-            isaContribution: Math.round(current.isa * scale),
-            pensionContribution: Math.round(current.pension * scale),
-            giaContribution: Math.round(current.gia * scale),
-          };
-        }
-        // No existing contributions — allocate evenly to ISA
-        const personGross = household.income.find((i) => i.personId === person.id)?.grossSalary ?? 0;
-        const personShare = totalGrossIncome > 0 ? personGross / totalGrossIncome : 0;
-        return {
-          personId: person.id,
-          isaContribution: Math.round(targetTotalContribs * personShare),
-        };
-      });
+      newOverrides.contributionOverrides = scaleSavingsRateContributions(
+        household.persons,
+        household.income,
+        household.bonusStructures,
+        household.contributions,
+        savingsRateOverride
+      );
     } else {
       const contribChanges = Object.entries(contributionOverrides).filter(
         ([, val]) => val.isa !== undefined || val.pension !== undefined || val.gia !== undefined
@@ -496,6 +387,18 @@ export function ScenarioPanel() {
     setSavingsRateOverride(null);
     setRetirementAgeOverrides({});
   }, [disableScenario]);
+
+  // Precompute scaled contributions for savings rate preview
+  const scaledContributions = useMemo(() => {
+    if (savingsRateOverride === null || totalGrossIncome <= 0) return null;
+    return scaleSavingsRateContributions(
+      household.persons,
+      household.income,
+      household.bonusStructures,
+      household.contributions,
+      savingsRateOverride
+    );
+  }, [savingsRateOverride, totalGrossIncome, household.persons, household.income, household.bonusStructures, household.contributions]);
 
   // Total impact summary
   const totalImpact = useMemo(() => {
@@ -655,20 +558,18 @@ export function ScenarioPanel() {
                 format={(v) => `${v.toFixed(1)}%`}
                 onChange={(v) => setSavingsRateOverride(v)}
               />
-              {savingsRateOverride !== null && totalGrossIncome > 0 && (
+              {scaledContributions && (
                 <div className="rounded-md bg-muted/50 px-2 py-1.5 space-y-1">
                   <p className="text-xs text-muted-foreground">
-                    Total contributions: <span className="tabular-nums font-medium text-foreground">{formatCurrencyCompact(Math.round((savingsRateOverride / 100) * totalGrossIncome))}/yr</span>
+                    Total contributions: <span className="tabular-nums font-medium text-foreground">{formatCurrencyCompact(Math.round((savingsRateOverride! / 100) * totalGrossIncome))}/yr</span>
                     <span className="text-muted-foreground/60"> (was {formatCurrencyCompact(Math.round((currentSavingsRate / 100) * totalGrossIncome))})</span>
                   </p>
-                  {household.persons.map((person) => {
-                    const current = contribsByPerson[person.id];
-                    if (!current) return null;
-                    const currentTotal = Object.values(contribsByPerson).reduce((s, c) => s + c.total, 0);
-                    const scale = currentTotal > 0 ? ((savingsRateOverride / 100) * totalGrossIncome) / currentTotal : 0;
+                  {scaledContributions.map((co) => {
+                    const person = household.persons.find((p) => p.id === co.personId);
+                    if (!person) return null;
                     return (
-                      <p key={person.id} className="text-xs text-muted-foreground tabular-nums">
-                        {person.name}: ISA {formatCurrencyCompact(Math.round(current.isa * scale))} · Pension {formatCurrencyCompact(Math.round(current.pension * scale))} · GIA {formatCurrencyCompact(Math.round(current.gia * scale))}
+                      <p key={co.personId} className="text-xs text-muted-foreground tabular-nums">
+                        {person.name}: ISA {formatCurrencyCompact(co.isaContribution ?? 0)} · Pension {formatCurrencyCompact(co.pensionContribution ?? 0)} · GIA {formatCurrencyCompact(co.giaContribution ?? 0)}
                       </p>
                     );
                   })}
@@ -707,7 +608,7 @@ export function ScenarioPanel() {
                     <RangeInput
                       label={`${person.name} — retire at`}
                       value={sliderValue}
-                      min={45}
+                      min={Math.max(45, age + 1)}
                       max={75}
                       step={1}
                       current={currentPlannedAge}
@@ -775,12 +676,21 @@ export function ScenarioPanel() {
                       type="number"
                       placeholder="New gross salary"
                       value={incomeOverrides[person.id] ?? ""}
-                      onChange={(e) =>
-                        setIncomeOverrides((prev) => ({
-                          ...prev,
-                          [person.id]: parseFloat(e.target.value) || 0,
-                        }))
-                      }
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw === "") {
+                          setIncomeOverrides((prev) => {
+                            const next = { ...prev };
+                            delete next[person.id];
+                            return next;
+                          });
+                        } else {
+                          setIncomeOverrides((prev) => ({
+                            ...prev,
+                            [person.id]: parseFloat(raw),
+                          }));
+                        }
+                      }}
                       className="mt-1"
                     />
                   </div>

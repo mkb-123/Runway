@@ -20,10 +20,11 @@ import {
   applyScenarioOverrides,
   type ScenarioOverrides,
   type ContributionOverride,
+  type PersonOverride,
 } from "@/lib/scenario";
 
 // Re-export for consumers
-export type { ScenarioOverrides, ContributionOverride };
+export type { ScenarioOverrides, ContributionOverride, PersonOverride };
 
 export interface SavedScenario {
   name: string;
