@@ -36,8 +36,6 @@ import { CashFlowTimeline } from "@/components/charts/cash-flow-timeline";
 import { generateCashFlowTimeline } from "@/lib/cash-flow";
 import { ScenarioDelta } from "@/components/scenario-delta";
 
-// projectedValue helper removed — now using totalProjectedDeferredValue from lib
-
 // --- Helper: student loan plan label ---
 function studentLoanLabel(plan: string): string {
   switch (plan) {
