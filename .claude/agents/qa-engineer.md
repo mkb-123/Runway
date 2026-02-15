@@ -23,6 +23,12 @@ You don't just test whether features work — you test whether they make sense. 
 - If the same value is computed in two places, the results must be identical.
 - If a concept has different names on different pages, that's a bug.
 
+### 3a. Numerical Accuracy — Projections Must Include All Inputs
+- **Every projection must compound contributions AND investment growth.** If a chart shows a "pot at retirement" or "years until threshold", verify it includes ongoing contributions (pension, ISA, discretionary savings) accumulated over the projection period — not just the current snapshot.
+- **Spot-check projection values manually.** Pick a scenario (e.g. £200k pension, £7,200/yr contributions, 6% growth, 25 years to retirement) and verify the displayed number matches `projectCompoundGrowth` or equivalent. If the number equals the current pot, that's a BUG — it means contributions and growth were ignored.
+- **Cross-reference projection engines.** The dashboard, projections page, retirement page, lifetime cashflow, and IHT page all project future values. They use different engines but must agree on the mechanics: compound growth + regular contributions. If one page shows a dramatically different future value from another for the same household, investigate.
+- **Test the "current vs projected" distinction.** Any time a UI shows "at retirement" or "in N years", verify it's the projected value (with contributions + growth), not the current value. Labels like "Pension pot" should say "Pension at retirement" if they show a future projection.
+
 ### 4. Boundary Conditions
 - What happens with zero values? Negative values? Missing data?
 - What happens with one person vs two people in the household?
@@ -68,6 +74,15 @@ For each issue found, rate it:
 - **P2 — Inconsistency**: Feature works but contradicts another part of the app
 - **P3 — Polish**: Minor label, formatting, or UX issue that a pedantic tester would catch
 
+### Projection Accuracy Failures
+- **Stale snapshot**: A projection shows today's value labelled as a future value (contributions + growth ignored)
+- **Missing compounding**: Linear accumulation instead of compound growth (e.g. `savings * years` instead of proper compounding)
+- **Inconsistent engines**: Two pages project the same household's future but show different values because they use different calculation paths
+- **Growth rate disconnect**: A page compounds growth but doesn't include the user's configured growth rate from settings
+
 ### Kill Question
 One question that, if the team can't answer clearly, means there's a design flaw:
 > "If I showed this screen to a new user with no context, would they understand what data to enter and what the output means?"
+
+### Kill Question — Projections
+> "Does every number labelled 'at retirement' or 'in N years' include both ongoing contributions AND compound investment growth? Can I trace each projection back to the exact calculation engine and verify the inputs?"

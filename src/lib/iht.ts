@@ -130,22 +130,29 @@ export function calculateIHT(
 
 /**
  * Calculate how many years until the estate exceeds the IHT threshold,
- * given annual savings flowing into the estate.
+ * given annual savings flowing into the estate and investment growth.
  *
  * @param currentEstateValue - Current in-estate value
  * @param combinedThreshold - NRB + RNRB combined threshold
  * @param annualSavingsInEstate - Annual contributions to estate-exposed accounts
- * @returns null if estate won't exceed threshold (no savings), 0 if already exceeded, else years
+ * @param growthRate - Annual investment growth rate (decimal, e.g. 0.05). Defaults to 0.
+ * @returns null if estate won't exceed threshold within 100 years, 0 if already exceeded, else years
  */
 export function calculateYearsUntilIHTExceeded(
   currentEstateValue: number,
   combinedThreshold: number,
-  annualSavingsInEstate: number
+  annualSavingsInEstate: number,
+  growthRate: number = 0
 ): number | null {
   if (currentEstateValue >= combinedThreshold) return 0;
-  if (annualSavingsInEstate <= 0) return null;
-  const gap = combinedThreshold - currentEstateValue;
-  return Math.ceil(gap / annualSavingsInEstate);
+  if (annualSavingsInEstate <= 0 && growthRate <= 0) return null;
+
+  let estate = currentEstateValue;
+  for (let year = 1; year <= 100; year++) {
+    estate = estate * (1 + growthRate) + annualSavingsInEstate;
+    if (estate >= combinedThreshold) return year;
+  }
+  return null;
 }
 
 /**

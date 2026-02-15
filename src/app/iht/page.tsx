@@ -143,10 +143,15 @@ export default function IHTPage() {
         (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
         0,
       );
+    // Use mid scenario growth rate for estate projection
+    const midGrowthRate = household.retirement.scenarioRates[
+      Math.floor(household.retirement.scenarioRates.length / 2)
+    ] ?? 0.05;
     const yearsUntilExceeded = calculateYearsUntilIHTExceeded(
       inEstate,
       combinedThreshold,
-      annualSavingsInEstate
+      annualSavingsInEstate,
+      midGrowthRate
     );
 
     // Data for the sheltered vs exposed pie chart

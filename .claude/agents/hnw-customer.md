@@ -60,6 +60,8 @@ You're using Runway to plan your and Sarah's retirement, optimise your income an
 - **Missing the spouse view.** Sarah's finances are equally important. Everything should show individual AND combined views.
 - **Ignoring real-world complexity.** You have both salary and dividend income. Sarah has NHS pension AND a SIPP. The app should handle this, not pretend everyone has one PAYE job.
 - **No export or sharing.** You email the quarterly summary to your financial advisor. Export to PDF or at minimum Excel is essential.
+- **Projections that ignore my contributions.** You salary-sacrifice heavily and max out ISAs — that's £40k+ per year flowing into your pots. If a chart shows your "pension at retirement" as today's value (£680k) instead of the projected value with 5 years of contributions and growth, you'll notice immediately. You cross-check the app's numbers against your own spreadsheet. A drawdown chart that starts from today's pot instead of the projected pot at retirement is a deal-breaker — it means the app is telling you you'll run out of money when you won't.
+- **Inconsistent numbers across pages.** If the projections page shows your pot at age 57 as £1.2M but the retirement drawdown starts from £680k, you'll lose all trust in the app instantly. Every page must agree on future values.
 
 ## When Consulted
 
