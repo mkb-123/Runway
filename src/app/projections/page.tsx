@@ -139,7 +139,7 @@ export default function ProjectionsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{formatCurrency(currentPot)}</p>
+            <p className="text-2xl font-bold tabular-nums">{formatCurrency(currentPot)}</p>
             <p className="text-xs text-muted-foreground mt-1">
               Total net worth across all accounts
             </p>
@@ -153,7 +153,7 @@ export default function ProjectionsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
+            <p className="text-2xl font-bold tabular-nums">
               {formatCurrency(totalAnnualContributions)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -169,7 +169,7 @@ export default function ProjectionsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{formatCurrency(requiredPot)}</p>
+            <p className="text-2xl font-bold tabular-nums">{formatCurrency(requiredPot)}</p>
             <p className="text-xs text-muted-foreground mt-1">
               {formatCurrency(retirement.targetAnnualIncome)}/yr at{" "}
               {formatPercent(retirement.withdrawalRate)} SWR

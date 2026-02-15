@@ -234,6 +234,9 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
               )}
             </div>
             <p className="text-xs text-muted-foreground">{rec.description}</p>
+            {rec.plainAction && (
+              <p className="text-xs text-foreground/80 italic">{rec.plainAction}</p>
+            )}
             <p className="text-xs font-medium">{rec.impact}</p>
             {rec.actionUrl && (
               <Link
@@ -651,9 +654,9 @@ export default function Home() {
         return (
           <div className="space-y-4">
             {/* Primary metric — the headline number */}
-            <Card className="relative overflow-hidden border-primary/20 bg-gradient-to-br from-primary/8 via-primary/4 to-card">
-              <div className="pointer-events-none absolute -right-6 -top-6 size-32 rounded-full bg-primary/5" />
-              <div className="pointer-events-none absolute -right-2 bottom-0 size-20 rounded-full bg-primary/3" />
+            <Card className="relative overflow-hidden border-primary/15 bg-gradient-to-br from-primary/10 via-primary/5 to-card">
+              <div className="pointer-events-none absolute -right-8 -top-8 size-40 rounded-full bg-primary/[0.04]" />
+              <div className="pointer-events-none absolute right-12 -bottom-6 size-24 rounded-full bg-primary/[0.03]" />
               <CardContent className="relative pt-6 pb-5">
                 <div className="flex items-start justify-between">
                   <div>
@@ -697,7 +700,7 @@ export default function Home() {
                     </div>
                     <div className="h-2.5 w-full overflow-hidden rounded-full bg-primary/10">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-all"
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-all duration-500 ease-out"
                         style={{ width: `${Math.min(heroData.fireProgress, 100)}%` }}
                       />
                     </div>
@@ -721,7 +724,7 @@ export default function Home() {
                   const MetricIcon = metric.icon;
                   const baseMetric = baseSecondaryMetrics[i];
                   return (
-                    <Card key={i} className="border-muted-foreground/10">
+                    <Card key={i} className="border-muted-foreground/10 transition-shadow duration-200 hover:shadow-md">
                       <CardContent className="pt-4 pb-3">
                         <div className="flex items-center gap-2 mb-1.5">
                           <div className="flex size-6 items-center justify-center rounded-md bg-muted">
@@ -769,7 +772,7 @@ export default function Home() {
 
       {/* PRIMARY CHARTS — 2-col on desktop, with accent top border */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="border-t-2 border-t-primary/30">
+        <Card className="border-t border-t-primary/20">
           <CardHeader>
             <div className="flex items-baseline justify-between">
               <CardTitle>Net Worth by Wrapper</CardTitle>
@@ -781,7 +784,7 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <Card className="border-t-2 border-t-primary/30">
+        <Card className="border-t border-t-primary/20">
           <CardHeader>
             <div className="flex items-baseline justify-between">
               <CardTitle>Net Worth Trajectory</CardTitle>

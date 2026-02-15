@@ -90,9 +90,9 @@ export function RetirementHero({
 
         {/* Progress bar */}
         <div className="space-y-2">
-          <div className="relative h-4 w-full overflow-hidden rounded-full bg-muted">
+          <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-500"
+              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500 ease-out"
               style={{ width: `${clampedPercent}%` }}
             />
           </div>

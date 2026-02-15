@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Users,
   Landmark,
@@ -50,6 +51,14 @@ import { SettingsSummaryBar } from "./components/settings-summary-bar";
 // ============================================================
 
 export default function SettingsPage() {
+  return (
+    <Suspense>
+      <SettingsPageInner />
+    </Suspense>
+  );
+}
+
+function SettingsPageInner() {
   const {
     household,
     snapshots,
@@ -59,9 +68,20 @@ export default function SettingsPage() {
     loadExampleData,
   } = useData();
 
-  const [activeTab, setActiveTab] = useState("household");
+  const searchParams = useSearchParams();
+  const validTabs = ["household", "accounts", "planning", "commitments", "iht"];
+  const initialTab = validTabs.includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "household";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync tab with URL search params when navigating via deep link
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && validTabs.includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   // ----------------------------------------------------------
   // Quick Setup completeness
@@ -207,7 +227,7 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {setupSteps.map((step) => (
                 <button
                   key={step.key}
@@ -298,9 +318,9 @@ export default function SettingsPage() {
       </Tabs>
 
       {/* Data Management */}
-      <Card className="border-destructive/50">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-destructive">Data Management</CardTitle>
+          <CardTitle>Data Management</CardTitle>
           <CardDescription>
             Export your data as JSON to back up or transfer between devices.
             Import a previously exported file to restore.

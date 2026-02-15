@@ -54,7 +54,7 @@ export function FireMetricsCard({
             <p className="text-sm font-medium text-muted-foreground">
               Savings Rate
             </p>
-            <p className="text-2xl font-bold mt-1">
+            <p className="text-2xl font-bold tabular-nums mt-1">
               {baseSavingsRate !== undefined ? (
                 <ScenarioDelta
                   base={baseSavingsRate}

@@ -345,7 +345,7 @@ export default function TaxPlanningPage() {
                             <p
                               className={`text-lg font-semibold ${
                                 totalUnrealisedGain >= 0
-                                  ? "text-green-600"
+                                  ? "text-emerald-600 dark:text-emerald-400"
                                   : "text-red-600"
                               }`}
                             >
@@ -564,7 +564,7 @@ export default function TaxPlanningPage() {
                                 {formatCurrency(scenario.incomeTax)}
                               </TableCell>
                               {isSalarySacrifice && (
-                                <TableCell className="text-right text-green-600">
+                                <TableCell className="text-right text-emerald-600 dark:text-emerald-400">
                                   {scenario.niSaving > 0
                                     ? formatCurrency(scenario.niSaving)
                                     : "--"}

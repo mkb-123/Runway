@@ -74,12 +74,16 @@ export function EffectiveTaxRateChart({
             dataKey="income"
             tickFormatter={formatCurrencyAxis}
             tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
             type="number"
             domain={[0, maxIncome]}
           />
           <YAxis
             tickFormatter={(v: number) => `${v}%`}
             tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
             width={50}
             domain={[0, 70]}
           />

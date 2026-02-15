@@ -105,8 +105,8 @@ describe("ScenarioDelta", () => {
         <ScenarioDelta base={1000} scenario={1200} format={fmt} />
       );
 
-      // +20.0%
-      expect(screen.getByText("(+20.0%)")).toBeInTheDocument();
+      // +20.0% (pill badge format — no parentheses)
+      expect(screen.getByText("+20.0%")).toBeInTheDocument();
     });
 
     it("shows negative percentage change", () => {
@@ -114,8 +114,8 @@ describe("ScenarioDelta", () => {
         <ScenarioDelta base={2000} scenario={1500} format={fmt} />
       );
 
-      // (1500 - 2000) / |2000| * 100 = -25.0%
-      expect(screen.getByText("(-25.0%)")).toBeInTheDocument();
+      // (1500 - 2000) / |2000| * 100 = -25.0% (pill badge format — no parentheses)
+      expect(screen.getByText("-25.0%")).toBeInTheDocument();
     });
 
     it("applies green color class for positive change", () => {

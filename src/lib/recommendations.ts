@@ -185,7 +185,7 @@ export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
         category: "isa",
         personId: person.id,
         personName: person.name,
-        actionUrl: "/settings",
+        actionUrl: "/settings?tab=household",
         plainAction: `Open or fund an ISA with up to £${isaAllowance.toLocaleString()}. Everything inside grows tax-free, forever.`,
       },
     ];
@@ -210,7 +210,7 @@ export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
       category: "isa",
       personId: person.id,
       personName: person.name,
-      actionUrl: "/settings",
+      actionUrl: "/settings?tab=household",
       plainAction: `Transfer £${isaRemaining.toLocaleString()} into your ISA before 5 April. You can't get this allowance back once the tax year ends.`,
     },
   ];
@@ -404,7 +404,7 @@ export function analyzeEmergencyFund(household: HouseholdData): Recommendation[]
       impact: `Shortfall of £${Math.round(shortfall).toLocaleString()}. Build cash reserves before investing.`,
       priority: shortfall > emergencyTarget * 0.5 ? "high" : "medium",
       category: "risk",
-      actionUrl: "/settings",
+      actionUrl: "/settings?tab=planning",
       plainAction: `You need £${Math.round(shortfall).toLocaleString()} more in easy-access savings to cover ${household.emergencyFund.targetMonths} months of expenses. Keep this separate from investments.`,
     },
   ];
@@ -436,7 +436,7 @@ export function analyzeExcessCash(household: HouseholdData): Recommendation[] {
       impact: `Consider investing the excess in ISA or pension for long-term growth.`,
       priority: "medium",
       category: "investment",
-      actionUrl: "/settings",
+      actionUrl: "/settings?tab=household",
       plainAction: `You have more cash than you need for emergencies. The extra £${Math.round(excessCash).toLocaleString()} could be working harder in an ISA or pension.`,
     },
   ];

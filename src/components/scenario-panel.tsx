@@ -224,7 +224,11 @@ function Section({
           <ChevronDown className="size-4 text-muted-foreground" />
         )}
       </button>
-      {open && <div className="border-t px-3 pb-3 pt-3">{children}</div>}
+      <div className={`grid transition-all duration-200 ease-out ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+        <div className="overflow-hidden border-t">
+          <div className="px-3 pb-3 pt-3">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }

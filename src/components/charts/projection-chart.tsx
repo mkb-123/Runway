@@ -60,10 +60,14 @@ export function ProjectionChart({
             dataKey="year"
             label={{ value: "Years", position: "insideBottom", offset: -5 }}
             tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
           />
           <YAxis
             tickFormatter={(value: number) => formatCurrencyCompact(value)}
             tick={{ fontSize: 12 }}
+            tickLine={false}
+            axisLine={false}
             width={70}
           />
           <Tooltip
