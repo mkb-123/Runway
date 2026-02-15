@@ -46,7 +46,7 @@ export function RetirementHero({
             <p className="text-sm font-medium text-muted-foreground">
               Retirement Progress
             </p>
-            <p className="text-4xl font-bold tracking-tight sm:text-5xl">
+            <p className="text-4xl font-bold tracking-tight tabular-nums sm:text-5xl">
               {baseProgressPercent !== undefined ? (
                 <ScenarioDelta
                   base={baseProgressPercent}
@@ -58,7 +58,7 @@ export function RetirementHero({
                 `${progressPercent.toFixed(1)}%`
               )}
             </p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mt-1 tabular-nums">
               {remaining > 0
                 ? `${formatCurrencyCompact(remaining)} remaining`
                 : "Target reached"}
@@ -103,7 +103,7 @@ export function RetirementHero({
         </div>
 
         {/* Supporting details */}
-        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground border-t pt-3">
+        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground border-t pt-3 tabular-nums">
           <span>
             Target income: {formatCurrency(targetAnnualIncome)}/yr
           </span>

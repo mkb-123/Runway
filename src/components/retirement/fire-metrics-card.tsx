@@ -66,7 +66,7 @@ export function FireMetricsCard({
                 `${savingsRate.toFixed(1)}%`
               )}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-1 tabular-nums">
               {formatCurrency(totalAnnualContributions)} /{" "}
               {formatCurrency(totalGrossIncome)} gross
             </p>

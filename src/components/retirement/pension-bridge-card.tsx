@@ -136,7 +136,7 @@ export function PensionBridgeCard({
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Wealth split</span>
-            <span className="font-mono text-muted-foreground">
+            <span className="font-mono tabular-nums text-muted-foreground">
               {formatCurrencyCompact(totalWealth)} total
             </span>
           </div>

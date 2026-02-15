@@ -51,6 +51,47 @@ describe("applyScenarioOverrides", () => {
       // Person 2 unchanged
       expect(result.income[1].grossSalary).toBe(50000);
     });
+
+    it("applies salary and pension overrides for the same person", () => {
+      const h = makeHousehold();
+      const overrides: ScenarioOverrides = {
+        income: [{ personId: "p1", grossSalary: 120000, employeePensionContribution: 20000 }],
+      };
+      const result = applyScenarioOverrides(h, overrides);
+      expect(result.income[0].grossSalary).toBe(120000);
+      expect(result.income[0].employeePensionContribution).toBe(20000);
+      // Other fields preserved
+      expect(result.income[0].employerPensionContribution).toBe(4000);
+      expect(result.income[0].pensionContributionMethod).toBe("salary_sacrifice");
+    });
+
+    it("applies overrides to different persons independently", () => {
+      const h = makeHousehold();
+      const overrides: ScenarioOverrides = {
+        income: [
+          { personId: "p1", employeePensionContribution: 20000 },
+          { personId: "p2", grossSalary: 70000 },
+        ],
+      };
+      const result = applyScenarioOverrides(h, overrides);
+      // P1: pension changed, salary preserved
+      expect(result.income[0].employeePensionContribution).toBe(20000);
+      expect(result.income[0].grossSalary).toBe(80000);
+      // P2: salary changed, pension preserved
+      expect(result.income[1].grossSalary).toBe(70000);
+      expect(result.income[1].employeePensionContribution).toBe(2500);
+    });
+
+    it("allows zero salary for redundancy scenario", () => {
+      const h = makeHousehold();
+      const overrides: ScenarioOverrides = {
+        income: [{ personId: "p1", grossSalary: 0 }],
+      };
+      const result = applyScenarioOverrides(h, overrides);
+      expect(result.income[0].grossSalary).toBe(0);
+      // Other fields preserved
+      expect(result.income[0].employerPensionContribution).toBe(4000);
+    });
   });
 
   describe("contribution overrides", () => {

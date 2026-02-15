@@ -324,38 +324,44 @@ export function ScenarioPanel() {
   const hasAnyChange = useMemo(() => {
     return (
       Object.keys(pensionOverrides).length > 0 ||
-      Object.keys(incomeOverrides).some((k) => incomeOverrides[k] > 0) ||
+      Object.keys(incomeOverrides).some((k) => {
+        const personIncome = household.income.find((i) => i.personId === k);
+        return personIncome !== undefined && incomeOverrides[k] !== personIncome.grossSalary;
+      }) ||
       Object.keys(contributionOverrides).length > 0 ||
       marketShock !== ""
     );
-  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock]);
+  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock, household.income]);
 
   const applyCustomScenario = useCallback(() => {
     const newOverrides: ScenarioOverrides = {};
 
+    // Merge pension slider changes and salary input changes into a single
+    // income overrides array, keyed by personId so both are applied together.
+    const incomeByPerson = new Map<string, Partial<import("@/types").PersonIncome>>();
+
     // Pension overrides (from sliders)
-    const pensionChanges = Object.entries(pensionOverrides);
-    if (pensionChanges.length > 0) {
-      newOverrides.income = pensionChanges.map(([personId, newPension]) => {
-        const income = household.income.find((i) => i.personId === personId);
-        return {
-          personId,
-          grossSalary: incomeOverrides[personId] || income?.grossSalary,
-          employeePensionContribution: newPension,
-          employerPensionContribution: income?.employerPensionContribution,
-          pensionContributionMethod: income?.pensionContributionMethod,
-        };
+    for (const [personId, newPension] of Object.entries(pensionOverrides)) {
+      const income = household.income.find((i) => i.personId === personId);
+      incomeByPerson.set(personId, {
+        personId,
+        employeePensionContribution: newPension,
+        employerPensionContribution: income?.employerPensionContribution,
+        pensionContributionMethod: income?.pensionContributionMethod,
       });
     }
 
-    // Income overrides (salary)
-    // BUG-013: Allow zero income (val >= 0) for redundancy scenarios
-    const salaryChanges = Object.entries(incomeOverrides).filter(([, val]) => val >= 0);
-    if (salaryChanges.length > 0 && !newOverrides.income) {
-      newOverrides.income = salaryChanges.map(([personId, grossSalary]) => ({
-        personId,
-        grossSalary,
-      }));
+    // Income overrides (salary) — merge into existing pension entries or create new ones.
+    // BUG-013: Allow zero income (val >= 0) for redundancy scenarios.
+    for (const [personId, grossSalary] of Object.entries(incomeOverrides)) {
+      if (grossSalary >= 0 && incomeOverrides[personId] !== undefined) {
+        const existing = incomeByPerson.get(personId) ?? { personId };
+        incomeByPerson.set(personId, { ...existing, grossSalary });
+      }
+    }
+
+    if (incomeByPerson.size > 0) {
+      newOverrides.income = Array.from(incomeByPerson.values());
     }
 
     // Contribution overrides
