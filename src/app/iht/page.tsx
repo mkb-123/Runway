@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
+import { getMidScenarioRate } from "@/lib/projections";
 import {
   calculateIHT,
   calculateYearsUntilIHTExceeded,
@@ -144,9 +145,7 @@ export default function IHTPage() {
         0,
       );
     // Use mid scenario growth rate for estate projection
-    const midGrowthRate = household.retirement.scenarioRates[
-      Math.floor(household.retirement.scenarioRates.length / 2)
-    ] ?? 0.05;
+    const midGrowthRate = getMidScenarioRate(household.retirement.scenarioRates, 0.05);
     const yearsUntilExceeded = calculateYearsUntilIHTExceeded(
       inEstate,
       combinedThreshold,
@@ -198,6 +197,7 @@ export default function IHTPage() {
       giftsWithStatus,
       annualSavingsInEstate,
       yearsUntilExceeded,
+      midGrowthRate,
       shelteredVsExposedData,
       estateBreakdown,
       numberOfPersons,
@@ -223,6 +223,7 @@ export default function IHTPage() {
     giftsWithStatus,
     annualSavingsInEstate,
     yearsUntilExceeded,
+    midGrowthRate,
     shelteredVsExposedData,
     estateBreakdown,
     numberOfPersons,
@@ -539,21 +540,21 @@ export default function IHTPage() {
                   <p className="text-sm">
                     At the current savings rate of{" "}
                     {formatCurrency(annualSavingsInEstate)} per year into
-                    estate-exposed accounts, your estate will exceed the{" "}
+                    estate-exposed accounts, with assumed investment growth of{" "}
+                    {formatPercent(midGrowthRate)}/yr, your estate will exceed the{" "}
                     {formatCurrency(combinedThreshold)} IHT threshold in
                     approximately{" "}
                     <span className="font-medium">
                       {yearsUntilExceeded} year
                       {yearsUntilExceeded !== 1 ? "s" : ""}
                     </span>
-                    . This does not account for investment growth, which would
-                    bring this date closer.
+                    .
                   </p>
                 ) : (
                   <p className="text-sm">
-                    With no additional savings flowing into estate-exposed
-                    accounts, your estate is projected to remain below the IHT
-                    threshold at current values (excluding investment growth).
+                    Even with assumed investment growth of{" "}
+                    {formatPercent(midGrowthRate)}/yr, your estate is projected
+                    to remain below the IHT threshold for the foreseeable future.
                   </p>
                 )}
               </div>

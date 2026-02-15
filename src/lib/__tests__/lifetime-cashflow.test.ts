@@ -55,6 +55,7 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
       monthlyLifestyleSpending: 2_500,
     },
     iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
+    children: [],
     committedOutgoings: [
       {
         id: "o1",
@@ -436,6 +437,74 @@ describe("generateLifetimeCashFlow deferred bonus", () => {
     for (const year of retiredYears) {
       expect(year.employmentIncome).toBe(0);
     }
+  });
+});
+
+describe("calculateExpenditure with inflation", () => {
+  it("applies inflation when baseYear is provided and year > baseYear", () => {
+    const outgoings: CommittedOutgoing[] = [
+      { id: "1", category: "school_fees", label: "Fees", amount: 6000, frequency: "termly", inflationRate: 0.05 },
+    ];
+    // Base year 2025, calendar year 2030 => 5 years of 5% inflation
+    const base = calculateExpenditure(outgoings, 0, 2025, 2025);
+    const inflated = calculateExpenditure(outgoings, 0, 2030, 2025);
+    expect(base).toBe(18_000); // 6000 * 3
+    // 18000 * 1.05^5 = 22977 (approx)
+    expect(inflated).toBeCloseTo(18_000 * Math.pow(1.05, 5), 0);
+    expect(inflated).toBeGreaterThan(base);
+  });
+
+  it("no inflation in the base year (yearOffset = 0)", () => {
+    const outgoings: CommittedOutgoing[] = [
+      { id: "1", category: "school_fees", label: "Fees", amount: 6000, frequency: "termly", inflationRate: 0.05 },
+    ];
+    const result = calculateExpenditure(outgoings, 0, 2025, 2025);
+    expect(result).toBe(18_000);
+  });
+
+  it("items without inflationRate are unaffected", () => {
+    const outgoings: CommittedOutgoing[] = [
+      { id: "1", category: "mortgage", label: "Mortgage", amount: 1500, frequency: "monthly" },
+    ];
+    const base = calculateExpenditure(outgoings, 0, 2025, 2025);
+    const later = calculateExpenditure(outgoings, 0, 2035, 2025);
+    expect(base).toBe(later); // no inflation
+  });
+
+  it("mixes inflated and non-inflated outgoings correctly", () => {
+    const outgoings: CommittedOutgoing[] = [
+      { id: "1", category: "mortgage", label: "Mortgage", amount: 1500, frequency: "monthly" },
+      { id: "2", category: "school_fees", label: "Fees", amount: 6000, frequency: "termly", inflationRate: 0.10 },
+    ];
+    // Year 0: mortgage 18000 + fees 18000 = 36000
+    const year0 = calculateExpenditure(outgoings, 0, 2025, 2025);
+    expect(year0).toBe(36_000);
+    // Year 1: mortgage 18000 (no inflation) + fees 18000 * 1.10 = 19800 => total 37800
+    const year1 = calculateExpenditure(outgoings, 0, 2026, 2025);
+    expect(year1).toBeCloseTo(18_000 + 18_000 * 1.10, 0);
+  });
+});
+
+describe("generateLifetimeCashFlow with inflated outgoings", () => {
+  it("expenditure increases over time when outgoings have inflation", () => {
+    const household = makeHousehold({
+      committedOutgoings: [
+        {
+          id: "o1",
+          category: "school_fees" as const,
+          label: "School fees",
+          amount: 6_000,
+          frequency: "termly" as const,
+          inflationRate: 0.05,
+        },
+      ],
+    });
+    const result = generateLifetimeCashFlow(household, 0.05);
+    const year0 = result.data[0];
+    const year10 = result.data[10];
+    // School fees inflate at 5%/yr, so expenditure at year 10 should be higher
+    // (lifestyle spending is the same, so the difference comes from inflated fees)
+    expect(year10.totalExpenditure).toBeGreaterThan(year0.totalExpenditure);
   });
 });
 

@@ -125,6 +125,18 @@ export const EmergencyFundConfigSchema = z.object({
   monthlyLifestyleSpending: z.number().min(0).default(0),
 });
 
+// --- Children ---
+
+export const ChildSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  dateOfBirth: z.string(),
+  schoolFeeAnnual: z.number().min(0).default(0),
+  feeInflationRate: z.number().min(-0.2).max(0.2).default(0.05),
+  schoolStartAge: z.number().int().min(0).max(25).default(4),
+  schoolEndAge: z.number().int().min(0).max(25).default(18),
+});
+
 // --- Committed Outgoings ---
 
 export const CommittedOutgoingCategorySchema = z.enum([
@@ -147,6 +159,8 @@ export const CommittedOutgoingSchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   personId: z.string().optional(),
+  inflationRate: z.number().min(-0.2).max(0.2).optional(),
+  linkedChildId: z.string().optional(),
 });
 
 // --- Dashboard Configuration ---
@@ -211,6 +225,7 @@ export const NetWorthSnapshotSchema = z.object({
 
 export const HouseholdDataSchema = z.object({
   persons: z.array(PersonSchema),
+  children: z.array(ChildSchema).default([]),
   accounts: z.array(AccountSchema),
   income: z.array(PersonIncomeSchema),
   bonusStructures: z.array(BonusStructureSchema),

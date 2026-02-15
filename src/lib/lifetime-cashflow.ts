@@ -184,11 +184,12 @@ export function generateLifetimeCashFlow(
     // 2. State pension
     const statePensionIncome = calculateStatePensionIncome(personStates, yearOffset);
 
-    // 3. Expenditure
+    // 3. Expenditure (baseYear = currentYear so inflation compounds from today)
     const totalExpenditure = calculateExpenditure(
       committedOutgoings,
       emergencyFund.monthlyLifestyleSpending,
-      calendarYear
+      calendarYear,
+      currentYear
     );
 
     // 4. During working years: add contributions to pots
@@ -244,24 +245,22 @@ function calculateEmploymentIncome(personStates: PersonState[], yearOffset: numb
 
     const salaryGrowthRate = state.personIncome.salaryGrowthRate ?? 0;
     const grownSalary = state.personIncome.grossSalary * Math.pow(1 + salaryGrowthRate, yearOffset);
-    const grownIncome: PersonIncome = { ...state.personIncome, grossSalary: grownSalary };
+
+    // Compute total bonus income (cash + deferred vesting) and include in gross
+    // so that tax is calculated on the full income, not just salary
+    const bonusGrowthRate = state.personIncome.bonusGrowthRate ?? 0;
+    const grownCashBonus = state.annualCashBonus > 0
+      ? state.annualCashBonus * Math.pow(1 + bonusGrowthRate, yearOffset)
+      : 0;
+    const grownDeferredBonus = state.annualDeferredBonus > 0
+      ? state.annualDeferredBonus * Math.pow(1 + bonusGrowthRate, yearOffset)
+      : 0;
+    const totalGrossIncome = grownSalary + grownCashBonus + grownDeferredBonus;
+
+    // Tax is calculated on the full gross (salary + bonus), preserving pension method
+    const grownIncome: PersonIncome = { ...state.personIncome, grossSalary: totalGrossIncome };
     const takeHome = calculateTakeHomePay(grownIncome);
     total += takeHome.takeHome;
-
-    // Cash bonus (apply growth)
-    if (state.annualCashBonus > 0) {
-      const bonusGrowthRate = state.personIncome.bonusGrowthRate ?? 0;
-      const grownBonus = state.annualCashBonus * Math.pow(1 + bonusGrowthRate, yearOffset);
-      total += grownBonus;
-    }
-
-    // Deferred bonus vesting — in steady state, annual vesting equals annual grant.
-    // During ramp-up (first vestingYears), vesting is proportionally less.
-    if (state.annualDeferredBonus > 0) {
-      const bonusGrowthRate = state.personIncome.bonusGrowthRate ?? 0;
-      const grownDeferred = state.annualDeferredBonus * Math.pow(1 + bonusGrowthRate, yearOffset);
-      total += grownDeferred;
-    }
   }
   return total;
 }
@@ -283,17 +282,26 @@ function calculateStatePensionIncome(personStates: PersonState[], yearOffset: nu
 /**
  * Calculate total annual expenditure for a calendar year.
  * Respects start/end dates on committed outgoings.
+ * Applies per-outgoing inflationRate when present (compounds from baseYear).
  */
 export function calculateExpenditure(
   committedOutgoings: HouseholdData["committedOutgoings"],
   monthlyLifestyleSpending: number,
-  calendarYear: number
+  calendarYear: number,
+  baseYear?: number
 ): number {
   let total = 0;
+  const effectiveBaseYear = baseYear ?? calendarYear;
 
   for (const outgoing of committedOutgoings) {
     if (!isOutgoingActiveInYear(outgoing, calendarYear)) continue;
-    total += annualiseOutgoing(outgoing.amount, outgoing.frequency);
+    const baseAmount = annualiseOutgoing(outgoing.amount, outgoing.frequency);
+    const inflationRate = outgoing.inflationRate ?? 0;
+    const yearsElapsed = calendarYear - effectiveBaseYear;
+    const inflatedAmount = inflationRate !== 0 && yearsElapsed > 0
+      ? baseAmount * Math.pow(1 + inflationRate, yearsElapsed)
+      : baseAmount;
+    total += inflatedAmount;
   }
 
   total += monthlyLifestyleSpending * 12;

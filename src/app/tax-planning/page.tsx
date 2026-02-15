@@ -39,6 +39,7 @@ import { ScenarioDelta } from "@/components/scenario-delta";
 import type { PersonIncome } from "@/types";
 import { getPersonContributionTotals, getAccountTaxWrapper } from "@/types";
 import type { TaxWrapper } from "@/types";
+import Link from "next/link";
 
 export default function TaxPlanningPage() {
   useData(); // keep context provider mounted
@@ -286,6 +287,48 @@ export default function TaxPlanningPage() {
 
       {persons.length === 0 && (
         <EmptyState message="No household data yet. Add people and accounts to see tax planning strategies." settingsTab="household" />
+      )}
+
+      {/* Allowance Summary Bar — always visible at top */}
+      {personData.length > 0 && (
+        <Card className="border-dashed">
+          <CardContent className="py-3">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+              {personData.map(({ person, isaUsed, isaRemaining, pensionUsed, pensionRemaining }) => {
+                const isaPercent = Math.min(100, (isaUsed / isaAllowance) * 100);
+                const pensionPercent = Math.min(100, (pensionUsed / pensionAllowance) * 100);
+                return (
+                  <div key={person.id} className="flex items-center gap-4">
+                    <span className="font-medium text-xs">{person.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-muted-foreground text-xs">ISA</span>
+                      <div className="h-2 w-16 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full transition-all ${isaPercent >= 100 ? "bg-green-500" : isaPercent >= 80 ? "bg-amber-500" : "bg-blue-500"}`}
+                          style={{ width: `${isaPercent}%` }}
+                        />
+                      </div>
+                      <span className="tabular-nums text-xs">{formatCurrency(isaRemaining)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-muted-foreground text-xs">Pension</span>
+                      <div className="h-2 w-16 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full transition-all ${pensionPercent >= 100 ? "bg-green-500" : pensionPercent >= 80 ? "bg-amber-500" : "bg-blue-500"}`}
+                          style={{ width: `${pensionPercent}%` }}
+                        />
+                      </div>
+                      <span className="tabular-nums text-xs">{formatCurrency(pensionRemaining)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+              <Link href="/settings?tab=household" className="ml-auto text-xs text-primary hover:underline">
+                Edit contributions
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Bed & ISA Planner */}

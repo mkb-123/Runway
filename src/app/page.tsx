@@ -53,6 +53,9 @@ import { ByPersonChart } from "@/components/charts/by-person-chart";
 import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
 import { LiquiditySplitChart } from "@/components/charts/liquidity-split-chart";
 import { ScenarioDelta } from "@/components/scenario-delta";
+import { SchoolFeeSummary } from "@/components/school-fee-summary";
+import { SchoolFeeTimelineChart } from "@/components/charts/school-fee-timeline-chart";
+import { generateSchoolFeeTimeline, findLastSchoolFeeYear } from "@/lib/school-fees";
 
 // ============================================================
 // Hero Metric — one of 3 configurable slots above the fold
@@ -579,6 +582,16 @@ export default function Home() {
     }
   }, []);
 
+  // --- School fee timeline (for education section) ---
+  const schoolFeeTimeline = useMemo(
+    () => generateSchoolFeeTimeline(household.children),
+    [household.children]
+  );
+  const lastSchoolFeeYear = useMemo(
+    () => findLastSchoolFeeYear(household.children),
+    [household.children]
+  );
+
   const heroMetrics = household.dashboardConfig.heroMetrics;
 
   return (
@@ -766,6 +779,39 @@ export default function Home() {
             {filteredRecommendations.map((rec) => (
               <RecommendationCard key={rec.id} rec={rec} />
             ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* EDUCATION — school fee summary and timeline */}
+      {household.children.length > 0 && household.children.some((c) => c.schoolFeeAnnual > 0) && (
+        <CollapsibleSection
+          title="Education Commitment"
+          summary={`${household.children.filter((c) => c.schoolFeeAnnual > 0).length} child${household.children.filter((c) => c.schoolFeeAnnual > 0).length !== 1 ? "ren" : ""} — ${formatCurrencyCompact(household.children.reduce((s, c) => s + c.schoolFeeAnnual, 0))}/yr`}
+          defaultOpen
+          storageKey="education"
+        >
+          <div className="space-y-4">
+            <SchoolFeeSummary childrenList={household.children} />
+            {schoolFeeTimeline.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-baseline justify-between">
+                    <CardTitle>School Fee Timeline</CardTitle>
+                    <span className="hidden text-xs text-muted-foreground sm:inline">
+                      Annual fees by child (including inflation)
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <SchoolFeeTimelineChart
+                    data={schoolFeeTimeline}
+                    childrenList={household.children}
+                    lastSchoolFeeYear={lastSchoolFeeYear}
+                  />
+                </CardContent>
+              </Card>
+            )}
           </div>
         </CollapsibleSection>
       )}

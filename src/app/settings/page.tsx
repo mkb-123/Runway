@@ -8,6 +8,7 @@ import {
   Target,
   Shield,
   Receipt,
+  GraduationCap,
   CheckCircle2,
   Circle,
   Download,
@@ -44,6 +45,7 @@ import { AccountsTab } from "./components/accounts-tab";
 import { PlanningTab } from "./components/planning-tab";
 import { IhtTab } from "./components/iht-tab";
 import { CommitmentsTab } from "./components/commitments-tab";
+import { ChildrenTab } from "./components/children-tab";
 import { SettingsSummaryBar } from "./components/settings-summary-bar";
 
 // ============================================================
@@ -69,7 +71,7 @@ function SettingsPageInner() {
   } = useData();
 
   const searchParams = useSearchParams();
-  const validTabs = ["household", "accounts", "planning", "commitments", "iht"];
+  const validTabs = ["household", "accounts", "planning", "children", "commitments", "iht"];
   const tabFromUrl = searchParams.get("tab");
   const urlTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : null;
   const [localTab, setLocalTab] = useState(urlTab ?? "household");
@@ -265,6 +267,11 @@ function SettingsPageInner() {
             <Target className="size-3.5" />
             Planning
           </TabsTrigger>
+          <TabsTrigger value="children" className="gap-1.5 shrink-0">
+            <GraduationCap className="size-3.5" />
+            <span className="hidden sm:inline">Children</span>
+            <span className="sm:hidden">Kids</span>
+          </TabsTrigger>
           <TabsTrigger value="commitments" className="gap-1.5 shrink-0">
             <Receipt className="size-3.5" />
             <span className="hidden sm:inline">Commitments</span>
@@ -292,6 +299,13 @@ function SettingsPageInner() {
 
         <TabsContent value="planning">
           <PlanningTab
+            household={household}
+            updateHousehold={updateHousehold}
+          />
+        </TabsContent>
+
+        <TabsContent value="children">
+          <ChildrenTab
             household={household}
             updateHousehold={updateHousehold}
           />
