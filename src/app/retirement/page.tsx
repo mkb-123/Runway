@@ -36,6 +36,8 @@ import { ScenarioControls } from "@/components/retirement/scenario-controls";
 import { PensionBridgeCard } from "@/components/retirement/pension-bridge-card";
 import { RetirementCountdownGrid } from "@/components/retirement/retirement-countdown-grid";
 import { FireMetricsCard } from "@/components/retirement/fire-metrics-card";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 export default function RetirementPage() {
   // Scenario-aware data
@@ -393,7 +395,39 @@ export default function RetirementPage() {
         baseProgressPercent={baseProgressPercent}
       />
 
-      {/* 2. Scenario Controls (shared across sections) */}
+      {/* 2. Planning Settings — quick reference */}
+      <Card className="border-dashed">
+        <CardContent className="py-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Target income</span>
+              <Badge variant="secondary">{formatCurrency(retirement.targetAnnualIncome)}/yr</Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Withdrawal rate</span>
+              <Badge variant="secondary">{formatPercent(retirement.withdrawalRate)}</Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">State pension</span>
+              <Badge variant={retirement.includeStatePension ? "default" : "outline"}>
+                {retirement.includeStatePension ? `Yes (${formatCurrency(totalStatePensionAnnual)}/yr)` : "Excluded"}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Pension access</span>
+              <Badge variant="secondary">Age {pensionAccessAge}</Badge>
+            </div>
+            <Link
+              href="/settings?tab=planning"
+              className="ml-auto text-xs text-primary hover:underline"
+            >
+              Edit in Settings
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 3. Scenario Controls (shared across sections) */}
       <ScenarioControls
         effectiveRetirementAge={effectiveRetirementAge}
         plannedRetirementAge={plannedRetirementAge}

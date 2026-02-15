@@ -19,7 +19,9 @@ import {
   projectSalaryTrajectory,
 } from "@/lib/projections";
 import { generateDeferredTranches, totalProjectedDeferredValue } from "@/lib/deferred-bonus";
-import { getPersonContributionTotals, annualiseOutgoing } from "@/types";
+import { getPersonContributionTotals, annualiseOutgoing, OUTGOING_CATEGORY_LABELS } from "@/types";
+import type { CommittedOutgoingCategory } from "@/types";
+import { SchoolFeeSummary } from "@/components/school-fee-summary";
 import {
   Table,
   TableHeader,
@@ -219,7 +221,26 @@ export default function IncomePage() {
       { name: "Employee Pension", value: combinedPension, type: "deduction" },
       { name: "Take-Home Pay", value: combinedTakeHome, type: "subtotal" },
       { name: "ISA Contributions", value: combinedISA, type: "deduction" },
-      { name: "Committed Outgoings", value: committedOutgoings.reduce((s, o) => s + annualiseOutgoing(o.amount, o.frequency), 0), type: "deduction" },
+      // Break committed outgoings down by category
+      ...(() => {
+        const byCategory = new Map<CommittedOutgoingCategory, number>();
+        for (const o of committedOutgoings) {
+          const annual = annualiseOutgoing(o.amount, o.frequency);
+          byCategory.set(o.category, (byCategory.get(o.category) ?? 0) + annual);
+        }
+        const entries: WaterfallDataPoint[] = [];
+        for (const [category, value] of byCategory) {
+          if (value > 0) {
+            entries.push({ name: OUTGOING_CATEGORY_LABELS[category], value, type: "deduction" });
+          }
+        }
+        // If only one category, keep the generic label for simplicity
+        if (entries.length <= 1) {
+          const total = committedOutgoings.reduce((s, o) => s + annualiseOutgoing(o.amount, o.frequency), 0);
+          return total > 0 ? [{ name: "Committed Outgoings", value: total, type: "deduction" as const }] : [];
+        }
+        return entries;
+      })(),
       ...(annualLifestyle > 0
         ? [{ name: "Lifestyle Spending", value: annualLifestyle, type: "deduction" as const }]
         : []),
@@ -608,6 +629,11 @@ export default function IncomePage() {
         </Card>
       </section>
       </CollapsibleSection>
+
+      {/* School Fees — only when children exist */}
+      {household.children.length > 0 && household.children.some((c) => c.schoolFeeAnnual > 0) && (
+        <SchoolFeeSummary childrenList={household.children} />
+      )}
 
       {/* Cash Flow Timeline */}
       <CollapsibleSection title="Cash Flow Timeline" summary="Monthly income vs outgoings over 24 months" storageKey="income-cashflow-timeline">
