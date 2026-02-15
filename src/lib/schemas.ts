@@ -83,7 +83,9 @@ export const DeferredBonusTrancheSchema = z.object({
 export const BonusStructureSchema = z.object({
   personId: z.string().min(1),
   cashBonusAnnual: z.number().min(0),
-  deferredTranches: z.array(DeferredBonusTrancheSchema),
+  deferredBonusAnnual: z.number().min(0).default(0),
+  vestingYears: z.number().int().min(0).max(10).default(0),
+  estimatedAnnualReturn: z.number().min(-0.5).max(0.5).default(0.08),
 });
 
 export const PersonIncomeSchema = z.object({

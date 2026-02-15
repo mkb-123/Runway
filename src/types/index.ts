@@ -59,7 +59,12 @@ export interface DeferredBonusTranche {
 export interface BonusStructure {
   personId: string;
   cashBonusAnnual: number;
-  deferredTranches: DeferredBonusTranche[];
+  /** Total annual deferred bonus amount (vests equally over vestingYears) */
+  deferredBonusAnnual: number;
+  /** Number of years for equal vesting (e.g. 3 = 1/3 vests each year) */
+  vestingYears: number;
+  /** Expected annual return on deferred amounts */
+  estimatedAnnualReturn: number;
 }
 
 export interface PersonIncome {

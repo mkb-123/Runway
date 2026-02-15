@@ -16,10 +16,9 @@ import {
 } from "@/lib/tax";
 import {
   calculateTaxEfficiencyScore,
-  projectDeferredBonusValue,
   projectSalaryTrajectory,
 } from "@/lib/projections";
-import type { DeferredBonusTranche } from "@/types";
+import { generateDeferredTranches, totalProjectedDeferredValue } from "@/lib/deferred-bonus";
 import { getPersonContributionTotals, annualiseOutgoing } from "@/types";
 import {
   Table,
@@ -43,15 +42,7 @@ import { generateCashFlowTimeline } from "@/lib/cash-flow";
 import type { TaxBandDataItem } from "@/components/charts/tax-band-chart";
 import { ScenarioDelta } from "@/components/scenario-delta";
 
-// --- Helper: projected value at vesting (delegates to lib function) ---
-function projectedValue(tranche: DeferredBonusTranche): number {
-  return projectDeferredBonusValue(
-    tranche.amount,
-    tranche.grantDate,
-    tranche.vestingDate,
-    tranche.estimatedAnnualReturn
-  );
-}
+// projectedValue helper removed — now using totalProjectedDeferredValue from lib
 
 // --- Helper: student loan plan label ---
 function studentLoanLabel(plan: string): string {
@@ -545,8 +536,8 @@ export default function IncomePage() {
               </CardContent>
             </Card>
 
-            {/* Deferred Bonus Section */}
-            {bonus && (bonus.cashBonusAnnual > 0 || bonus.deferredTranches.length > 0) && (
+            {/* Bonus Structure Section */}
+            {bonus && (bonus.cashBonusAnnual > 0 || bonus.deferredBonusAnnual > 0) && (
               <Card>
                 <CardHeader>
                   <CardTitle>Bonus Structure</CardTitle>
@@ -560,59 +551,59 @@ export default function IncomePage() {
                     </span>
                   </div>
 
-                  {/* Deferred Tranches */}
-                  {bonus.deferredTranches.length > 0 && (
+                  {/* Deferred Bonus — simplified display */}
+                  {bonus.deferredBonusAnnual > 0 && (
                     <div className="space-y-3">
-                      <h4 className="font-medium">Deferred Bonus Tranches</h4>
+                      <h4 className="font-medium">Deferred Bonus</h4>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-muted-foreground">Annual deferred</span>
+                          <span className="font-medium">{formatCurrency(bonus.deferredBonusAnnual)}</span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-muted-foreground">Vesting period</span>
+                          <span className="font-medium">{bonus.vestingYears} year{bonus.vestingYears !== 1 ? "s" : ""} (equal)</span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-muted-foreground">Per-tranche amount</span>
+                          <span className="font-medium">{formatCurrency(bonus.deferredBonusAnnual / bonus.vestingYears)}</span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-muted-foreground">Est. annual return</span>
+                          <span className="font-medium">{formatPercent(bonus.estimatedAnnualReturn)}</span>
+                        </div>
+                      </div>
+                      {/* Generated tranches table */}
                       <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Grant Date</TableHead>
-                              <TableHead>Vesting Date</TableHead>
+                              <TableHead>Vesting</TableHead>
                               <TableHead className="text-right">Amount</TableHead>
-                              <TableHead className="text-right">Est. Return</TableHead>
                               <TableHead className="text-right">Projected Value</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {bonus.deferredTranches.map((tranche, idx) => {
-                              const projected = projectedValue(tranche);
-                              return (
-                                <TableRow key={idx}>
-                                  <TableCell>{formatDate(tranche.grantDate)}</TableCell>
-                                  <TableCell>{formatDate(tranche.vestingDate)}</TableCell>
-                                  <TableCell className="text-right">
-                                    {formatCurrency(tranche.amount)}
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    {formatPercent(tranche.estimatedAnnualReturn)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-medium">
-                                    {formatCurrency(projected)}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
+                            {generateDeferredTranches(bonus).map((tranche, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell>{formatDate(tranche.vestingDate)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(tranche.amount)}</TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {formatCurrency(
+                                    tranche.amount * Math.pow(1 + tranche.estimatedAnnualReturn, idx + 1)
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
                           </TableBody>
                           <TableFooter>
                             <TableRow>
-                              <TableCell colSpan={2} className="font-semibold">
-                                Total Deferred
+                              <TableCell className="font-semibold">Total</TableCell>
+                              <TableCell className="text-right font-semibold">
+                                {formatCurrency(bonus.deferredBonusAnnual)}
                               </TableCell>
                               <TableCell className="text-right font-semibold">
-                                {formatCurrency(
-                                  bonus.deferredTranches.reduce((s, t) => s + t.amount, 0)
-                                )}
-                              </TableCell>
-                              <TableCell />
-                              <TableCell className="text-right font-semibold">
-                                {formatCurrency(
-                                  bonus.deferredTranches.reduce(
-                                    (s, t) => s + projectedValue(t),
-                                    0
-                                  )
-                                )}
+                                {formatCurrency(totalProjectedDeferredValue(bonus))}
                               </TableCell>
                             </TableRow>
                           </TableFooter>
@@ -635,9 +626,7 @@ export default function IncomePage() {
             const salary = personIncome.grossSalary;
             const employerPension = personIncome.employerPensionContribution;
             const cashBonus = bonus?.cashBonusAnnual ?? 0;
-            const deferredBonus = bonus
-              ? bonus.deferredTranches.reduce((s, t) => s + t.amount, 0)
-              : 0;
+            const deferredBonus = bonus?.deferredBonusAnnual ?? 0;
             const totalComp = salary + employerPension + cashBonus + deferredBonus;
 
             return (

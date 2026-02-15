@@ -9,6 +9,7 @@ import type { HouseholdData, DeferredBonusTranche } from "@/types";
 import { annualiseOutgoing } from "@/types";
 import type { CashFlowMonth } from "@/components/charts/cash-flow-timeline";
 import { calculateTakeHomePay } from "@/lib/tax";
+import { generateDeferredTranches } from "@/lib/deferred-bonus";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -21,7 +22,7 @@ const MONTHS = [
  * Income sources:
  * - Monthly salary (gross / 12 per person)
  * - Cash bonus (assumed paid in month specified, or March if unknown)
- * - Deferred vesting (in the month the tranche vests)
+ * - Deferred vesting (in the month the tranche vests — January)
  *
  * Outgoings:
  * - Committed outgoings by frequency (monthly / termly / annually)
@@ -32,6 +33,11 @@ export function generateCashFlowTimeline(household: HouseholdData): CashFlowMont
   const startYear = now.getFullYear();
   const startMonth = now.getMonth(); // 0-indexed
 
+  // Pre-generate all deferred tranches from simplified bonus structures
+  const allTranches: DeferredBonusTranche[] = household.bonusStructures.flatMap(
+    (bonus) => generateDeferredTranches(bonus)
+  );
+
   const months: CashFlowMonth[] = [];
 
   for (let i = 0; i < 24; i++) {
@@ -41,7 +47,7 @@ export function generateCashFlowTimeline(household: HouseholdData): CashFlowMont
 
     const salary = calculateMonthlySalaryForMonth(household, i);
     const bonus = calculateBonusForMonth(household, monthIdx, i);
-    const deferredVesting = calculateDeferredVestingForMonth(household, year, monthIdx);
+    const deferredVesting = calculateDeferredVestingForMonth(allTranches, year, monthIdx);
     const { committed, lifestyle } = calculateOutgoingsForMonth(household, monthIdx);
 
     const totalIncome = salary + bonus + deferredVesting;
@@ -93,20 +99,19 @@ function calculateBonusForMonth(household: HouseholdData, monthIdx: number, mont
 }
 
 /**
- * Check if any deferred tranches vest in this specific month.
+ * Check if any generated deferred tranches vest in this specific month.
+ * Vesting occurs in January (month 0) each year.
  */
 function calculateDeferredVestingForMonth(
-  household: HouseholdData,
+  tranches: DeferredBonusTranche[],
   year: number,
   monthIdx: number
 ): number {
   let total = 0;
-  for (const bonus of household.bonusStructures) {
-    for (const tranche of bonus.deferredTranches) {
-      const vestDate = parseDate(tranche.vestingDate);
-      if (vestDate && vestDate.getFullYear() === year && vestDate.getMonth() === monthIdx) {
-        total += estimateVestedValue(tranche);
-      }
+  for (const tranche of tranches) {
+    const vestDate = parseDate(tranche.vestingDate);
+    if (vestDate && vestDate.getFullYear() === year && vestDate.getMonth() === monthIdx) {
+      total += estimateVestedValue(tranche);
     }
   }
   return total;
