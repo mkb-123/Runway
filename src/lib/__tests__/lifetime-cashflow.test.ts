@@ -371,6 +371,74 @@ describe("generateLifetimeCashFlow events", () => {
   });
 });
 
+describe("generateLifetimeCashFlow deferred bonus", () => {
+  it("includes deferred bonus in employment income during working years", () => {
+    const withoutBonus = makeHousehold({ bonusStructures: [] });
+    const withBonus = makeHousehold({
+      bonusStructures: [
+        {
+          personId: "p1",
+          cashBonusAnnual: 0,
+          deferredBonusAnnual: 45_000,
+          vestingYears: 3,
+          estimatedAnnualReturn: 0.08,
+        },
+      ],
+    });
+
+    const resultWithout = generateLifetimeCashFlow(withoutBonus, 0.05);
+    const resultWith = generateLifetimeCashFlow(withBonus, 0.05);
+
+    // During working years, employment income should be higher with deferred bonus
+    const yearIdx = 5; // well into working years
+    expect(resultWith.data[yearIdx].employmentIncome).toBeGreaterThan(
+      resultWithout.data[yearIdx].employmentIncome
+    );
+  });
+
+  it("includes cash bonus in employment income during working years", () => {
+    const withoutBonus = makeHousehold({ bonusStructures: [] });
+    const withBonus = makeHousehold({
+      bonusStructures: [
+        {
+          personId: "p1",
+          cashBonusAnnual: 25_000,
+          deferredBonusAnnual: 0,
+          vestingYears: 3,
+          estimatedAnnualReturn: 0.08,
+        },
+      ],
+    });
+
+    const resultWithout = generateLifetimeCashFlow(withoutBonus, 0.05);
+    const resultWith = generateLifetimeCashFlow(withBonus, 0.05);
+
+    const yearIdx = 5;
+    expect(resultWith.data[yearIdx].employmentIncome).toBeGreaterThan(
+      resultWithout.data[yearIdx].employmentIncome
+    );
+  });
+
+  it("deferred bonus stops at retirement", () => {
+    const household = makeHousehold({
+      bonusStructures: [
+        {
+          personId: "p1",
+          cashBonusAnnual: 0,
+          deferredBonusAnnual: 45_000,
+          vestingYears: 3,
+          estimatedAnnualReturn: 0.08,
+        },
+      ],
+    });
+    const result = generateLifetimeCashFlow(household, 0.05);
+    const retiredYears = result.data.filter((d) => d.age >= 61);
+    for (const year of retiredYears) {
+      expect(year.employmentIncome).toBe(0);
+    }
+  });
+});
+
 describe("generateLifetimeCashFlow property: income consistency", () => {
   it("during working years, employment income is the dominant source", () => {
     const household = makeHousehold();
