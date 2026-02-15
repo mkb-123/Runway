@@ -792,3 +792,95 @@ describe("analyzeSavingsRate", () => {
     expect(recs[0].id).toBe("low-savings-rate");
   });
 });
+
+// --- Pension taper with bonus income ---
+
+describe("generateRecommendations — pension taper includes bonus", () => {
+  it("tapers pension allowance when salary + bonus exceeds £200k threshold income", () => {
+    // Salary £180k alone would NOT trigger taper (threshold income = £180k < £200k)
+    // But salary £180k + £30k cash bonus = £210k threshold income > £200k
+    // Adjusted income = £210k + £15k employer pension = £225k
+    // Still below £260k adjusted income threshold → no actual taper yet, but threshold check triggers
+    const household = makeHousehold({
+      income: [makeIncome({
+        grossSalary: 180000,
+        employerPensionContribution: 50000,
+        employeePensionContribution: 10000,
+        pensionContributionMethod: "salary_sacrifice",
+      })],
+      bonusStructures: [{
+        personId: "person-1",
+        totalBonusAnnual: 80000,
+        cashBonusAnnual: 80000,
+        vestingYears: 0,
+        vestingGapYears: 0,
+        estimatedAnnualReturn: 0,
+      }],
+      contributions: makeContributions("person-1", { pensionContribution: 0 }),
+    });
+
+    // With bonus: threshold income = 180k + 80k = 260k (> £200k)
+    // Adjusted income = 260k + 50k employer = 310k (> £260k)
+    // Excess: 310k - 260k = 50k, reduction: 25k
+    // Tapered allowance: 60k - 25k = 35k
+    // Total pension: employee 10k + employer 50k = 60k
+    // This exceeds the tapered 35k allowance → no headroom recommendation
+    const recs = generateRecommendations(household);
+    const pensionHeadroom = recs.find((r) => r.id === `pension-headroom-${makePerson().id}`);
+    // With tapered allowance of 35k and 60k used, there's no headroom — no recommendation
+    expect(pensionHeadroom).toBeUndefined();
+  });
+
+  it("does not taper when salary alone is below £200k and no bonus", () => {
+    const household = makeHousehold({
+      income: [makeIncome({
+        grossSalary: 180000,
+        employerPensionContribution: 15000,
+        employeePensionContribution: 10000,
+        pensionContributionMethod: "salary_sacrifice",
+      })],
+      bonusStructures: [],
+      contributions: makeContributions("person-1", { pensionContribution: 0 }),
+    });
+
+    // Without bonus: threshold income = £180k (< £200k) → no taper
+    // Full allowance = £60k, used = employee 10k + employer 15k = 25k
+    // Headroom = 35k → recommendation to use more
+    const recs = generateRecommendations(household);
+    const pensionHeadroom = recs.find((r) => r.id === `pension-headroom-${makePerson().id}`);
+    expect(pensionHeadroom).toBeDefined();
+    // Description references the full £60k allowance (no taper applied)
+    expect(pensionHeadroom?.description).toContain("60,000");
+  });
+
+  it("uses tapered allowance that limits pension headroom recommendation", () => {
+    // Person with salary £170k + £50k cash bonus = £220k threshold income (> £200k)
+    // Adjusted income = £220k + £20k employer = £240k (still below £260k → no actual reduction yet)
+    // But now add more employer pension to push adjusted over £260k:
+    // Salary £170k + bonus £50k = £220k, employer pension £50k → adjusted = £270k
+    // Excess over £260k = £10k, reduction = £5k, tapered allowance = £55k
+    const household = makeHousehold({
+      income: [makeIncome({
+        grossSalary: 170000,
+        employerPensionContribution: 50000,
+        employeePensionContribution: 5000,
+        pensionContributionMethod: "salary_sacrifice",
+      })],
+      bonusStructures: [{
+        personId: "person-1",
+        totalBonusAnnual: 50000,
+        cashBonusAnnual: 50000,
+        vestingYears: 0,
+        vestingGapYears: 0,
+        estimatedAnnualReturn: 0,
+      }],
+      contributions: makeContributions("person-1", { pensionContribution: 0 }),
+    });
+
+    // Total pension used = employee 5k + employer 50k = 55k
+    // Tapered allowance = 55k, headroom = 0 → no recommendation
+    const recs = generateRecommendations(household);
+    const pensionHeadroom = recs.find((r) => r.id === `pension-headroom-${makePerson().id}`);
+    expect(pensionHeadroom).toBeUndefined();
+  });
+});

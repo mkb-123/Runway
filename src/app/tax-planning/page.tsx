@@ -33,6 +33,7 @@ import {
   calculateBedAndISABreakEven,
 } from "@/lib/cgt";
 import { calculateTakeHomePay } from "@/lib/tax";
+import { calculateTaperedAnnualAllowance } from "@/lib/projections";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
 import { ScenarioDelta } from "@/components/scenario-delta";
@@ -100,11 +101,15 @@ export default function TaxPlanningPage() {
 
         // Pension remaining — ALL sources count against the annual allowance:
         // employee + employer (from income) + discretionary (from contributions array)
+        // Tapered allowance: threshold income includes salary + bonus (HMRC PTM057100)
         const employeePension = personIncome?.employeePensionContribution ?? 0;
         const employerPension = personIncome?.employerPensionContribution ?? 0;
         const discretionaryPension = personContributions.pensionContribution;
         const pensionUsed = employeePension + employerPension + discretionaryPension;
-        const pensionRemaining = Math.max(0, pensionAllowance - pensionUsed);
+        const thresholdIncome = (personIncome?.grossSalary ?? 0) + (personBonus?.cashBonusAnnual ?? 0);
+        const adjustedIncomeForTaper = thresholdIncome + employerPension;
+        const effectivePensionAllowance = calculateTaperedAnnualAllowance(thresholdIncome, adjustedIncomeForTaper);
+        const pensionRemaining = Math.max(0, effectivePensionAllowance - pensionUsed);
 
         // Unrealised gains in GIA
         const unrealisedGains = getUnrealisedGains(personGiaAccounts);
@@ -157,7 +162,11 @@ export default function TaxPlanningPage() {
         const baseEmployerPension = baseIncome?.employerPensionContribution ?? 0;
         const baseDiscretionaryPension = baseContributions.pensionContribution;
         const basePensionUsed = baseEmployeePension + baseEmployerPension + baseDiscretionaryPension;
-        const basePensionRemaining = Math.max(0, pensionAllowance - basePensionUsed);
+        const baseBonus = baseHousehold.bonusStructures.find((b) => b.personId === person.id);
+        const baseThresholdIncome = (baseIncome?.grossSalary ?? 0) + (baseBonus?.cashBonusAnnual ?? 0);
+        const baseAdjustedIncome = baseThresholdIncome + baseEmployerPension;
+        const baseEffectivePensionAllowance = calculateTaperedAnnualAllowance(baseThresholdIncome, baseAdjustedIncome);
+        const basePensionRemaining = Math.max(0, baseEffectivePensionAllowance - basePensionUsed);
 
         const baseUnrealisedGains = getUnrealisedGains(baseGiaAccounts);
         const baseTotalUnrealisedGain = baseUnrealisedGains.reduce(
@@ -174,6 +183,7 @@ export default function TaxPlanningPage() {
           isaRemaining,
           pensionUsed,
           pensionRemaining,
+          effectivePensionAllowance,
           unrealisedGains,
           totalUnrealisedGain,
           remainingCgtAllowance,
@@ -187,10 +197,11 @@ export default function TaxPlanningPage() {
           baseIsaRemaining,
           basePensionUsed,
           basePensionRemaining,
+          baseEffectivePensionAllowance,
           baseTotalUnrealisedGain,
         };
       }),
-    [persons, income, contributions, household.accounts, isaAllowance, pensionAllowance, cgtAnnualExempt, baseIncomeLookup, baseHousehold.contributions, baseHousehold.accounts]
+    [persons, income, contributions, household.accounts, household.bonusStructures, isaAllowance, pensionAllowance, cgtAnnualExempt, baseIncomeLookup, baseHousehold.contributions, baseHousehold.accounts, baseHousehold.bonusStructures]
   );
 
   // Pension modelling scenarios
@@ -293,9 +304,9 @@ export default function TaxPlanningPage() {
       {/* Allowance Summary Bar — always visible at top */}
       {personData.length > 0 && (
         <SettingsBar label="Allowance usage" settingsTab="household" editLabel="Edit contributions">
-          {personData.map(({ person, isaUsed, isaRemaining, pensionUsed, pensionRemaining }) => {
+          {personData.map(({ person, isaUsed, isaRemaining, pensionUsed, pensionRemaining, effectivePensionAllowance }) => {
             const isaPercent = Math.min(100, (isaUsed / isaAllowance) * 100);
-            const pensionPercent = Math.min(100, (pensionUsed / pensionAllowance) * 100);
+            const pensionPercent = Math.min(100, (pensionUsed / effectivePensionAllowance) * 100);
             return (
               <div key={person.id} className="flex items-center gap-4">
                 <span className="font-medium text-xs">{person.name}</span>
@@ -496,6 +507,8 @@ export default function TaxPlanningPage() {
                   (i) => i.personId === person.id
                 );
                 const personContributions = getPersonContributionTotals(contributions, person.id);
+                const pd = personData.find((d) => d.person.id === person.id);
+                const taperedAllowance = pd?.effectivePensionAllowance ?? pensionAllowance;
                 const isSalarySacrifice =
                   personIncome?.pensionContributionMethod === "salary_sacrifice";
 
@@ -508,6 +521,9 @@ export default function TaxPlanningPage() {
                       </Badge>
                       {isSalarySacrifice && (
                         <Badge variant="secondary">Salary Sacrifice</Badge>
+                      )}
+                      {taperedAllowance < pensionAllowance && (
+                        <Badge variant="destructive">Tapered</Badge>
                       )}
                     </div>
 
@@ -533,10 +549,13 @@ export default function TaxPlanningPage() {
                             </div>
                             <div>
                               <p className="text-muted-foreground text-sm">
-                                Pension Allowance Used
+                                Effective Annual Allowance
                               </p>
                               <p className="font-semibold">
-                                {formatCurrency(totalPensionUsed)}
+                                {formatCurrency(taperedAllowance)}
+                                {taperedAllowance < pensionAllowance && (
+                                  <span className="text-muted-foreground text-xs"> (tapered)</span>
+                                )}
                               </p>
                             </div>
                             <div>
@@ -545,7 +564,7 @@ export default function TaxPlanningPage() {
                               </p>
                               <p className="font-semibold">
                                 {formatCurrency(
-                                  pensionAllowance - totalPensionUsed
+                                  Math.max(0, taperedAllowance - totalPensionUsed)
                                 )}
                               </p>
                             </div>
