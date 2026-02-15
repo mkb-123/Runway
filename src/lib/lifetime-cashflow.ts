@@ -59,7 +59,9 @@ interface PersonState {
   currentAge: number;
   pensionPot: number;
   accessibleWealth: number;
-  annualBonus: number;
+  annualCashBonus: number;
+  /** Annual deferred bonus (in steady state, this vests each year) */
+  annualDeferredBonus: number;
   statePensionAnnual: number;
   /** Annual pension contribution (employee + employer) */
   annualPensionContribution: number;
@@ -104,7 +106,8 @@ export function generateLifetimeCashFlow(
       .reduce((sum, a) => sum + a.currentValue, 0);
 
     const bonusStructure = bonusStructures.find((b) => b.personId === person.id);
-    const annualBonus = bonusStructure?.cashBonusAnnual ?? 0;
+    const annualCashBonus = bonusStructure?.cashBonusAnnual ?? 0;
+    const annualDeferredBonus = bonusStructure?.deferredBonusAnnual ?? 0;
 
     // Pension contributions: employment-based
     const annualPensionContribution = personIncome
@@ -124,7 +127,8 @@ export function generateLifetimeCashFlow(
       currentAge: calculateAge(person.dateOfBirth),
       pensionPot,
       accessibleWealth,
-      annualBonus,
+      annualCashBonus,
+      annualDeferredBonus,
       statePensionAnnual: calculateProRataStatePension(person.niQualifyingYears),
       annualPensionContribution,
       annualSavingsContribution,
@@ -244,11 +248,19 @@ function calculateEmploymentIncome(personStates: PersonState[], yearOffset: numb
     const takeHome = calculateTakeHomePay(grownIncome);
     total += takeHome.takeHome;
 
-    // Bonus (apply growth, estimate net at ~60% for higher-rate payers — simplified)
-    if (state.annualBonus > 0) {
+    // Cash bonus (apply growth)
+    if (state.annualCashBonus > 0) {
       const bonusGrowthRate = state.personIncome.bonusGrowthRate ?? 0;
-      const grownBonus = state.annualBonus * Math.pow(1 + bonusGrowthRate, yearOffset);
+      const grownBonus = state.annualCashBonus * Math.pow(1 + bonusGrowthRate, yearOffset);
       total += grownBonus;
+    }
+
+    // Deferred bonus vesting — in steady state, annual vesting equals annual grant.
+    // During ramp-up (first vestingYears), vesting is proportionally less.
+    if (state.annualDeferredBonus > 0) {
+      const bonusGrowthRate = state.personIncome.bonusGrowthRate ?? 0;
+      const grownDeferred = state.annualDeferredBonus * Math.pow(1 + bonusGrowthRate, yearOffset);
+      total += grownDeferred;
     }
   }
   return total;

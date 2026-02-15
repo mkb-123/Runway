@@ -130,6 +130,7 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
 
     const bonus = household.bonusStructures.find((b) => b.personId === person.id);
     const cashBonus = bonus?.cashBonusAnnual ?? 0;
+    const deferredBonus = bonus?.deferredBonusAnnual ?? 0;
     const totalGross = inc.grossSalary + cashBonus;
     const taxResult = calculateIncomeTax(totalGross, inc.employeePensionContribution, inc.pensionContributionMethod);
     const niResult = calculateNI(totalGross, inc.employeePensionContribution, inc.pensionContributionMethod);
@@ -140,6 +141,8 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
     incomeRows.push(
       { Person: person.name, Item: "Gross Salary", "Value (£)": curr(inc.grossSalary) },
       { Person: "", Item: "Cash Bonus", "Value (£)": curr(cashBonus) },
+      { Person: "", Item: "Deferred Bonus (Annual)", "Value (£)": curr(deferredBonus) },
+      ...(bonus && bonus.vestingYears > 0 ? [{ Person: "" as string, Item: "  Vesting Period", "Value (£)": `${bonus.vestingYears} years` as string | number }] : []),
       { Person: "", Item: "Total Gross", "Value (£)": curr(totalGross) },
       { Person: "", Item: "Employee Pension", "Value (£)": curr(inc.employeePensionContribution) },
       { Person: "", Item: "Employer Pension", "Value (£)": curr(inc.employerPensionContribution) },

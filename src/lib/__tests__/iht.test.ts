@@ -202,24 +202,43 @@ describe("IHT Calculations", () => {
       expect(calculateYearsUntilIHTExceeded(600_000, 500_000, 20_000)).toBe(0);
     });
 
-    it("returns null when no savings flowing into estate", () => {
+    it("returns null when no savings and no growth", () => {
       expect(calculateYearsUntilIHTExceeded(300_000, 500_000, 0)).toBeNull();
     });
 
-    it("calculates years correctly", () => {
-      // Gap: 500,000 - 300,000 = 200,000
-      // At 50,000/yr: 200,000 / 50,000 = 4 years
-      expect(calculateYearsUntilIHTExceeded(300_000, 500_000, 50_000)).toBe(4);
+    it("calculates years with contributions only (zero growth)", () => {
+      // Gap: 500k - 300k = 200k. At 50k/yr with no growth: 4 years
+      expect(calculateYearsUntilIHTExceeded(300_000, 500_000, 50_000, 0)).toBe(4);
     });
 
-    it("rounds up to next year", () => {
-      // Gap: 500,000 - 400,000 = 100,000
-      // At 30,000/yr: 100,000 / 30,000 = 3.33, ceil = 4
-      expect(calculateYearsUntilIHTExceeded(400_000, 500_000, 30_000)).toBe(4);
+    it("returns null for negative savings rate with no growth", () => {
+      expect(calculateYearsUntilIHTExceeded(300_000, 500_000, -10_000, 0)).toBeNull();
     });
 
-    it("returns null for negative savings rate", () => {
-      expect(calculateYearsUntilIHTExceeded(300_000, 500_000, -10_000)).toBeNull();
+    it("growth accelerates threshold crossing", () => {
+      // With 5% growth, estate reaches threshold faster than contributions alone
+      const withoutGrowth = calculateYearsUntilIHTExceeded(300_000, 500_000, 50_000, 0);
+      const withGrowth = calculateYearsUntilIHTExceeded(300_000, 500_000, 50_000, 0.05);
+      expect(withGrowth).not.toBeNull();
+      expect(withoutGrowth).not.toBeNull();
+      expect(withGrowth!).toBeLessThan(withoutGrowth!);
+    });
+
+    it("growth alone can push estate over threshold even without contributions", () => {
+      // 500k at 5% growth vs 600k threshold: ~4 years (500k * 1.05^4 ≈ 607k)
+      const result = calculateYearsUntilIHTExceeded(500_000, 600_000, 0, 0.05);
+      expect(result).not.toBeNull();
+      expect(result!).toBeLessThanOrEqual(5);
+      expect(result!).toBeGreaterThanOrEqual(3);
+    });
+
+    it("returns null when no growth and no contributions", () => {
+      expect(calculateYearsUntilIHTExceeded(300_000, 500_000, 0, 0)).toBeNull();
+    });
+
+    it("returns null when growth is negative and insufficient to bridge gap", () => {
+      // Negative growth with no contributions — estate shrinks, never reaches threshold
+      expect(calculateYearsUntilIHTExceeded(300_000, 500_000, 0, -0.05)).toBeNull();
     });
   });
 

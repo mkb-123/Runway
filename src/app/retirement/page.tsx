@@ -20,6 +20,7 @@ import {
   calculatePensionBridge,
   calculateProRataStatePension,
   calculateAge,
+  projectCompoundGrowth,
 } from "@/lib/projections";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { RetirementDrawdownChart } from "@/components/charts/retirement-drawdown-chart";
@@ -314,7 +315,33 @@ export default function RetirementPage() {
     );
   }, [primaryPerson]);
 
-  // Combined Retirement Income Timeline data
+  // Years from now to retirement for the primary person
+  const yearsToRetirement = Math.max(0, effectiveRetirementAge - currentAge);
+
+  // Per-person pension and accessible contributions (for projecting pots to retirement)
+  const personContribBreakdown = useMemo(() => {
+    return persons.map((person) => {
+      const personIncome = income.find((i) => i.personId === person.id);
+      const pensionContrib = personIncome
+        ? personIncome.employeePensionContribution + personIncome.employerPensionContribution
+        : 0;
+      const personContribs = filteredContributions.filter((c) => c.personId === person.id);
+      const accessibleContrib = personContribs.reduce(
+        (sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0
+      );
+      return { personId: person.id, pensionContrib, accessibleContrib };
+    });
+  }, [persons, income, filteredContributions]);
+
+  // Projected pot at retirement (current pot + contributions compounded at selected growth rate)
+  const projectedPotAtRetirement = useMemo(() => {
+    if (yearsToRetirement <= 0) return currentPot;
+    const monthlyContrib = totalAnnualContributions / 12;
+    const projection = projectCompoundGrowth(currentPot, monthlyContrib, midRate, yearsToRetirement);
+    return projection.length > 0 ? projection[projection.length - 1].value : currentPot;
+  }, [currentPot, totalAnnualContributions, midRate, yearsToRetirement]);
+
+  // Combined Retirement Income Timeline data — projected to retirement age
   const personRetirementInputs: PersonRetirementInput[] = useMemo(() => {
     return persons.map((person) => {
       const personPensionPot = accounts
@@ -337,16 +364,30 @@ export default function RetirementPage() {
         person.niQualifyingYears ?? 0
       );
 
+      // Project pots forward to retirement age with contributions + growth
+      const contribs = personContribBreakdown.find((c) => c.personId === person.id);
+      const monthlyPensionContrib = (contribs?.pensionContrib ?? 0) / 12;
+      const monthlyAccessibleContrib = (contribs?.accessibleContrib ?? 0) / 12;
+
+      let projectedPension = personPensionPot;
+      let projectedAccessible = personAccessible;
+      if (yearsToRetirement > 0) {
+        const pensionProj = projectCompoundGrowth(personPensionPot, monthlyPensionContrib, midRate, yearsToRetirement);
+        projectedPension = pensionProj.length > 0 ? pensionProj[pensionProj.length - 1].value : personPensionPot;
+        const accessibleProj = projectCompoundGrowth(personAccessible, monthlyAccessibleContrib, midRate, yearsToRetirement);
+        projectedAccessible = accessibleProj.length > 0 ? accessibleProj[accessibleProj.length - 1].value : personAccessible;
+      }
+
       return {
         name: person.name,
         pensionAccessAge: person.pensionAccessAge,
         stateRetirementAge: person.stateRetirementAge,
-        pensionPot: personPensionPot,
-        accessibleWealth: personAccessible,
+        pensionPot: projectedPension,
+        accessibleWealth: projectedAccessible,
         statePensionAnnual: Math.round(statePensionAnnual),
       };
     });
-  }, [persons, accounts]);
+  }, [persons, accounts, personContribBreakdown, yearsToRetirement, midRate]);
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -425,10 +466,8 @@ export default function RetirementPage() {
           </CardHeader>
           <CardContent>
             <p className="mb-4 text-sm text-muted-foreground">
-              Household income sources stacked by year: state pensions, DC
-              pension drawdown, and ISA/savings bridge at{" "}
-              {formatPercent(midRate)} growth. Target:{" "}
-              {formatCurrency(retirement.targetAnnualIncome)}/yr.
+              Pots projected to retirement ({formatPercent(midRate)} growth + contributions), then
+              drawn down. Target: {formatCurrency(retirement.targetAnnualIncome)}/yr.
             </p>
 
             <RetirementIncomeTimeline
@@ -449,7 +488,7 @@ export default function RetirementPage() {
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
-                        Pension pot
+                        Pension at retirement
                       </span>
                       <span className="font-mono">
                         {formatCurrencyCompact(p.pensionPot)}
@@ -457,7 +496,7 @@ export default function RetirementPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
-                        ISA/Savings
+                        ISA/Savings at retirement
                       </span>
                       <span className="font-mono">
                         {formatCurrencyCompact(p.accessibleWealth)}
@@ -495,14 +534,13 @@ export default function RetirementPage() {
           </CardHeader>
           <CardContent>
             <p className="mb-4 text-sm text-muted-foreground">
-              How your current pot ({formatCurrencyCompact(currentPot)})
-              depletes during retirement at{" "}
-              {formatCurrencyCompact(retirement.targetAnnualIncome)}/yr, with
+              Projected pot at retirement: {formatCurrencyCompact(projectedPotAtRetirement)} (today: {formatCurrencyCompact(currentPot)}, +{yearsToRetirement}yr growth at {formatPercent(midRate)}).
+              Drawdown at {formatCurrencyCompact(retirement.targetAnnualIncome)}/yr, with
               state pension reducing withdrawals from age{" "}
               {primaryPerson?.stateRetirementAge ?? 67}.
             </p>
             <RetirementDrawdownChart
-              startingPot={currentPot}
+              startingPot={projectedPotAtRetirement}
               annualSpend={retirement.targetAnnualIncome}
               retirementAge={effectiveRetirementAge}
               scenarioRates={retirement.scenarioRates}

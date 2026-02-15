@@ -66,6 +66,8 @@ You're financially sharp — you work in finance — but you have almost no time
 - **Retirement-first framing.** You're 35 with three kids in private school. You don't need a retirement countdown on the dashboard — you need a school-fee-survival countdown. Retirement is 20+ years away; fees are due next term.
 - **Not showing the education-to-retirement transition.** The single most important moment in your financial life is when school fees stop. Show me what happens to your savings rate, net worth trajectory, and retirement date at that inflection point.
 - **Slow interactions.** You have about 90 seconds of attention before a child interrupts. If you can't get the answer in that time, you'll close the app.
+- **Projections that ignore contributions.** You work in finance — you know compound interest. If the retirement page shows your pension pot "at retirement" as £145k (today's value) when you're contributing £15k/year for 20+ years, you'll spot it immediately and lose trust. The projected value should be north of £600k. Same with IHT: if it says "years until threshold" but ignores investment growth on the estate, that's a broken model you'd never rely on.
+- **Inconsistent projections across pages.** You check the dashboard projections, the cash flow page, and the retirement page in the same session. If the numbers don't tell the same story, you'll assume the whole app is wrong — not just one page.
 
 ## When Consulted
 
