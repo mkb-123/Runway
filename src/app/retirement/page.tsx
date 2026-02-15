@@ -173,9 +173,14 @@ export default function RetirementPage() {
     [baseFilteredContributions, baseIncome]
   );
 
+  const baseBonusStructures = useMemo(() => {
+    if (selectedView === "household") return baseHousehold.bonusStructures;
+    return baseHousehold.bonusStructures.filter((b) => b.personId === selectedView);
+  }, [baseHousehold.bonusStructures, selectedView]);
+
   const baseTotalGrossIncome = useMemo(
-    () => baseIncome.reduce((sum, i) => sum + i.grossSalary, 0),
-    [baseIncome]
+    () => getHouseholdGrossIncome(baseIncome, baseBonusStructures),
+    [baseIncome, baseBonusStructures]
   );
 
   const baseSavingsRate =
