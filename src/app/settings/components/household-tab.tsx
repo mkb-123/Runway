@@ -29,7 +29,6 @@ import type {
   Account,
   PersonIncome,
   BonusStructure,
-  DeferredBonusTranche,
   Contribution,
   ContributionTarget,
   ContributionFrequency,
@@ -109,7 +108,9 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
     updated.bonusStructures.push({
       personId: newPerson.id,
       cashBonusAnnual: 0,
-      deferredTranches: [],
+      deferredBonusAnnual: 0,
+      vestingYears: 3,
+      estimatedAnnualReturn: 0.08,
     });
     // No default contributions — user adds them explicitly
     updateHousehold(updated);
@@ -150,33 +151,8 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
     updateHousehold(updated);
   }
 
-  function updateTranche(
-    bonusIndex: number,
-    trancheIndex: number,
-    field: keyof DeferredBonusTranche,
-    value: string | number
-  ) {
-    const updated = clone(household);
-    setField(updated.bonusStructures[bonusIndex].deferredTranches[trancheIndex], field, value);
-    updateHousehold(updated);
-  }
-
-  function addTranche(bonusIndex: number) {
-    const updated = clone(household);
-    updated.bonusStructures[bonusIndex].deferredTranches.push({
-      grantDate: new Date().toISOString().split("T")[0],
-      vestingDate: new Date().toISOString().split("T")[0],
-      amount: 0,
-      estimatedAnnualReturn: 0.08,
-    });
-    updateHousehold(updated);
-  }
-
-  function removeTranche(bonusIndex: number, trancheIndex: number) {
-    const updated = clone(household);
-    updated.bonusStructures[bonusIndex].deferredTranches.splice(trancheIndex, 1);
-    updateHousehold(updated);
-  }
+  // Tranche helpers removed — deferred bonus now uses simplified model
+  // (deferredBonusAnnual + vestingYears + estimatedAnnualReturn)
 
   // ----------------------------------------------------------
   // Contribution helpers
@@ -579,112 +555,85 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                       </div>
 
                       <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h5 className="text-sm font-medium">Deferred Tranches</h5>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => addTranche(bonusIdx)}
-                          >
-                            + Add Tranche
-                          </Button>
+                        <h5 className="text-sm font-medium">Deferred Bonus</h5>
+                        <p className="text-xs text-muted-foreground">
+                          Set the total annual deferred amount and how many years it vests over equally. Vesting occurs in January each year.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          {renderField(
+                            "Annual Deferred Amount",
+                            <>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={bonus.deferredBonusAnnual}
+                                onChange={(e) =>
+                                  updateBonus(bonusIdx, "deferredBonusAnnual", Number(e.target.value))
+                                }
+                                placeholder="0.00"
+                              />
+                              <FieldWarning
+                                value={bonus.deferredBonusAnnual}
+                                min={0}
+                                max={1000000}
+                                label="deferred bonus"
+                                isCurrency
+                              />
+                            </>,
+                            "Total annual deferred bonus before tax"
+                          )}
+                          {renderField(
+                            "Vesting Years",
+                            <>
+                              <Input
+                                type="number"
+                                step="1"
+                                min="0"
+                                max="10"
+                                value={bonus.vestingYears}
+                                onChange={(e) =>
+                                  updateBonus(bonusIdx, "vestingYears", Number(e.target.value))
+                                }
+                                placeholder="3"
+                              />
+                              <FieldWarning
+                                value={bonus.vestingYears}
+                                min={0}
+                                max={10}
+                                label="vesting years"
+                              />
+                            </>,
+                            "Equal vesting over this many years"
+                          )}
+                          {renderField(
+                            "Est. Annual Return (%)",
+                            <>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={
+                                  Math.round(bonus.estimatedAnnualReturn * 100 * 100) / 100
+                                }
+                                onChange={(e) =>
+                                  updateBonus(
+                                    bonusIdx,
+                                    "estimatedAnnualReturn",
+                                    Number(e.target.value) / 100
+                                  )
+                                }
+                                placeholder="8"
+                              />
+                              <FieldWarning
+                                value={Math.round(bonus.estimatedAnnualReturn * 100 * 100) / 100}
+                                min={-10}
+                                max={30}
+                                label="annual return"
+                                suffix="%"
+                              />
+                            </>,
+                            "Expected annual return on deferred amount"
+                          )}
                         </div>
-                        {bonus.deferredTranches.length === 0 && (
-                          <p className="text-sm text-muted-foreground">
-                            No deferred tranches.
-                          </p>
-                        )}
-                        {bonus.deferredTranches.map((tranche, tIdx) => (
-                          <Card key={`${person.id}-tranche-${tIdx}`} className="border-dashed">
-                            <CardContent className="pt-4">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                {renderField(
-                                  "Grant Date",
-                                  <Input
-                                    type="date"
-                                    value={tranche.grantDate}
-                                    onChange={(e) =>
-                                      updateTranche(bonusIdx, tIdx, "grantDate", e.target.value)
-                                    }
-                                  />
-                                )}
-                                {renderField(
-                                  "Vesting Date",
-                                  <Input
-                                    type="date"
-                                    value={tranche.vestingDate}
-                                    onChange={(e) =>
-                                      updateTranche(bonusIdx, tIdx, "vestingDate", e.target.value)
-                                    }
-                                  />
-                                )}
-                                {renderField(
-                                  "Amount",
-                                  <>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      value={tranche.amount}
-                                      onChange={(e) =>
-                                        updateTranche(
-                                          bonusIdx,
-                                          tIdx,
-                                          "amount",
-                                          Number(e.target.value)
-                                        )
-                                      }
-                                      placeholder="0.00"
-                                    />
-                                    <FieldWarning
-                                      value={tranche.amount}
-                                      min={0}
-                                      max={1000000}
-                                      label="tranche amount"
-                                      isCurrency
-                                    />
-                                  </>
-                                )}
-                                {renderField(
-                                  "Est. Annual Return (%)",
-                                  <>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      value={
-                                        Math.round(tranche.estimatedAnnualReturn * 100 * 100) / 100
-                                      }
-                                      onChange={(e) =>
-                                        updateTranche(
-                                          bonusIdx,
-                                          tIdx,
-                                          "estimatedAnnualReturn",
-                                          Number(e.target.value) / 100
-                                        )
-                                      }
-                                      placeholder="8"
-                                    />
-                                    <FieldWarning
-                                      value={Math.round(tranche.estimatedAnnualReturn * 100 * 100) / 100}
-                                      min={-10}
-                                      max={30}
-                                      label="annual return"
-                                      suffix="%"
-                                    />
-                                  </>
-                                )}
-                              </div>
-                              <div className="mt-3 flex justify-end">
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => removeTranche(bonusIdx, tIdx)}
-                                >
-                                  Remove Tranche
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
                       </div>
                     </div>
                   </CollapsibleContent>

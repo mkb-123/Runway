@@ -43,7 +43,9 @@ function buildMinimalHousehold(overrides?: {
       {
         personId: "person-1",
         cashBonusAnnual: 0,
-        deferredTranches: [],
+        deferredBonusAnnual: 0,
+        vestingYears: 3,
+        estimatedAnnualReturn: 0.08,
       },
     ],
     contributions: [],

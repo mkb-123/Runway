@@ -1,0 +1,311 @@
+"use client";
+
+import { useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/page-header";
+import { PersonToggle } from "@/components/person-toggle";
+import { CollapsibleSection } from "@/components/collapsible-section";
+import { EmptyState } from "@/components/empty-state";
+import { useScenarioData } from "@/context/use-scenario-data";
+import { usePersonView } from "@/context/person-view-context";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/format";
+import { calculateAge } from "@/lib/projections";
+import { generateLifetimeCashFlow } from "@/lib/lifetime-cashflow";
+import { LifetimeCashFlowChart } from "@/components/charts/lifetime-cashflow-chart";
+import {
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Calendar,
+} from "lucide-react";
+
+export default function CashFlowPage() {
+  const scenarioData = useScenarioData();
+  const household = scenarioData.household;
+  const { selectedView } = usePersonView();
+
+  // Use mid scenario rate for the projection
+  const growthRate = useMemo(() => {
+    const rates = household.retirement.scenarioRates;
+    return rates[Math.floor(rates.length / 2)] ?? 0.05;
+  }, [household.retirement.scenarioRates]);
+
+  // Generate lifetime cash flow data
+  const { data, events, primaryPersonName } = useMemo(
+    () => generateLifetimeCashFlow(household, growthRate),
+    [household, growthRate]
+  );
+
+  // Key metrics
+  const metrics = useMemo(() => {
+    if (data.length === 0) return null;
+
+    const currentYear = data[0];
+    const peakIncome = data.reduce((max, d) => Math.max(max, d.totalIncome), 0);
+    const peakExpenditure = data.reduce((max, d) => Math.max(max, d.totalExpenditure), 0);
+
+    // Find the first year where income drops below expenditure (the "crossover")
+    const crossoverYear = data.find((d, i) => i > 0 && d.surplus < 0 && data[i - 1].surplus >= 0);
+
+    // Find years with shortfall
+    const shortfallYears = data.filter((d) => d.surplus < 0);
+
+    // Total lifetime income and expenditure
+    const totalLifetimeIncome = data.reduce((sum, d) => sum + d.totalIncome, 0);
+    const totalLifetimeExpenditure = data.reduce((sum, d) => sum + d.totalExpenditure, 0);
+
+    // Find when employment income stops (retirement)
+    const retirementYear = data.find((d, i) => i > 0 && d.employmentIncome === 0 && data[i - 1].employmentIncome > 0);
+
+    // Find when all income runs out (including pots depleted)
+    const depletionYear = data.find((d) => d.totalIncome === 0 && d.totalExpenditure > 0);
+
+    return {
+      currentYear,
+      peakIncome,
+      peakExpenditure,
+      crossoverYear,
+      shortfallYears,
+      totalLifetimeIncome,
+      totalLifetimeExpenditure,
+      retirementYear,
+      depletionYear,
+    };
+  }, [data]);
+
+  if (household.persons.length === 0) {
+    return (
+      <div className="space-y-8">
+        <PageHeader title="Lifetime Cash Flow" description="Year-by-year income vs expenditure" />
+        <EmptyState message="Add people and income in Settings to see your lifetime cash flow projection." />
+      </div>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="space-y-8">
+        <PageHeader title="Lifetime Cash Flow" description="Year-by-year income vs expenditure" />
+        <EmptyState message="Ensure at least one person has a date of birth configured in Settings." />
+      </div>
+    );
+  }
+
+  const primaryPerson = household.persons.find((p) => p.relationship === "self") ?? household.persons[0];
+  const currentAge = calculateAge(primaryPerson.dateOfBirth);
+
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title="Lifetime Cash Flow"
+        description={`${primaryPersonName}'s household \u2014 age ${currentAge} to 95 at ${(growthRate * 100).toFixed(0)}% growth`}
+      >
+        <PersonToggle />
+      </PageHeader>
+
+      {/* Key Metrics Row */}
+      {metrics && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Current Year Income */}
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="flex size-6 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-950">
+                  <ArrowDown className="size-3.5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Current Income
+                </span>
+              </div>
+              <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums">
+                {formatCurrencyCompact(metrics.currentYear.totalIncome)}
+              </span>
+              <span className="mt-0.5 block text-[11px] text-muted-foreground">/year net</span>
+            </CardContent>
+          </Card>
+
+          {/* Current Year Expenditure */}
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="flex size-6 items-center justify-center rounded-md bg-red-100 dark:bg-red-950">
+                  <ArrowUp className="size-3.5 text-red-600 dark:text-red-400" />
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Current Spend
+                </span>
+              </div>
+              <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums">
+                {formatCurrencyCompact(metrics.currentYear.totalExpenditure)}
+              </span>
+              <span className="mt-0.5 block text-[11px] text-muted-foreground">/year committed + lifestyle</span>
+            </CardContent>
+          </Card>
+
+          {/* Current Surplus/Deficit */}
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className={`flex size-6 items-center justify-center rounded-md ${
+                  metrics.currentYear.surplus >= 0
+                    ? "bg-emerald-100 dark:bg-emerald-950"
+                    : "bg-red-100 dark:bg-red-950"
+                }`}>
+                  {metrics.currentYear.surplus >= 0
+                    ? <TrendingUp className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                    : <TrendingDown className="size-3.5 text-red-600 dark:text-red-400" />
+                  }
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Annual Surplus
+                </span>
+              </div>
+              <span className={`text-xl sm:text-2xl font-bold tracking-tight tabular-nums ${
+                metrics.currentYear.surplus >= 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-red-600 dark:text-red-400"
+              }`}>
+                {metrics.currentYear.surplus >= 0 ? "+" : ""}{formatCurrencyCompact(metrics.currentYear.surplus)}
+              </span>
+              <span className="mt-0.5 block text-[11px] text-muted-foreground">income less spending</span>
+            </CardContent>
+          </Card>
+
+          {/* Shortfall Warning or All Clear */}
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className={`flex size-6 items-center justify-center rounded-md ${
+                  metrics.shortfallYears.length > 0
+                    ? "bg-amber-100 dark:bg-amber-950"
+                    : "bg-emerald-100 dark:bg-emerald-950"
+                }`}>
+                  {metrics.shortfallYears.length > 0
+                    ? <AlertTriangle className="size-3.5 text-amber-600 dark:text-amber-400" />
+                    : <Calendar className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                  }
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {metrics.shortfallYears.length > 0 ? "Shortfall" : "Coverage"}
+                </span>
+              </div>
+              {metrics.shortfallYears.length > 0 ? (
+                <>
+                  <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-amber-600 dark:text-amber-400">
+                    {metrics.shortfallYears.length} yr{metrics.shortfallYears.length !== 1 ? "s" : ""}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                    income below spending
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-emerald-600 dark:text-emerald-400">
+                    Fully funded
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                    income covers spending
+                  </span>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Main Chart */}
+      <Card className="border-t border-t-primary/20">
+        <CardHeader>
+          <div className="flex items-baseline justify-between">
+            <CardTitle>Lifetime Cash Flow</CardTitle>
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              Real terms (today&apos;s money) at {(growthRate * 100).toFixed(0)}% growth
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <LifetimeCashFlowChart data={data} events={events} primaryPersonName={primaryPersonName} />
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            Projections are estimates in today&apos;s money, not guarantees. Capital is at risk.
+            Past performance does not predict future returns. Employment income shown net of
+            tax, NI, and pension deductions.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Key Events Timeline */}
+      {events.length > 0 && (
+        <CollapsibleSection
+          title="Key Life Events"
+          summary={`${events.length} milestone${events.length !== 1 ? "s" : ""} from age ${currentAge} to 95`}
+          defaultOpen
+          storageKey="cashflow-events"
+        >
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {events
+              .sort((a, b) => a.age - b.age)
+              .map((event, i) => (
+                <Card key={`${event.age}-${event.label}-${i}`}>
+                  <CardContent className="flex items-center gap-3 py-3">
+                    <Badge variant="secondary" className="shrink-0 tabular-nums">
+                      Age {event.age}
+                    </Badge>
+                    <span className="text-sm">{event.label}</span>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Year-by-Year Summary Table */}
+      <CollapsibleSection
+        title="Year-by-Year Breakdown"
+        summary="Detailed annual figures"
+        storageKey="cashflow-table"
+      >
+        <Card>
+          <CardContent className="pt-6 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="pb-2 pr-4 text-xs font-semibold text-muted-foreground">Age</th>
+                  <th className="pb-2 pr-4 text-right text-xs font-semibold text-muted-foreground">Employment</th>
+                  <th className="pb-2 pr-4 text-right text-xs font-semibold text-muted-foreground">Pension</th>
+                  <th className="pb-2 pr-4 text-right text-xs font-semibold text-muted-foreground">State Pension</th>
+                  <th className="pb-2 pr-4 text-right text-xs font-semibold text-muted-foreground">Savings</th>
+                  <th className="pb-2 pr-4 text-right text-xs font-semibold text-muted-foreground">Total Income</th>
+                  <th className="pb-2 pr-4 text-right text-xs font-semibold text-muted-foreground">Expenditure</th>
+                  <th className="pb-2 text-right text-xs font-semibold text-muted-foreground">Surplus</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data
+                  .filter((_, i) => i % 5 === 0 || i === data.length - 1)
+                  .map((row) => (
+                    <tr key={row.age} className="border-b border-border/50 last:border-0">
+                      <td className="py-2 pr-4 font-medium tabular-nums">{row.age}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{formatCurrency(row.employmentIncome)}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{formatCurrency(row.pensionIncome)}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{formatCurrency(row.statePensionIncome)}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{formatCurrency(row.investmentIncome)}</td>
+                      <td className="py-2 pr-4 text-right font-medium tabular-nums">{formatCurrency(row.totalIncome)}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{formatCurrency(row.totalExpenditure)}</td>
+                      <td className={`py-2 text-right font-medium tabular-nums ${
+                        row.surplus >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                      }`}>
+                        {row.surplus >= 0 ? "+" : ""}{formatCurrency(row.surplus)}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
+    </div>
+  );
+}

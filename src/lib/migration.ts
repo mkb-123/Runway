@@ -34,6 +34,7 @@ export function migrateHouseholdData(raw: Record<string, unknown>): Record<strin
   data = migrateCommittedOutgoingsDefault(data);
   data = migrateDashboardConfigDefault(data);
   data = migratePersonDefaults(data);
+  data = migrateDeferredBonusSimplified(data);
   return data;
 }
 
@@ -190,6 +191,58 @@ function migratePersonDefaults(data: Record<string, unknown>): Record<string, un
   });
 
   return { ...data, persons: updated };
+}
+
+/**
+ * Migration 7: Convert old deferredTranches[] to simplified deferred bonus model
+ *
+ * Old format:
+ *   bonusStructures[].deferredTranches: [{ grantDate, vestingDate, amount, estimatedAnnualReturn }]
+ *
+ * New format:
+ *   bonusStructures[]: { deferredBonusAnnual, vestingYears, estimatedAnnualReturn }
+ */
+function migrateDeferredBonusSimplified(data: Record<string, unknown>): Record<string, unknown> {
+  const bonusStructures = data.bonusStructures;
+  if (!Array.isArray(bonusStructures)) return data;
+
+  const updated = bonusStructures.map((bs: unknown) => {
+    if (typeof bs !== "object" || bs === null) return bs;
+    const bonus = bs as Record<string, unknown>;
+
+    // Already migrated — has new fields
+    if (typeof bonus.deferredBonusAnnual === "number") return bonus;
+
+    // Migrate from old deferredTranches format
+    const tranches = bonus.deferredTranches;
+    if (!Array.isArray(tranches) || tranches.length === 0) {
+      const result: Record<string, unknown> = { ...bonus, deferredBonusAnnual: 0, vestingYears: 3, estimatedAnnualReturn: 0.08 };
+      delete result.deferredTranches;
+      return result;
+    }
+
+    // Sum up tranche amounts to get total deferred bonus
+    const totalAmount = tranches.reduce((sum: number, t: unknown) => {
+      if (typeof t !== "object" || t === null) return sum;
+      const amount = (t as Record<string, unknown>).amount;
+      return sum + (typeof amount === "number" ? amount : 0);
+    }, 0);
+
+    // Vesting years = number of tranches
+    const vestingYears = tranches.length;
+
+    // Use the return rate from the first tranche
+    const firstTranche = tranches[0] as Record<string, unknown>;
+    const estimatedAnnualReturn = typeof firstTranche.estimatedAnnualReturn === "number"
+      ? firstTranche.estimatedAnnualReturn
+      : 0.08;
+
+    const result: Record<string, unknown> = { ...bonus, deferredBonusAnnual: totalAmount, vestingYears, estimatedAnnualReturn };
+    delete result.deferredTranches;
+    return result;
+  });
+
+  return { ...data, bonusStructures: updated };
 }
 
 // --- Helpers ---

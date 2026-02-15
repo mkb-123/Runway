@@ -84,10 +84,10 @@
 }
 
 .dark {
-  /* Dark mode: deep navy-slate with teal accent, visible contrast */
-  --background: oklch(0.17 0.015 260);
+  /* Dark mode: warm navy-slate with teal accent (Enhancement 10: warm, not pure neutral) */
+  --background: oklch(0.17 0.015 255);
   --foreground: oklch(0.93 0.005 250);
-  --card: oklch(0.22 0.015 260);
+  --card: oklch(0.22 0.018 255);
   --card-foreground: oklch(0.93 0.005 250);
   --popover: oklch(0.22 0.015 260);
   --popover-foreground: oklch(0.93 0.005 250);
@@ -126,13 +126,74 @@
     @apply bg-background text-foreground;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
-  /* Tabular figures for all numeric displays — essential for financial data alignment */
-  td, th, [data-numeric], .tabular-nums {
+  /* Enhancement 1: Tabular figures everywhere — financial data alignment */
+  td, th, [data-numeric], .tabular-nums,
+  [class*="font-bold"], [class*="font-semibold"] {
     font-variant-numeric: tabular-nums;
+  }
+  /* Enhancement 8: Number hierarchy — tight tracking for hero numbers */
+  .tracking-tight {
+    letter-spacing: -0.02em;
   }
   /* Smooth transitions for collapsible sections and cards */
   [data-collapsible] {
     transition: grid-template-rows 250ms ease-out;
+  }
+}
+
+/* ============================================================ */
+/* Visual Design Enhancements                                    */
+/* ============================================================ */
+
+/* Enhancement 9: Card hover micro-interaction — subtle lift on hover */
+@layer components {
+  .card-hover-lift {
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+  }
+  .card-hover-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  }
+  .dark .card-hover-lift:hover {
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Enhancement 3: Muted status colors — desaturated for premium feel */
+  .status-positive {
+    color: oklch(0.55 0.10 155);
+  }
+  .dark .status-positive {
+    color: oklch(0.70 0.10 155);
+  }
+  .status-negative {
+    color: oklch(0.55 0.12 25);
+  }
+  .dark .status-negative {
+    color: oklch(0.70 0.12 25);
+  }
+  .status-warning {
+    color: oklch(0.60 0.12 70);
+  }
+  .dark .status-warning {
+    color: oklch(0.72 0.12 70);
+  }
+
+  /* Enhancement 4: Frosted glass effect for hero sections */
+  .hero-glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Enhancement 6: Unified chart tooltip styling */
+  .recharts-tooltip-wrapper .recharts-default-tooltip {
+    border-radius: 8px !important;
+    font-size: 12px !important;
+    padding: 8px 12px !important;
+  }
+
+  /* Enhancement 10: Dark mode chart area opacity adjustment */
+  .dark .recharts-area {
+    opacity: 0.85;
   }
 }
 

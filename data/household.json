@@ -143,31 +143,16 @@
     {
       "personId": "person-1",
       "cashBonusAnnual": 25000,
-      "deferredTranches": [
-        {
-          "grantDate": "2024-03-15",
-          "vestingDate": "2025-03-15",
-          "amount": 15000,
-          "estimatedAnnualReturn": 0.08
-        },
-        {
-          "grantDate": "2024-03-15",
-          "vestingDate": "2026-03-15",
-          "amount": 15000,
-          "estimatedAnnualReturn": 0.08
-        },
-        {
-          "grantDate": "2024-03-15",
-          "vestingDate": "2027-03-15",
-          "amount": 15000,
-          "estimatedAnnualReturn": 0.08
-        }
-      ]
+      "deferredBonusAnnual": 45000,
+      "vestingYears": 3,
+      "estimatedAnnualReturn": 0.08
     },
     {
       "personId": "person-2",
       "cashBonusAnnual": 5000,
-      "deferredTranches": []
+      "deferredBonusAnnual": 0,
+      "vestingYears": 3,
+      "estimatedAnnualReturn": 0.08
     }
   ],
   "contributions": [
