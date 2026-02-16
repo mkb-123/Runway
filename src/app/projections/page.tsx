@@ -21,6 +21,7 @@ import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/form
 import { getHouseholdGrossIncome } from "@/types";
 import { projectScenarios, projectScenariosWithGrowth, calculateAdjustedRequiredPot, calculateAge } from "@/lib/projections";
 import { calculateTotalAnnualContributions, calculateHouseholdStatePension } from "@/lib/aggregations";
+import { ScenarioDelta } from "@/components/scenario-delta";
 import { ProjectionChart } from "@/components/charts/projection-chart";
 import { SettingsBar } from "@/components/settings-bar";
 
@@ -31,6 +32,7 @@ export default function ProjectionsPage() {
   const scenarioData = useScenarioData();
   const { selectedView } = usePersonView();
   const household = scenarioData.household;
+  const baseHousehold = scenarioData.baseHousehold;
   const { retirement } = household;
 
   const filteredAccounts = useMemo(() => {
@@ -112,6 +114,53 @@ export default function ProjectionsPage() {
     [retirement.targetAnnualIncome, retirement.withdrawalRate, retirement.includeStatePension, totalStatePensionAnnual]
   );
 
+  // --- Base (un-overridden) values for what-if comparison ---
+  const baseFilteredAccounts = useMemo(() => {
+    if (selectedView === "household") return baseHousehold.accounts;
+    return baseHousehold.accounts.filter((a) => a.personId === selectedView);
+  }, [baseHousehold.accounts, selectedView]);
+
+  const baseCurrentPot = useMemo(
+    () => baseFilteredAccounts.reduce((sum, a) => sum + a.currentValue, 0),
+    [baseFilteredAccounts]
+  );
+
+  const baseFilteredContributions = useMemo(() => {
+    if (selectedView === "household") return baseHousehold.contributions;
+    return baseHousehold.contributions.filter((c) => c.personId === selectedView);
+  }, [baseHousehold.contributions, selectedView]);
+
+  const baseFilteredIncome = useMemo(() => {
+    if (selectedView === "household") return baseHousehold.income;
+    return baseHousehold.income.filter((i) => i.personId === selectedView);
+  }, [baseHousehold.income, selectedView]);
+
+  const baseTotalAnnualContributions = useMemo(
+    () => calculateTotalAnnualContributions(baseFilteredContributions, baseFilteredIncome),
+    [baseFilteredContributions, baseFilteredIncome]
+  );
+
+  const baseFilteredPersons = useMemo(() => {
+    if (selectedView === "household") return baseHousehold.persons;
+    return baseHousehold.persons.filter((p) => p.id === selectedView);
+  }, [baseHousehold.persons, selectedView]);
+
+  const baseTotalStatePensionAnnual = useMemo(
+    () => calculateHouseholdStatePension(baseFilteredPersons),
+    [baseFilteredPersons]
+  );
+
+  const baseRequiredPot = useMemo(
+    () =>
+      calculateAdjustedRequiredPot(
+        baseHousehold.retirement.targetAnnualIncome,
+        baseHousehold.retirement.withdrawalRate,
+        baseHousehold.retirement.includeStatePension,
+        baseTotalStatePensionAnnual
+      ),
+    [baseHousehold.retirement, baseTotalStatePensionAnnual]
+  );
+
   // Run projections — use growth-aware version if salary growth is configured
   // Contributions stop at retirement age; investment growth continues for the full period
   const scenarios = useMemo(
@@ -169,7 +218,7 @@ export default function ProjectionsPage() {
               </span>
             </div>
             <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums">
-              {formatCurrency(currentPot)}
+              <ScenarioDelta base={baseCurrentPot} scenario={currentPot} format={formatCurrency} />
             </span>
             <span className="mt-0.5 block text-[11px] text-muted-foreground">
               Across all accounts
@@ -188,7 +237,7 @@ export default function ProjectionsPage() {
               </span>
             </div>
             <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums">
-              {formatCurrency(totalAnnualContributions)}
+              <ScenarioDelta base={baseTotalAnnualContributions} scenario={totalAnnualContributions} format={formatCurrency} />
             </span>
             <span className="mt-0.5 block text-[11px] text-muted-foreground">
               {formatCurrency(monthlyContributions)}/month
@@ -207,7 +256,7 @@ export default function ProjectionsPage() {
               </span>
             </div>
             <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums">
-              {formatCurrency(requiredPot)}
+              <ScenarioDelta base={baseRequiredPot} scenario={requiredPot} format={formatCurrency} />
             </span>
             <span className="mt-0.5 block text-[11px] text-muted-foreground">
               {formatCurrency(retirement.targetAnnualIncome)}/yr at {formatPercent(retirement.withdrawalRate)} SWR

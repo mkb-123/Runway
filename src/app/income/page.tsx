@@ -198,6 +198,31 @@ export default function IncomePage() {
     };
   }, [personAnalysis, income]);
 
+  // Base (un-overridden) tax efficiency values for what-if comparison
+  const baseTaxEfficiency = useMemo(() => {
+    let baseTotISA = 0;
+    let baseDiscPension = 0;
+    let baseEmpPension = 0;
+    let baseTotGIA = 0;
+
+    for (const person of baseHousehold.persons) {
+      if (selectedView !== "household" && person.id !== selectedView) continue;
+      const baseContribs = getPersonContributionTotals(baseHousehold.contributions, person.id);
+      baseTotISA += baseContribs.isaContribution;
+      baseDiscPension += baseContribs.pensionContribution;
+      baseTotGIA += baseContribs.giaContribution;
+    }
+    for (const inc of baseHousehold.income) {
+      if (selectedView !== "household" && inc.personId !== selectedView) continue;
+      baseEmpPension += inc.employeePensionContribution + inc.employerPensionContribution;
+    }
+    const basePension = baseDiscPension + baseEmpPension;
+    const baseTotal = baseTotISA + basePension + baseTotGIA;
+    const baseTaxAdv = baseTotISA + basePension;
+    const baseScore = calculateTaxEfficiencyScore(baseTotISA, basePension, baseTotGIA);
+    return { totalSavings: baseTotal, taxAdvantagedSavings: baseTaxAdv, taxEfficiencyScore: baseScore };
+  }, [baseHousehold, selectedView]);
+
   return (
     <div className="space-y-8 p-4 md:p-8">
       <PageHeader title="Income & Cash Flow" description="Detailed income tax breakdown, take-home pay, bonus structures, and cash flow analysis.">
@@ -248,13 +273,13 @@ export default function IncomePage() {
                   <div>
                     <div className="text-xs text-muted-foreground uppercase tracking-wider">Tax + NI</div>
                     <div className="text-lg font-bold tabular-nums text-red-600 dark:text-red-400">
-                      {formatCurrency(incomeTaxResult.tax + niResult.ni)}
+                      <ScenarioDelta base={(base?.incomeTax ?? incomeTaxResult.tax) + (base?.ni ?? niResult.ni)} scenario={incomeTaxResult.tax + niResult.ni} format={formatCurrency} />
                     </div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground uppercase tracking-wider">Pension</div>
                     <div className="text-lg font-bold tabular-nums">
-                      {formatCurrency(totalPension)}
+                      <ScenarioDelta base={(base?.employeePension ?? personIncome.employeePensionContribution) + (base?.employerPension ?? personIncome.employerPensionContribution)} scenario={totalPension} format={formatCurrency} />
                     </div>
                   </div>
                 </div>
@@ -290,7 +315,9 @@ export default function IncomePage() {
                     {studentLoan > 0 && (
                       <div className="flex items-baseline justify-between">
                         <span className="text-muted-foreground">Student loan <Badge variant="secondary" className="ml-1 text-[10px]">{studentLoanLabel(person.studentLoanPlan)}</Badge></span>
-                        <span className="font-medium tabular-nums text-red-600 dark:text-red-400">{formatCurrency(studentLoan)}</span>
+                        <span className="font-medium tabular-nums text-red-600 dark:text-red-400">
+                          <ScenarioDelta base={base?.studentLoan ?? studentLoan} scenario={studentLoan} format={formatCurrency} />
+                        </span>
                       </div>
                     )}
                     <div className="flex items-baseline justify-between">
@@ -302,7 +329,7 @@ export default function IncomePage() {
                       </span>
                       <span className="font-medium tabular-nums text-red-600 dark:text-red-400">
                         <ScenarioDelta base={base?.pensionDeduction ?? takeHome.pensionDeduction} scenario={takeHome.pensionDeduction} format={formatCurrency} />
-                        <span className="ml-2 text-xs text-muted-foreground tabular-nums">+ {formatCurrency(personIncome.employerPensionContribution)} employer</span>
+                        <span className="ml-2 text-xs text-muted-foreground tabular-nums">+ <ScenarioDelta base={base?.employerPension ?? personIncome.employerPensionContribution} scenario={personIncome.employerPensionContribution} format={formatCurrency} showPercent={false} /> employer</span>
                       </span>
                     </div>
                   </div>
@@ -440,6 +467,10 @@ export default function IncomePage() {
             const cashBonus = bonus?.cashBonusAnnual ?? 0;
             const deferredBonus = bonus ? getDeferredBonus(bonus) : 0;
             const totalComp = salary + employerPension + cashBonus + deferredBonus;
+            const base = baseIncomeLookup.get(person.id);
+            const baseSalary = base?.grossSalary ?? salary;
+            const baseEmployerPension = base?.employerPension ?? employerPension;
+            const baseTotalComp = baseSalary + baseEmployerPension + cashBonus + deferredBonus;
 
             return (
               <Card key={person.id}>
@@ -450,11 +481,11 @@ export default function IncomePage() {
                   <div className="space-y-3">
                     <div className="flex items-baseline justify-between">
                       <span className="text-muted-foreground">Base salary</span>
-                      <span className="font-medium tabular-nums">{formatCurrency(salary)}</span>
+                      <span className="font-medium tabular-nums"><ScenarioDelta base={baseSalary} scenario={salary} format={formatCurrency} /></span>
                     </div>
                     <div className="flex items-baseline justify-between">
                       <span className="text-muted-foreground">Employer pension</span>
-                      <span className="font-medium tabular-nums">{formatCurrency(employerPension)}</span>
+                      <span className="font-medium tabular-nums"><ScenarioDelta base={baseEmployerPension} scenario={employerPension} format={formatCurrency} /></span>
                     </div>
                     {cashBonus > 0 && (
                       <div className="flex items-baseline justify-between">
@@ -470,7 +501,7 @@ export default function IncomePage() {
                     )}
                     <div className="border-t pt-3 flex items-baseline justify-between">
                       <span className="text-lg font-semibold">Total compensation</span>
-                      <span className="text-lg font-bold tabular-nums">{formatCurrency(totalComp)}</span>
+                      <span className="text-lg font-bold tabular-nums"><ScenarioDelta base={baseTotalComp} scenario={totalComp} format={formatCurrency} /></span>
                     </div>
                   </div>
                 </CardContent>
@@ -588,7 +619,9 @@ export default function IncomePage() {
           <CardContent className="pt-6">
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <div className="text-3xl font-bold">{formatPercent(taxEfficiencyScore)}</div>
+                <div className="text-3xl font-bold">
+                  <ScenarioDelta base={baseTaxEfficiency.taxEfficiencyScore} scenario={taxEfficiencyScore} format={formatPercent} epsilon={0.001} />
+                </div>
                 <div className="text-sm text-muted-foreground">tax-advantaged (ISA + Pension)</div>
               </div>
               <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
@@ -601,18 +634,20 @@ export default function IncomePage() {
                 <div className="rounded-lg border p-3">
                   <div className="text-sm text-muted-foreground">ISA + Pension (tax-advantaged)</div>
                   <div className="text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                    {formatCurrency(taxAdvantagedSavings)}
+                    <ScenarioDelta base={baseTaxEfficiency.taxAdvantagedSavings} scenario={taxAdvantagedSavings} format={formatCurrency} />
                   </div>
                 </div>
                 <div className="rounded-lg border p-3">
                   <div className="text-sm text-muted-foreground">GIA (taxable)</div>
                   <div className="text-lg font-semibold tabular-nums text-amber-600">
-                    {formatCurrency(totalSavings - taxAdvantagedSavings)}
+                    <ScenarioDelta base={baseTaxEfficiency.totalSavings - baseTaxEfficiency.taxAdvantagedSavings} scenario={totalSavings - taxAdvantagedSavings} format={formatCurrency} />
                   </div>
                 </div>
                 <div className="rounded-lg border p-3">
                   <div className="text-sm text-muted-foreground">Total annual savings</div>
-                  <div className="text-lg font-semibold tabular-nums">{formatCurrency(totalSavings)}</div>
+                  <div className="text-lg font-semibold tabular-nums">
+                    <ScenarioDelta base={baseTaxEfficiency.totalSavings} scenario={totalSavings} format={formatCurrency} />
+                  </div>
                 </div>
               </div>
             </div>

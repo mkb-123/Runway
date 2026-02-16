@@ -39,6 +39,7 @@ import { RetirementCountdownGrid } from "@/components/retirement/retirement-coun
 import { FireMetricsCard } from "@/components/retirement/fire-metrics-card";
 import { Badge } from "@/components/ui/badge";
 import { SettingsBar } from "@/components/settings-bar";
+import { ScenarioDelta } from "@/components/scenario-delta";
 
 export default function RetirementPage() {
   // Scenario-aware data
@@ -306,6 +307,12 @@ export default function RetirementPage() {
     [currentPot, totalAnnualContributions, midRate, yearsToRetirement]
   );
 
+  // Base projected pot at retirement for what-if comparison
+  const baseProjectedPotAtRetirement = useMemo(() =>
+    projectFinalValue(baseCurrentPot, baseTotalAnnualContributions, midRate, yearsToRetirement),
+    [baseCurrentPot, baseTotalAnnualContributions, midRate, yearsToRetirement]
+  );
+
   // Projected accessible wealth at retirement (for pension bridge)
   const totalAccessibleContrib = useMemo(() =>
     personContribBreakdown.reduce((sum, p) => sum + p.accessibleContrib, 0),
@@ -362,6 +369,45 @@ export default function RetirementPage() {
     });
   }, [persons, accounts, personContribBreakdown, yearsToRetirement, midRate]);
 
+  // Base per-person retirement inputs for what-if comparison
+  const basePersonContribBreakdown = useMemo(() => {
+    return basePersons.map((person) => {
+      const personIncome = baseIncome.find((i) => i.personId === person.id);
+      const employmentPensionContrib = personIncome
+        ? personIncome.employeePensionContribution + personIncome.employerPensionContribution
+        : 0;
+      const personContribs = baseFilteredContributions.filter((c) => c.personId === person.id);
+      const discretionaryPension = personContribs
+        .filter((c) => c.target === "pension")
+        .reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+      const accessibleContrib = personContribs
+        .filter((c) => c.target === "isa" || c.target === "gia")
+        .reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+      return {
+        personId: person.id,
+        pensionContrib: employmentPensionContrib + discretionaryPension,
+        accessibleContrib,
+      };
+    });
+  }, [basePersons, baseIncome, baseFilteredContributions]);
+
+  const basePersonRetirementInputs = useMemo(() => {
+    return basePersons.map((person) => {
+      const personPensionPot = baseAccounts
+        .filter((a) => a.personId === person.id && !isAccountAccessible(a.type))
+        .reduce((sum, a) => sum + a.currentValue, 0);
+      const personAccessible = baseAccounts
+        .filter((a) => a.personId === person.id && isAccountAccessible(a.type))
+        .reduce((sum, a) => sum + a.currentValue, 0);
+      const contribs = basePersonContribBreakdown.find((c) => c.personId === person.id);
+      return {
+        name: person.name,
+        pensionPot: projectFinalValue(personPensionPot, contribs?.pensionContrib ?? 0, midRate, yearsToRetirement),
+        accessibleWealth: projectFinalValue(personAccessible, contribs?.accessibleContrib ?? 0, midRate, yearsToRetirement),
+      };
+    });
+  }, [basePersons, baseAccounts, basePersonContribBreakdown, midRate, yearsToRetirement]);
+
   return (
     <div className="space-y-8 p-4 md:p-8">
       <PageHeader
@@ -389,6 +435,7 @@ export default function RetirementPage() {
         totalStatePensionAnnual={totalStatePensionAnnual}
         baseCurrentPot={baseCurrentPot}
         baseProgressPercent={baseProgressPercent}
+        baseRequiredPot={baseRequiredPot}
       />
 
       {/* 2. Planning Settings — quick reference */}
@@ -474,7 +521,9 @@ export default function RetirementPage() {
 
             {/* Per-person summary cards */}
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {personRetirementInputs.map((p) => (
+              {personRetirementInputs.map((p) => {
+                const basePerson = basePersonRetirementInputs.find((bp) => bp.name === p.name);
+                return (
                 <div
                   key={p.name}
                   className="rounded-lg border bg-muted/30 p-3 space-y-2"
@@ -486,7 +535,7 @@ export default function RetirementPage() {
                         Pension at retirement
                       </span>
                       <span className="font-mono">
-                        {formatCurrencyCompact(p.pensionPot)}
+                        <ScenarioDelta base={basePerson?.pensionPot ?? p.pensionPot} scenario={p.pensionPot} format={formatCurrencyCompact} />
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -494,7 +543,7 @@ export default function RetirementPage() {
                         ISA/Savings at retirement
                       </span>
                       <span className="font-mono">
-                        {formatCurrencyCompact(p.accessibleWealth)}
+                        <ScenarioDelta base={basePerson?.accessibleWealth ?? p.accessibleWealth} scenario={p.accessibleWealth} format={formatCurrencyCompact} />
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -511,7 +560,8 @@ export default function RetirementPage() {
                     <span>State: age {p.stateRetirementAge}</span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -529,7 +579,7 @@ export default function RetirementPage() {
           </CardHeader>
           <CardContent>
             <p className="mb-4 text-sm text-muted-foreground">
-              Projected pot at retirement: {formatCurrencyCompact(projectedPotAtRetirement)} (today: {formatCurrencyCompact(currentPot)}, +{yearsToRetirement}yr growth at {formatPercent(midRate)}).
+              Projected pot at retirement: <span className="font-medium text-foreground"><ScenarioDelta base={baseProjectedPotAtRetirement} scenario={projectedPotAtRetirement} format={formatCurrencyCompact} /></span> (today: {formatCurrencyCompact(currentPot)}, +{yearsToRetirement}yr growth at {formatPercent(midRate)}).
               Drawdown at {formatCurrencyCompact(retirement.targetAnnualIncome)}/yr, with
               state pension reducing withdrawals from age{" "}
               {primaryPerson?.stateRetirementAge ?? 67}.
@@ -560,6 +610,9 @@ export default function RetirementPage() {
           scenarioRates={retirement.scenarioRates}
           currentAge={currentAge}
           selectedRateIndex={selectedRateIndex}
+          baseCurrentPot={baseCurrentPot}
+          baseTotalAnnualContributions={baseTotalAnnualContributions}
+          baseRequiredPot={baseRequiredPot}
         />
       </CollapsibleSection>
 
@@ -579,6 +632,8 @@ export default function RetirementPage() {
           midRate={midRate}
           requiredMonthlySavings={requiredMonthlySavings}
           baseSavingsRate={baseSavingsRate}
+          baseTotalAnnualContributions={baseTotalAnnualContributions}
+          baseTotalGrossIncome={baseTotalGrossIncome}
         />
       </CollapsibleSection>
 

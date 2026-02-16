@@ -28,6 +28,8 @@ interface FireMetricsCardProps {
   requiredMonthlySavings: { years: number; monthly: number }[];
   /** Base (un-overridden) values for what-if comparison */
   baseSavingsRate?: number;
+  baseTotalAnnualContributions?: number;
+  baseTotalGrossIncome?: number;
 }
 
 export function FireMetricsCard({
@@ -40,6 +42,8 @@ export function FireMetricsCard({
   midRate,
   requiredMonthlySavings,
   baseSavingsRate,
+  baseTotalAnnualContributions,
+  baseTotalGrossIncome,
 }: FireMetricsCardProps) {
   return (
     <Card>
@@ -67,8 +71,8 @@ export function FireMetricsCard({
               )}
             </p>
             <p className="text-xs text-muted-foreground mt-1 tabular-nums">
-              {formatCurrency(totalAnnualContributions)} /{" "}
-              {formatCurrency(totalGrossIncome)} gross
+              <ScenarioDelta base={baseTotalAnnualContributions ?? totalAnnualContributions} scenario={totalAnnualContributions} format={formatCurrency} showPercent={false} /> /{" "}
+              <ScenarioDelta base={baseTotalGrossIncome ?? totalGrossIncome} scenario={totalGrossIncome} format={formatCurrency} showPercent={false} /> gross
             </p>
           </div>
 
