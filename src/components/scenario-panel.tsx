@@ -22,6 +22,7 @@ import {
   ChevronUp,
   Percent,
   CalendarClock,
+  Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -212,6 +213,7 @@ export function ScenarioPanel() {
   const [marketShock, setMarketShock] = useState<string>("");
   const [savingsRateOverride, setSavingsRateOverride] = useState<number | null>(null);
   const [retirementAgeOverrides, setRetirementAgeOverrides] = useState<Record<string, number>>({});
+  const [targetIncomeOverride, setTargetIncomeOverride] = useState<number | null>(null);
 
   // Current savings rate calculation
   const { currentSavingsRate, totalGrossIncome, contribsByPerson } = useMemo(() => {
@@ -253,6 +255,7 @@ export function ScenarioPanel() {
         setMarketShock("");
         setSavingsRateOverride(null);
         setRetirementAgeOverrides({});
+        setTargetIncomeOverride(null);
       }
     },
     [isScenarioMode]
@@ -274,9 +277,10 @@ export function ScenarioPanel() {
       Object.keys(contributionOverrides).length > 0 ||
       marketShock !== "" ||
       savingsRateOverride !== null ||
-      Object.keys(retirementAgeOverrides).length > 0
+      Object.keys(retirementAgeOverrides).length > 0 ||
+      targetIncomeOverride !== null
     );
-  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, retirementAgeOverrides, household.income]);
+  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, retirementAgeOverrides, targetIncomeOverride, household.income]);
 
   const applyCustomScenario = useCallback(() => {
     const newOverrides: ScenarioOverrides = {};
@@ -347,8 +351,16 @@ export function ScenarioPanel() {
       }));
     }
 
+    // Retirement target income override
+    if (targetIncomeOverride !== null) {
+      newOverrides.retirement = {
+        ...newOverrides.retirement,
+        targetAnnualIncome: targetIncomeOverride,
+      };
+    }
+
     enableScenario("Custom Scenario", newOverrides);
-  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, totalGrossIncome, contribsByPerson, retirementAgeOverrides, enableScenario]);
+  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, totalGrossIncome, contribsByPerson, retirementAgeOverrides, targetIncomeOverride, enableScenario]);
 
   const applyPreset = useCallback(
     (preset: SmartPreset) => {
@@ -369,6 +381,7 @@ export function ScenarioPanel() {
       setContributionOverrides({});
       setSavingsRateOverride(null);
       setRetirementAgeOverrides({});
+      setTargetIncomeOverride(null);
       setMarketShock(
         overrides.marketShockPercent !== undefined
           ? String(overrides.marketShockPercent * 100)
@@ -386,6 +399,7 @@ export function ScenarioPanel() {
     setMarketShock("");
     setSavingsRateOverride(null);
     setRetirementAgeOverrides({});
+    setTargetIncomeOverride(null);
   }, [disableScenario]);
 
   // Precompute scaled contributions for savings rate preview
@@ -573,6 +587,37 @@ export function ScenarioPanel() {
                       </p>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          </Section>
+
+          {/* Target Retirement Income */}
+          <Section title="Target Retirement Income" icon={Target} defaultOpen={true}>
+            <div className="space-y-3">
+              <RangeInput
+                label="Annual income in retirement"
+                value={targetIncomeOverride ?? household.retirement.targetAnnualIncome}
+                min={10000}
+                max={200000}
+                step={1000}
+                current={household.retirement.targetAnnualIncome}
+                format={(v) => formatCurrencyCompact(v)}
+                onChange={(v) => setTargetIncomeOverride(v)}
+              />
+              {targetIncomeOverride !== null && targetIncomeOverride !== household.retirement.targetAnnualIncome && (
+                <div className="rounded-md bg-muted/50 px-2 py-1.5 space-y-0.5">
+                  <p className="text-xs text-muted-foreground">
+                    Required pot changes from{" "}
+                    <span className="tabular-nums font-medium text-foreground">
+                      {formatCurrencyCompact(household.retirement.targetAnnualIncome / household.retirement.withdrawalRate)}
+                    </span>
+                    {" → "}
+                    <span className="tabular-nums font-medium text-foreground">
+                      {formatCurrencyCompact(targetIncomeOverride / household.retirement.withdrawalRate)}
+                    </span>
+                    <span className="text-muted-foreground/60"> at {(household.retirement.withdrawalRate * 100).toFixed(0)}% SWR</span>
+                  </p>
                 </div>
               )}
             </div>

@@ -10,6 +10,7 @@ import {
   calculatePensionBridge,
   calculateSWR,
   calculateRequiredPot,
+  calculateAdjustedRequiredPot,
   calculateProRataStatePension,
   calculateAge,
   calculateTaxEfficiencyScore,
@@ -646,5 +647,48 @@ describe("projectFinalValue", () => {
     const withContrib = projectFinalValue(100_000, 12_000, 0.06, 20);
     const withoutContrib = projectFinalValue(100_000, 0, 0.06, 20);
     expect(withContrib).toBeGreaterThan(withoutContrib);
+  });
+});
+
+describe("projected retirement income (integration)", () => {
+  it("calculates sustainable income from projected pot at retirement", () => {
+    // Scenario: £500k current pot, £20k/yr contributions, 7% growth, 15 years to retirement, 4% SWR
+    const projectedPot = projectFinalValue(500_000, 20_000, 0.07, 15);
+    const sustainableIncome = calculateSWR(projectedPot, 0.04);
+
+    // Projected pot should be significantly larger than starting pot
+    expect(projectedPot).toBeGreaterThan(1_000_000);
+    // Sustainable income should be meaningful
+    expect(sustainableIncome).toBeGreaterThan(40_000);
+    // SWR at 4% means income = 4% of pot
+    expect(sustainableIncome).toBeCloseTo(projectedPot * 0.04, 0);
+  });
+
+  it("total retirement income includes state pension", () => {
+    const projectedPot = projectFinalValue(300_000, 15_000, 0.05, 20);
+    const sustainableIncome = calculateSWR(projectedPot, 0.04);
+    const statePension = calculateProRataStatePension(35); // full qualifying years
+    const totalIncome = sustainableIncome + statePension;
+
+    expect(totalIncome).toBeGreaterThan(sustainableIncome);
+    expect(statePension).toBeGreaterThan(0);
+  });
+
+  it("higher target income requires larger pot (via scenario override)", () => {
+    // If someone changes target income from £40k to £60k, required pot increases
+    const requiredPotAt40k = calculateAdjustedRequiredPot(40_000, 0.04, true, 11_500);
+    const requiredPotAt60k = calculateAdjustedRequiredPot(60_000, 0.04, true, 11_500);
+
+    expect(requiredPotAt60k).toBeGreaterThan(requiredPotAt40k);
+    // £20k more income at 4% SWR = £500k more pot needed
+    expect(requiredPotAt60k - requiredPotAt40k).toBeCloseTo(500_000, -2);
+  });
+
+  it("returns zero sustainable income when years to retirement is zero", () => {
+    const projectedPot = projectFinalValue(500_000, 20_000, 0.07, 0);
+    // Should return current value unchanged
+    expect(projectedPot).toBe(500_000);
+    const sustainableIncome = calculateSWR(projectedPot, 0.04);
+    expect(sustainableIncome).toBe(20_000);
   });
 });

@@ -253,7 +253,8 @@ export type HeroMetricType =
   | "year_on_year_change"
   | "savings_rate"
   | "fire_progress"
-  | "net_worth_after_commitments";
+  | "net_worth_after_commitments"
+  | "projected_retirement_income";
 
 export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   net_worth: "Total Net Worth",
@@ -264,6 +265,7 @@ export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   savings_rate: "Savings Rate",
   fire_progress: "FIRE Progress",
   net_worth_after_commitments: "Net Worth After Commitments",
+  projected_retirement_income: "Projected Retirement Income",
 };
 
 export interface DashboardConfig {

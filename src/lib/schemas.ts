@@ -175,6 +175,7 @@ export const HeroMetricTypeSchema = z.enum([
   "savings_rate",
   "fire_progress",
   "net_worth_after_commitments",
+  "projected_retirement_income",
 ]);
 
 export const DashboardConfigSchema = z.object({
