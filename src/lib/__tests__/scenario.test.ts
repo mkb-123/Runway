@@ -463,3 +463,52 @@ describe("buildAvoidTaperPreset", () => {
     expect(result.income).toHaveLength(0);
   });
 });
+
+describe("target income scenario override (integration)", () => {
+  it("changing target income via scenario affects required pot", () => {
+    const h = makeHousehold();
+    // Base: target £40k at 4% SWR → required pot = £40k / 0.04 = £1M
+    // (ignoring state pension offset for simplicity of mental model)
+    expect(h.retirement.targetAnnualIncome).toBe(40000);
+
+    // Apply scenario to increase target income
+    const result = applyScenarioOverrides(h, {
+      retirement: { targetAnnualIncome: 60000 },
+    });
+
+    expect(result.retirement.targetAnnualIncome).toBe(60000);
+    // Other retirement config preserved
+    expect(result.retirement.withdrawalRate).toBe(0.04);
+    expect(result.retirement.includeStatePension).toBe(true);
+    expect(result.retirement.scenarioRates).toEqual([0.05, 0.07]);
+  });
+
+  it("combined target income + contributions override", () => {
+    const h = makeHousehold();
+    const result = applyScenarioOverrides(h, {
+      retirement: { targetAnnualIncome: 50000 },
+      contributionOverrides: [
+        { personId: "p1", isaContribution: 25000 },
+      ],
+    });
+
+    expect(result.retirement.targetAnnualIncome).toBe(50000);
+    // Contribution override applied
+    const p1Contribs = result.contributions.filter((c) => c.personId === "p1");
+    expect(p1Contribs).toHaveLength(1);
+    expect(p1Contribs[0].amount).toBe(25000);
+  });
+
+  it("combined target income + retirement age override", () => {
+    const h = makeHousehold();
+    const result = applyScenarioOverrides(h, {
+      retirement: { targetAnnualIncome: 35000 },
+      personOverrides: [{ id: "p1", plannedRetirementAge: 55 }],
+    });
+
+    expect(result.retirement.targetAnnualIncome).toBe(35000);
+    expect(result.persons[0].plannedRetirementAge).toBe(55);
+    // Person 2 unchanged
+    expect(result.persons[1].plannedRetirementAge).toBe(60);
+  });
+});

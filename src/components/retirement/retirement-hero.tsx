@@ -5,6 +5,7 @@ import { ScenarioDelta } from "@/components/scenario-delta";
 import {
   formatCurrency,
   formatCurrencyCompact,
+  formatPercent,
 } from "@/lib/format";
 
 interface RetirementHeroProps {
@@ -15,10 +16,23 @@ interface RetirementHeroProps {
   withdrawalRate: number;
   includeStatePension: boolean;
   totalStatePensionAnnual: number;
+  /** Projected pot at retirement (with contributions + growth) */
+  projectedPotAtRetirement: number;
+  /** Sustainable annual income from projected pot (SWR * projected pot) */
+  sustainableIncome: number;
+  /** Total projected income including state pension */
+  totalProjectedIncome: number;
+  /** Years until retirement */
+  yearsToRetirement: number;
+  /** Growth rate used for projection */
+  growthRate: number;
   /** Base (un-overridden) values for what-if comparison */
   baseCurrentPot?: number;
   baseProgressPercent?: number;
   baseRequiredPot?: number;
+  baseProjectedPotAtRetirement?: number;
+  baseSustainableIncome?: number;
+  baseTotalProjectedIncome?: number;
 }
 
 export function RetirementHero({
@@ -29,9 +43,17 @@ export function RetirementHero({
   withdrawalRate,
   includeStatePension,
   totalStatePensionAnnual,
+  projectedPotAtRetirement,
+  sustainableIncome,
+  totalProjectedIncome,
+  yearsToRetirement,
+  growthRate,
   baseCurrentPot,
   baseProgressPercent,
   baseRequiredPot,
+  baseProjectedPotAtRetirement,
+  baseSustainableIncome,
+  baseTotalProjectedIncome,
 }: RetirementHeroProps) {
   const remaining = requiredPot - currentPot;
   const clampedPercent = Math.min(progressPercent, 100);
@@ -111,6 +133,76 @@ export function RetirementHero({
             <span>{formatCurrencyCompact(requiredPot)}</span>
           </div>
         </div>
+
+        {/* Estimated pot at retirement & projected income */}
+        {yearsToRetirement > 0 && (
+          <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Estimated pot at retirement</p>
+                <p className="text-lg font-bold font-mono">
+                  {baseProjectedPotAtRetirement !== undefined ? (
+                    <ScenarioDelta
+                      base={baseProjectedPotAtRetirement}
+                      scenario={projectedPotAtRetirement}
+                      format={formatCurrencyCompact}
+                    />
+                  ) : (
+                    formatCurrencyCompact(projectedPotAtRetirement)
+                  )}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  in {yearsToRetirement}yr at {formatPercent(growthRate)} growth
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Sustainable drawdown</p>
+                <p className="text-lg font-bold font-mono">
+                  {baseSustainableIncome !== undefined ? (
+                    <ScenarioDelta
+                      base={baseSustainableIncome}
+                      scenario={sustainableIncome}
+                      format={(n) => `${formatCurrencyCompact(n)}/yr`}
+                    />
+                  ) : (
+                    <>{formatCurrencyCompact(sustainableIncome)}/yr</>
+                  )}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  at {(withdrawalRate * 100).toFixed(1)}% SWR
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total retirement income</p>
+                <p className="text-lg font-bold font-mono text-primary">
+                  {baseTotalProjectedIncome !== undefined ? (
+                    <ScenarioDelta
+                      base={baseTotalProjectedIncome}
+                      scenario={totalProjectedIncome}
+                      format={(n) => `${formatCurrencyCompact(n)}/yr`}
+                    />
+                  ) : (
+                    <>{formatCurrencyCompact(totalProjectedIncome)}/yr</>
+                  )}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  drawdown{includeStatePension && totalStatePensionAnnual > 0
+                    ? ` + ${formatCurrencyCompact(totalStatePensionAnnual)} state pension`
+                    : ""}
+                </p>
+              </div>
+            </div>
+            {totalProjectedIncome < targetAnnualIncome ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                Shortfall of {formatCurrencyCompact(targetAnnualIncome - totalProjectedIncome)}/yr vs your {formatCurrencyCompact(targetAnnualIncome)} target
+              </p>
+            ) : (
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                Exceeds target by {formatCurrencyCompact(totalProjectedIncome - targetAnnualIncome)}/yr
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Supporting details */}
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground border-t pt-3 tabular-nums">

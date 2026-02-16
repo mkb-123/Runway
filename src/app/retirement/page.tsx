@@ -20,6 +20,7 @@ import {
   calculateRequiredSavings,
   calculatePensionBridge,
   calculateProRataStatePension,
+  calculateSWR,
   calculateAge,
   projectFinalValue,
   getMidScenarioRate,
@@ -313,6 +314,29 @@ export default function RetirementPage() {
     [baseCurrentPot, baseTotalAnnualContributions, midRate, yearsToRetirement]
   );
 
+  // Sustainable income from projected pot (SWR * projected pot)
+  const sustainableIncome = useMemo(
+    () => calculateSWR(projectedPotAtRetirement, retirement.withdrawalRate),
+    [projectedPotAtRetirement, retirement.withdrawalRate]
+  );
+
+  // Total projected retirement income (sustainable drawdown + state pension if enabled)
+  const totalProjectedIncome = useMemo(
+    () => sustainableIncome + (retirement.includeStatePension ? totalStatePensionAnnual : 0),
+    [sustainableIncome, retirement.includeStatePension, totalStatePensionAnnual]
+  );
+
+  // Base sustainable income for what-if comparison
+  const baseSustainableIncome = useMemo(
+    () => calculateSWR(baseProjectedPotAtRetirement, baseHousehold.retirement.withdrawalRate),
+    [baseProjectedPotAtRetirement, baseHousehold.retirement.withdrawalRate]
+  );
+
+  const baseTotalProjectedIncome = useMemo(
+    () => baseSustainableIncome + (baseHousehold.retirement.includeStatePension ? baseTotalStatePensionAnnual : 0),
+    [baseSustainableIncome, baseHousehold.retirement.includeStatePension, baseTotalStatePensionAnnual]
+  );
+
   // Projected accessible wealth at retirement (for pension bridge)
   const totalAccessibleContrib = useMemo(() =>
     personContribBreakdown.reduce((sum, p) => sum + p.accessibleContrib, 0),
@@ -433,9 +457,17 @@ export default function RetirementPage() {
         withdrawalRate={retirement.withdrawalRate}
         includeStatePension={retirement.includeStatePension}
         totalStatePensionAnnual={totalStatePensionAnnual}
+        projectedPotAtRetirement={projectedPotAtRetirement}
+        sustainableIncome={sustainableIncome}
+        totalProjectedIncome={totalProjectedIncome}
+        yearsToRetirement={yearsToRetirement}
+        growthRate={midRate}
         baseCurrentPot={baseCurrentPot}
         baseProgressPercent={baseProgressPercent}
         baseRequiredPot={baseRequiredPot}
+        baseProjectedPotAtRetirement={baseProjectedPotAtRetirement}
+        baseSustainableIncome={baseSustainableIncome}
+        baseTotalProjectedIncome={baseTotalProjectedIncome}
       />
 
       {/* 2. Planning Settings — quick reference */}

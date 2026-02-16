@@ -88,15 +88,32 @@ export function PlanningTab({ household, updateHousehold }: PlanningTabProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {renderField(
               "Target Annual Income",
-              <Input
-                type="number"
-                step="0.01"
-                value={household.retirement.targetAnnualIncome}
-                onChange={(e) =>
-                  updateRetirement("targetAnnualIncome", Number(e.target.value))
-                }
-                placeholder="0.00"
-              />,
+              <div className="space-y-2">
+                <Input
+                  type="number"
+                  step="1000"
+                  value={household.retirement.targetAnnualIncome}
+                  onChange={(e) =>
+                    updateRetirement("targetAnnualIncome", Number(e.target.value))
+                  }
+                  placeholder="0.00"
+                />
+                <input
+                  type="range"
+                  min={10000}
+                  max={200000}
+                  step={1000}
+                  value={household.retirement.targetAnnualIncome}
+                  onChange={(e) =>
+                    updateRetirement("targetAnnualIncome", Number(e.target.value))
+                  }
+                  className="h-2 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+                />
+                <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
+                  <span>£10k</span>
+                  <span>£200k</span>
+                </div>
+              </div>,
               "How much you want to spend per year in retirement (today's money)"
             )}
             {renderField(

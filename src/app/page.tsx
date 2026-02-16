@@ -17,6 +17,7 @@ import {
   PiggyBank,
   Target,
   Shield,
+  Sunrise,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +38,10 @@ import { projectScenarios } from "@/lib/projections";
 import {
   calculateRetirementCountdown,
   calculateAdjustedRequiredPot,
+  calculateSWR,
+  projectFinalValue,
+  calculateAge,
+  getMidScenarioRate,
 } from "@/lib/projections";
 import {
   generateRecommendations,
@@ -74,6 +79,8 @@ interface HeroMetricData {
   fireProgress: number;
   netWorthAfterCommitments: number;
   totalAnnualCommitments: number;
+  projectedRetirementIncome: number;
+  projectedRetirementIncomeStatePension: number;
 }
 
 interface ResolvedMetric {
@@ -183,6 +190,18 @@ function resolveMetric(
         subtext: `${formatCurrencyCompact(data.totalAnnualCommitments)}/yr committed`,
         color: "",
         icon: Shield,
+      };
+    case "projected_retirement_income":
+      return {
+        label: "Retirement Income",
+        value: `${formatCurrencyCompact(data.projectedRetirementIncome)}/yr`,
+        rawValue: data.projectedRetirementIncome,
+        format: (n: number) => `${formatCurrencyCompact(n)}/yr`,
+        subtext: data.projectedRetirementIncomeStatePension > 0
+          ? `incl. ${formatCurrencyCompact(data.projectedRetirementIncomeStatePension)} state pension`
+          : "from projected pot at retirement",
+        color: "",
+        icon: Sunrise,
       };
   }
 }
@@ -450,6 +469,39 @@ export default function Home() {
     return committed + lifestyle;
   }, [baseHousehold.committedOutgoings, baseHousehold.emergencyFund.monthlyLifestyleSpending]);
 
+  // --- Projected retirement income ---
+  const { projectedRetirementIncome, projectedRetirementIncomeStatePension } = useMemo(() => {
+    const { retirement } = household;
+    const totalContrib = calculateTotalAnnualContributions(household.contributions, household.income);
+    const midRate = getMidScenarioRate(retirement.scenarioRates);
+    const primaryPerson = household.persons.find((p) => p.relationship === "self");
+    const currentAge = primaryPerson ? calculateAge(primaryPerson.dateOfBirth) : 35;
+    const yearsToRetirement = Math.max(0, (primaryPerson?.plannedRetirementAge ?? 60) - currentAge);
+    const projectedPot = projectFinalValue(totalNetWorth, totalContrib, midRate, yearsToRetirement);
+    const sustainableIncome = calculateSWR(projectedPot, retirement.withdrawalRate);
+    const statePensionPortion = retirement.includeStatePension ? totalStatePensionAnnual : 0;
+    return {
+      projectedRetirementIncome: sustainableIncome + statePensionPortion,
+      projectedRetirementIncomeStatePension: statePensionPortion,
+    };
+  }, [household, totalNetWorth, totalStatePensionAnnual]);
+
+  const { baseProjectedRetirementIncome, baseProjectedRetirementIncomeStatePension } = useMemo(() => {
+    const { retirement } = baseHousehold;
+    const totalContrib = calculateTotalAnnualContributions(baseHousehold.contributions, baseHousehold.income);
+    const midRate = getMidScenarioRate(retirement.scenarioRates);
+    const primaryPerson = baseHousehold.persons.find((p) => p.relationship === "self");
+    const currentAge = primaryPerson ? calculateAge(primaryPerson.dateOfBirth) : 35;
+    const yearsToRetirement = Math.max(0, (primaryPerson?.plannedRetirementAge ?? 60) - currentAge);
+    const projectedPot = projectFinalValue(baseTotalNetWorth, totalContrib, midRate, yearsToRetirement);
+    const sustainableIncome = calculateSWR(projectedPot, retirement.withdrawalRate);
+    const statePensionPortion = retirement.includeStatePension ? baseStatePensionAnnual : 0;
+    return {
+      baseProjectedRetirementIncome: sustainableIncome + statePensionPortion,
+      baseProjectedRetirementIncomeStatePension: statePensionPortion,
+    };
+  }, [baseHousehold, baseTotalNetWorth, baseStatePensionAnnual]);
+
   // --- Hero data ---
   const heroData: HeroMetricData = useMemo(
     () => ({
@@ -465,12 +517,15 @@ export default function Home() {
       fireProgress,
       netWorthAfterCommitments: totalNetWorth - totalAnnualCommitments,
       totalAnnualCommitments,
+      projectedRetirementIncome,
+      projectedRetirementIncomeStatePension,
     }),
     [
       totalNetWorth, filteredNetWorth, selectedView, cashPosition,
       monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent,
       retirementCountdownYears, retirementCountdownMonths,
       savingsRate, fireProgress, totalAnnualCommitments,
+      projectedRetirementIncome, projectedRetirementIncomeStatePension,
     ]
   );
 
@@ -489,12 +544,15 @@ export default function Home() {
       fireProgress: baseFireProgress,
       netWorthAfterCommitments: baseTotalNetWorth - baseCommitments,
       totalAnnualCommitments: baseCommitments,
+      projectedRetirementIncome: baseProjectedRetirementIncome,
+      projectedRetirementIncomeStatePension: baseProjectedRetirementIncomeStatePension,
     }),
     [
       baseTotalNetWorth, baseFilteredNetWorth, selectedView, baseCashPosition,
       monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent,
       baseRetCountdownYears, baseRetCountdownMonths,
       baseSavingsRate, baseFireProgress, baseCommitments,
+      baseProjectedRetirementIncome, baseProjectedRetirementIncomeStatePension,
     ]
   );
 

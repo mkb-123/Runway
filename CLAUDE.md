@@ -14,7 +14,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (481 tests)
+- **Testing:** Vitest + Testing Library (490 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
@@ -273,7 +273,7 @@ Single source of truth. Never hardcode rates elsewhere.
 
 ### src/types/index.ts — Domain Type Definitions
 
-**Enums:** `AccountType`, `TaxWrapper`, `StudentLoanPlan`, `PensionContributionMethod`, `OutgoingFrequency`, `CommittedOutgoingCategory`, `ContributionTarget`, `HeroMetricType`
+**Enums:** `AccountType`, `TaxWrapper`, `StudentLoanPlan`, `PensionContributionMethod`, `OutgoingFrequency`, `CommittedOutgoingCategory`, `ContributionTarget`, `HeroMetricType` (includes `projected_retirement_income`)
 
 **Core types:**
 - `Person` — id, name, relationship, dateOfBirth, plannedRetirementAge, niQualifyingYears, studentLoanPlan?
@@ -327,7 +327,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | File | Tab | Edits |
 |------|-----|-------|
 | `household-tab.tsx` | Household | Persons (name, DOB, retirement age, NI years, student loan), income (salary, pension, growth rates), bonus structures (total, cash, vesting), dashboard hero metrics |
-| `planning-tab.tsx` | Planning | Target annual income, withdrawal rate, state pension toggle, scenario growth rates |
+| `planning-tab.tsx` | Planning | Target annual income (input + slider), withdrawal rate, state pension toggle, scenario growth rates |
 | `children-tab.tsx` | Children | Child name, DOB, school fee, inflation rate, start/end ages |
 | `commitments-tab.tsx` | Commitments | Committed outgoings (category, label, amount, frequency, dates), auto-synced school fees |
 | `iht-tab.tsx` | IHT | Property value, direct descendants toggle, gifts register |
@@ -345,7 +345,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | `theme-toggle.tsx` | Light/dark mode toggle |
 | `person-toggle.tsx` | Dropdown: household vs per-person view |
 | `scenario-banner.tsx` | "In scenario mode" banner |
-| `scenario-panel.tsx` | Scenario control panel (enable/save/load/delete) |
+| `scenario-panel.tsx` | Scenario control panel (enable/save/load/delete, target retirement income slider) |
 | `scenario-delta.tsx` | Before/after metric comparison |
 | `empty-state.tsx` | No-data fallback message |
 | `page-header.tsx` | Page title + subtitle |
@@ -378,7 +378,7 @@ Single source of truth. Never hardcode rates elsewhere.
 
 | File | Purpose |
 |------|---------|
-| `retirement-hero.tsx` | Large headline card (countdown, target pot) |
+| `retirement-hero.tsx` | Large headline card (countdown, target pot, projected pot at retirement, sustainable income) |
 | `retirement-countdown-grid.tsx` | 3-column grid: retirement, pension access, state pension ages |
 | `pension-bridge-card.tsx` | Early retirement bridge gap analysis |
 | `fire-metrics-card.tsx` | Coast FIRE, required savings, SWR metrics |
@@ -409,7 +409,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | `projection-consistency.test.ts` | Cross-function consistency checks |
 | `school-fees.test.ts` | Start/end dates, years remaining, total cost, timeline generation |
 | `deferred-bonus.test.ts` | Tranche generation, vesting schedule (including vestingGapYears), projected value |
-| `scenario.test.ts` | Scenario override merging (income, contributions, retirement, accounts, market shock), savings rate scaling, impact calculation, avoid-taper preset, combined integration |
+| `scenario.test.ts` | Scenario override merging (income, contributions, retirement, accounts, market shock), savings rate scaling, impact calculation, avoid-taper preset, target income override integration, combined integration |
 | `format.test.ts` | Currency, percentage, date, number formatting |
 | `cash-flow.test.ts` | 24-month timeline: salary growth, bonus months, deferred vesting, term fees |
 | `migration.test.ts` | All 9 data migrations: old formats → current schema |
