@@ -444,7 +444,7 @@ export default function IHTPage() {
           <CardContent>
             <div className="grid gap-6 md:grid-cols-2">
               <div>
-                <AllocationPie data={shelteredVsExposedData} height={280} />
+                <AllocationPie data={shelteredVsExposedData} />
               </div>
               <div className="flex flex-col justify-center space-y-4">
                 <div className="rounded-lg border bg-green-50 dark:bg-green-950/20 p-4">

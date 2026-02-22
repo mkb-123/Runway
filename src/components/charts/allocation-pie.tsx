@@ -20,7 +20,6 @@ interface AllocationPieProps {
   data: AllocationPieDataItem[];
   innerRadius?: number;
   outerRadius?: number;
-  height?: number;
 }
 
 const DEFAULT_COLORS = [
@@ -40,7 +39,6 @@ export function AllocationPie({
   data,
   innerRadius = 60,
   outerRadius = 100,
-  height = 350,
 }: AllocationPieProps) {
   // Filter out zero-value entries for cleaner display
   const filteredData = data.filter((d) => d.value > 0);
@@ -54,7 +52,7 @@ export function AllocationPie({
   }
 
   return (
-    <div style={{ height }} className="w-full" role="img" aria-label="Asset allocation breakdown by account type">
+    <div className="h-[250px] sm:h-[350px] w-full" role="img" aria-label="Asset allocation breakdown by account type">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
