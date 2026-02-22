@@ -14,7 +14,8 @@ import { annualiseOutgoing } from "@/types";
 import type { CashFlowMonth } from "@/components/charts/cash-flow-timeline";
 import { calculateTakeHomePay, calculateTakeHomePayWithStudentLoan } from "@/lib/tax";
 import { generateDeferredTranches } from "@/lib/deferred-bonus";
-import { calculateIncomeTax, calculateNI } from "@/lib/tax";
+import { calculateIncomeTax, calculateNI, calculateStudentLoan } from "@/lib/tax";
+import type { StudentLoanPlan } from "@/types";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -138,7 +139,9 @@ function calculateNetBonusAndVestingForMonth(
     if (grossCombined <= 0) continue;
 
     // Tax the combined amount together against this person's salary
-    const netCombined = calculateNetBonusAmount(personIncome, grossCombined, yearsElapsed);
+    const person = household.persons.find((p) => p.id === bonusStructure.personId);
+    const studentLoanPlan: StudentLoanPlan = person?.studentLoanPlan ?? "none";
+    const netCombined = calculateNetBonusAmount(personIncome, grossCombined, yearsElapsed, studentLoanPlan);
 
     // Split net amount proportionally between bonus and vesting
     const bonusShare = grossCombined > 0 ? grossBonus / grossCombined : 0;
@@ -150,26 +153,39 @@ function calculateNetBonusAndVestingForMonth(
 }
 
 /**
- * Calculate the net (after tax and NI) amount of a bonus payment,
- * applying marginal tax on top of the person's grown salary.
+ * Calculate the net (after tax, NI, and student loan) amount of a bonus payment,
+ * applying marginal deductions on top of the person's grown salary.
  */
-function calculateNetBonusAmount(income: PersonIncome, grossBonus: number, yearsElapsed: number): number {
+function calculateNetBonusAmount(
+  income: PersonIncome,
+  grossBonus: number,
+  yearsElapsed: number,
+  studentLoanPlan: StudentLoanPlan = "none"
+): number {
   const salaryGrowthRate = income.salaryGrowthRate ?? 0;
   const grownSalary = income.grossSalary * Math.pow(1 + salaryGrowthRate, yearsElapsed);
+
+  // For student loan, use adjusted gross (salary sacrifice reduces the base)
+  const slGross = income.pensionContributionMethod === "salary_sacrifice"
+    ? grownSalary - income.employeePensionContribution
+    : grownSalary;
 
   // Tax on salary alone
   const taxOnSalary = calculateIncomeTax(grownSalary, income.employeePensionContribution, income.pensionContributionMethod);
   const niOnSalary = calculateNI(grownSalary, income.employeePensionContribution, income.pensionContributionMethod);
+  const slOnSalary = calculateStudentLoan(slGross, studentLoanPlan);
 
   // Tax on salary + bonus combined
   const taxOnCombined = calculateIncomeTax(grownSalary + grossBonus, income.employeePensionContribution, income.pensionContributionMethod);
   const niOnCombined = calculateNI(grownSalary + grossBonus, income.employeePensionContribution, income.pensionContributionMethod);
+  const slOnCombined = calculateStudentLoan(slGross + grossBonus, studentLoanPlan);
 
-  // Marginal tax and NI on the bonus
+  // Marginal tax, NI, and student loan on the bonus
   const marginalTax = taxOnCombined.tax - taxOnSalary.tax;
   const marginalNI = niOnCombined.ni - niOnSalary.ni;
+  const marginalSL = slOnCombined - slOnSalary;
 
-  return Math.max(0, grossBonus - marginalTax - marginalNI);
+  return Math.max(0, grossBonus - marginalTax - marginalNI - marginalSL);
 }
 
 
