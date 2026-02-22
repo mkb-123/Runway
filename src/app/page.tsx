@@ -71,6 +71,8 @@ import { SchoolFeeSummary } from "@/components/school-fee-summary";
 import { SchoolFeeTimelineChart } from "@/components/charts/school-fee-timeline-chart";
 import { generateSchoolFeeTimeline, findLastSchoolFeeYear } from "@/lib/school-fees";
 import { StaleTaxBanner } from "@/components/stale-tax-banner";
+import { PropertyEquityChart } from "@/components/charts/property-equity-chart";
+import { projectPropertyEquity, calculateMortgagePayoffYears } from "@/lib/property";
 
 // ============================================================
 // Hero Metric — resolve type to display properties
@@ -456,6 +458,33 @@ export default function Home() {
     () => findLastSchoolFeeYear(household.children),
     [household.children]
   );
+
+  // =============================================
+  // Property equity projections (for chart)
+  // =============================================
+  const propertyProjections = useMemo(() => {
+    if (household.properties.length === 0) return { projections: [], mortgagePayoffYear: null };
+
+    const projections = household.properties.map((prop) => ({
+      label: prop.label,
+      data: projectPropertyEquity(prop, 30),
+    }));
+
+    // Find earliest mortgage payoff across all properties with mortgages
+    let mortgagePayoffYear: number | null = null;
+    for (const prop of household.properties) {
+      if (prop.mortgageBalance > 0) {
+        const payoff = calculateMortgagePayoffYears(prop);
+        if (payoff !== null && payoff > 0) {
+          if (mortgagePayoffYear === null || payoff < mortgagePayoffYear) {
+            mortgagePayoffYear = payoff;
+          }
+        }
+      }
+    }
+
+    return { projections, mortgagePayoffYear };
+  }, [household.properties]);
 
   const latestSnapshot = snapshots[snapshots.length - 1];
   const heroMetrics = household.dashboardConfig.heroMetrics;
@@ -905,6 +934,36 @@ export default function Home() {
           </CardContent>
         </Card>
       </CollapsibleSection>
+
+      {/* Property Equity Trajectory */}
+      {propertyProjections.projections.length > 0 && (
+        <CollapsibleSection
+          title="Property Equity"
+          summary={`${household.properties.length} propert${household.properties.length !== 1 ? "ies" : "y"} · ${formatCurrencyCompact(heroData.totalPropertyEquity)} equity`}
+          defaultOpen
+          storageKey="property-equity"
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-baseline justify-between">
+                <CardTitle>Property Equity Trajectory</CardTitle>
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  30-year projection with appreciation + mortgage paydown
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <PropertyEquityChart
+                projections={propertyProjections.projections}
+                mortgagePayoffYear={propertyProjections.mortgagePayoffYear}
+              />
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Property values are estimates. Past appreciation does not guarantee future growth.
+              </p>
+            </CardContent>
+          </Card>
+        </CollapsibleSection>
+      )}
 
       {household.committedOutgoings.length > 0 && (() => {
         const categoryTotals = household.committedOutgoings.reduce<Record<string, number>>((acc, o) => {

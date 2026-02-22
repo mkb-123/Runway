@@ -26,6 +26,7 @@ import {
   Save,
   Trash2,
   BookOpen,
+  Home,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -231,6 +232,8 @@ export function ScenarioPanel() {
   const [savingsRateOverride, setSavingsRateOverride] = useState<number | null>(null);
   const [retirementAgeOverrides, setRetirementAgeOverrides] = useState<Record<string, number>>({});
   const [targetIncomeOverride, setTargetIncomeOverride] = useState<number | null>(null);
+  const [propertyValueOverrides, setPropertyValueOverrides] = useState<Record<string, number>>({});
+  const [propertyMortgageOverrides, setPropertyMortgageOverrides] = useState<Record<string, number>>({});
 
   // Current savings rate calculation
   const { currentSavingsRate, totalGrossIncome, contribsByPerson } = useMemo(() => {
@@ -273,6 +276,8 @@ export function ScenarioPanel() {
         setSavingsRateOverride(null);
         setRetirementAgeOverrides({});
         setTargetIncomeOverride(null);
+        setPropertyValueOverrides({});
+        setPropertyMortgageOverrides({});
       }
     },
     [isScenarioMode]
@@ -295,9 +300,11 @@ export function ScenarioPanel() {
       marketShock !== "" ||
       savingsRateOverride !== null ||
       Object.keys(retirementAgeOverrides).length > 0 ||
-      targetIncomeOverride !== null
+      targetIncomeOverride !== null ||
+      Object.keys(propertyValueOverrides).length > 0 ||
+      Object.keys(propertyMortgageOverrides).length > 0
     );
-  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, retirementAgeOverrides, targetIncomeOverride, household.income]);
+  }, [pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, retirementAgeOverrides, targetIncomeOverride, household.income, propertyValueOverrides, propertyMortgageOverrides]);
 
   const applyCustomScenario = useCallback(() => {
     const newOverrides: ScenarioOverrides = {};
@@ -376,8 +383,24 @@ export function ScenarioPanel() {
       };
     }
 
+    // Property overrides (value changes, mortgage changes for downsizing/overpayment)
+    const propOverrideEntries = new Map<string, { propertyId: string; estimatedValue?: number; mortgageBalance?: number }>();
+    for (const [propId, value] of Object.entries(propertyValueOverrides)) {
+      const existing = propOverrideEntries.get(propId) ?? { propertyId: propId };
+      existing.estimatedValue = value;
+      propOverrideEntries.set(propId, existing);
+    }
+    for (const [propId, mortgage] of Object.entries(propertyMortgageOverrides)) {
+      const existing = propOverrideEntries.get(propId) ?? { propertyId: propId };
+      existing.mortgageBalance = mortgage;
+      propOverrideEntries.set(propId, existing);
+    }
+    if (propOverrideEntries.size > 0) {
+      newOverrides.propertyOverrides = Array.from(propOverrideEntries.values());
+    }
+
     enableScenario("Custom Scenario", newOverrides);
-  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, totalGrossIncome, retirementAgeOverrides, targetIncomeOverride, enableScenario]);
+  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, totalGrossIncome, retirementAgeOverrides, targetIncomeOverride, propertyValueOverrides, propertyMortgageOverrides, enableScenario]);
 
   const applyPreset = useCallback(
     (preset: SmartPreset) => {
@@ -399,6 +422,8 @@ export function ScenarioPanel() {
       setSavingsRateOverride(null);
       setRetirementAgeOverrides({});
       setTargetIncomeOverride(null);
+      setPropertyValueOverrides({});
+      setPropertyMortgageOverrides({});
       setMarketShock(
         overrides.marketShockPercent !== undefined
           ? String(overrides.marketShockPercent * 100)
@@ -417,6 +442,8 @@ export function ScenarioPanel() {
     setSavingsRateOverride(null);
     setRetirementAgeOverrides({});
     setTargetIncomeOverride(null);
+    setPropertyValueOverrides({});
+    setPropertyMortgageOverrides({});
   }, [disableScenario]);
 
   // Precompute scaled contributions for savings rate preview
@@ -681,6 +708,69 @@ export function ScenarioPanel() {
               )}
             </div>
           </Section>
+
+          {/* Property — downsizing, overpayment, value changes */}
+          {household.properties.length > 0 && (
+            <Section title="Property" icon={Home}>
+              <div className="space-y-4">
+                {household.properties.map((prop) => {
+                  const currentValue = prop.estimatedValue;
+                  const currentMortgage = prop.mortgageBalance;
+                  const valueSlider = propertyValueOverrides[prop.id] ?? currentValue;
+                  const mortgageSlider = propertyMortgageOverrides[prop.id] ?? currentMortgage;
+                  const equityChange = (valueSlider - mortgageSlider) - (currentValue - currentMortgage);
+
+                  return (
+                    <div key={prop.id} className="space-y-3">
+                      <p className="text-xs font-medium">{prop.label}</p>
+                      <RangeInput
+                        label="Property value"
+                        value={valueSlider}
+                        min={0}
+                        max={Math.max(currentValue * 2, 500000)}
+                        step={10000}
+                        current={currentValue}
+                        format={(v) => formatCurrencyCompact(v)}
+                        onChange={(v) =>
+                          setPropertyValueOverrides((prev) => ({
+                            ...prev,
+                            [prop.id]: v,
+                          }))
+                        }
+                      />
+                      {currentMortgage > 0 && (
+                        <RangeInput
+                          label="Mortgage balance"
+                          value={mortgageSlider}
+                          min={0}
+                          max={currentMortgage}
+                          step={5000}
+                          current={currentMortgage}
+                          format={(v) => formatCurrencyCompact(v)}
+                          onChange={(v) =>
+                            setPropertyMortgageOverrides((prev) => ({
+                              ...prev,
+                              [prop.id]: v,
+                            }))
+                          }
+                        />
+                      )}
+                      {equityChange !== 0 && (
+                        <div className="rounded-md bg-muted/50 px-2 py-1.5">
+                          <p className="text-xs text-muted-foreground">
+                            Equity change:{" "}
+                            <span className={`font-medium tabular-nums ${equityChange >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                              {equityChange >= 0 ? "+" : ""}{formatCurrencyCompact(equityChange)}
+                            </span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Section>
+          )}
 
           {/* Retirement Age */}
           <Section title="Retirement Age" icon={CalendarClock}>

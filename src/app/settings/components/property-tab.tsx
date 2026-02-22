@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -13,6 +15,7 @@ import {
 import type { Property, HouseholdData } from "@/types";
 import { clone, setField, renderField } from "./field-helpers";
 import { formatCurrency } from "@/lib/format";
+import { getAnnualMortgagePayment, getMortgageRemainingMonths } from "@/types";
 
 interface PropertyTabProps {
   household: HouseholdData;
@@ -131,62 +134,12 @@ export function PropertyTab({ household, updateHousehold }: PropertyTabProps) {
                   )}
                 </div>
 
-                {/* Mortgage section */}
-                <div className="mt-4 pt-4 border-t">
-                  <p className="text-sm font-medium mb-3">Mortgage</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {renderField(
-                      "Outstanding Balance",
-                      <Input
-                        type="number"
-                        step="1000"
-                        value={prop.mortgageBalance}
-                        onChange={(e) =>
-                          updateProperty(pIdx, "mortgageBalance", Number(e.target.value))
-                        }
-                        placeholder="0"
-                      />,
-                      "Current mortgage balance"
-                    )}
-                    {renderField(
-                      "Interest Rate (%)",
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={prop.mortgageRate !== undefined ? (prop.mortgageRate * 100).toFixed(2) : ""}
-                        onChange={(e) =>
-                          updateProperty(pIdx, "mortgageRate", e.target.value ? Number(e.target.value) / 100 : 0)
-                        }
-                        placeholder="e.g. 4.2"
-                      />,
-                      "Annual mortgage interest rate"
-                    )}
-                    {renderField(
-                      "Term (years)",
-                      <Input
-                        type="number"
-                        step="1"
-                        value={prop.mortgageTerm ?? ""}
-                        onChange={(e) =>
-                          updateProperty(pIdx, "mortgageTerm", e.target.value ? Number(e.target.value) : 0)
-                        }
-                        placeholder="e.g. 25"
-                      />,
-                      "Original mortgage term in years"
-                    )}
-                    {renderField(
-                      "Start Date",
-                      <Input
-                        type="date"
-                        value={prop.mortgageStartDate ?? ""}
-                        onChange={(e) =>
-                          updateProperty(pIdx, "mortgageStartDate", e.target.value)
-                        }
-                      />,
-                      "When mortgage payments began"
-                    )}
-                  </div>
-                </div>
+                {/* Mortgage section — collapsible, auto-opens when mortgage exists */}
+                <MortgageSection
+                  prop={prop}
+                  pIdx={pIdx}
+                  updateProperty={updateProperty}
+                />
 
                 {household.persons.length > 1 && (
                   <div className="mt-3">
@@ -225,6 +178,110 @@ export function PropertyTab({ household, updateHousehold }: PropertyTabProps) {
           ))}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ============================================================
+// Collapsible Mortgage Section
+// ============================================================
+
+function MortgageSection({
+  prop,
+  pIdx,
+  updateProperty,
+}: {
+  prop: Property;
+  pIdx: number;
+  updateProperty: (index: number, field: keyof Property, value: string | number | string[]) => void;
+}) {
+  const hasMortgage = prop.mortgageBalance > 0;
+  const [open, setOpen] = useState(hasMortgage);
+
+  // Computed monthly payment display
+  const annualPayment = getAnnualMortgagePayment(prop);
+  const monthlyPayment = annualPayment > 0 ? annualPayment / 12 : 0;
+  const remainingMonths = getMortgageRemainingMonths(prop);
+  const remainingYears = remainingMonths > 0 ? Math.ceil(remainingMonths / 12) : 0;
+
+  return (
+    <div className="mt-4 pt-4 border-t">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between text-left"
+      >
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium">Mortgage</p>
+          {hasMortgage && annualPayment > 0 && (
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {formatCurrency(Math.round(monthlyPayment))}/mo · {remainingYears}yr remaining
+            </span>
+          )}
+          {!hasMortgage && (
+            <span className="text-xs text-muted-foreground">No mortgage</span>
+          )}
+        </div>
+        {open ? (
+          <ChevronUp className="size-4 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="size-4 text-muted-foreground" />
+        )}
+      </button>
+      {open && (
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {renderField(
+            "Outstanding Balance",
+            <Input
+              type="number"
+              step="1"
+              value={prop.mortgageBalance}
+              onChange={(e) =>
+                updateProperty(pIdx, "mortgageBalance", Number(e.target.value))
+              }
+              placeholder="0"
+            />,
+            "Current mortgage balance"
+          )}
+          {renderField(
+            "Interest Rate (%)",
+            <Input
+              type="number"
+              step="0.1"
+              value={prop.mortgageRate !== undefined ? (prop.mortgageRate * 100).toFixed(2) : ""}
+              onChange={(e) =>
+                updateProperty(pIdx, "mortgageRate", e.target.value ? Number(e.target.value) / 100 : 0)
+              }
+              placeholder="e.g. 4.2"
+            />,
+            "Annual mortgage interest rate"
+          )}
+          {renderField(
+            "Term (years)",
+            <Input
+              type="number"
+              step="1"
+              value={prop.mortgageTerm ?? ""}
+              onChange={(e) =>
+                updateProperty(pIdx, "mortgageTerm", e.target.value ? Number(e.target.value) : 0)
+              }
+              placeholder="e.g. 25"
+            />,
+            "Original mortgage term in years"
+          )}
+          {renderField(
+            "Start Date",
+            <Input
+              type="date"
+              value={prop.mortgageStartDate ?? ""}
+              onChange={(e) =>
+                updateProperty(pIdx, "mortgageStartDate", e.target.value)
+              }
+            />,
+            "When the current mortgage started"
+          )}
+        </div>
+      )}
     </div>
   );
 }
