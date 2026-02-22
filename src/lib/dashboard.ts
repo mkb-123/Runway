@@ -483,6 +483,12 @@ export function getStatusSentence(
       color: "green",
     };
   }
+  if (heroData.fireProgress >= 25) {
+    return {
+      text: `${heroData.fireProgress.toFixed(0)}% to FIRE target — building momentum`,
+      color: "neutral",
+    };
+  }
 
   // Net worth trend
   if (heroData.hasEnoughSnapshotsForMoM && heroData.monthOnMonthChange !== 0) {
@@ -492,6 +498,15 @@ export function getStatusSentence(
       text: `Net worth ${direction} £${absK}k this month`,
       color: heroData.monthOnMonthChange > 0 ? "green" : "amber",
     };
+  }
+
+  // Savings rate fallback — better than a generic message
+  if (heroData.savingsRate > 0) {
+    const rate = heroData.savingsRate;
+    const rateText = `Saving ${rate.toFixed(0)}% of income`;
+    if (rate >= 20) return { text: `${rateText} — strong savings discipline`, color: "green" };
+    if (rate >= 10) return { text: `${rateText} — consider increasing contributions`, color: "neutral" };
+    return { text: `${rateText} — building towards financial security`, color: "neutral" };
   }
 
   return { text: "Your financial overview at a glance", color: "neutral" };

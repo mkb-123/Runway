@@ -863,16 +863,16 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
           <p className="text-sm text-muted-foreground">
             Choose which metrics appear in the hero section of your dashboard. The first metric is displayed prominently.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {([0, 1, 2] as const).map((slotIndex) => (
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {[0, 1, 2, 3, 4].map((slotIndex) => (
               <div key={slotIndex}>
                 {renderField(
                   slotIndex === 0 ? "Primary Metric" : `Secondary ${slotIndex}`,
                   <Select
-                    value={household.dashboardConfig.heroMetrics[slotIndex]}
+                    value={household.dashboardConfig.heroMetrics[slotIndex] ?? "net_worth"}
                     onValueChange={(val) => {
                       const updated = clone(household);
-                      const metrics = [...updated.dashboardConfig.heroMetrics] as [HeroMetricType, HeroMetricType, HeroMetricType];
+                      const metrics = [...updated.dashboardConfig.heroMetrics] as HeroMetricType[];
                       metrics[slotIndex] = val as HeroMetricType;
                       updated.dashboardConfig.heroMetrics = metrics;
                       updateHousehold(updated);

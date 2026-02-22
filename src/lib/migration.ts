@@ -37,6 +37,7 @@ export function migrateHouseholdData(raw: Record<string, unknown>): Record<strin
   data = migrateDeferredBonusSimplified(data);
   data = migrateChildrenDefault(data);
   data = migrateBonusTotalModel(data);
+  data = migrateHeroMetricsFiveSlots(data);
   return data;
 }
 
@@ -163,7 +164,9 @@ function migrateDashboardConfigDefault(data: Record<string, unknown>): Record<st
   if (data.dashboardConfig && typeof data.dashboardConfig === "object") return data;
   return {
     ...data,
-    dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
+    dashboardConfig: {
+      heroMetrics: ["net_worth", "period_change", "projected_retirement_income", "savings_rate", "retirement_countdown"],
+    },
   };
 }
 
@@ -327,4 +330,31 @@ function migrateBonusTotalModel(data: Record<string, unknown>): Record<string, u
   });
 
   return { ...data, bonusStructures: updated };
+}
+
+/**
+ * Migration 10: Expand heroMetrics from 3-slot tuple to 5-slot array.
+ *
+ * Old: heroMetrics: ["net_worth", "cash_position", "retirement_countdown"]  (exactly 3)
+ * New: heroMetrics: up to 5 items
+ *
+ * Users with existing customisation keep their current selections in slots 0–2.
+ * Slots 3 and 4 are filled with sensible defaults not already present.
+ */
+function migrateHeroMetricsFiveSlots(data: Record<string, unknown>): Record<string, unknown> {
+  const config = data.dashboardConfig;
+  if (typeof config !== "object" || config === null) return data;
+  const dc = config as Record<string, unknown>;
+  const metrics = dc.heroMetrics;
+  if (!Array.isArray(metrics) || metrics.length >= 5) return data;
+
+  // Fill up to 5 slots, avoiding duplicates, using a priority list of useful additions
+  const additions = ["period_change", "projected_retirement_income", "savings_rate", "retirement_countdown", "cash_position"];
+  const filled = [...metrics];
+  for (const candidate of additions) {
+    if (filled.length >= 5) break;
+    if (!filled.includes(candidate)) filled.push(candidate);
+  }
+
+  return { ...data, dashboardConfig: { ...dc, heroMetrics: filled } };
 }

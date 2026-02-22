@@ -293,7 +293,8 @@ export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
 };
 
 export interface DashboardConfig {
-  heroMetrics: [HeroMetricType, HeroMetricType, HeroMetricType];
+  /** At least 1 metric required; index 0 is primary, remainder are secondary (max 5 total). */
+  heroMetrics: HeroMetricType[];
 }
 
 // --- IHT ---

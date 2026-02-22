@@ -193,7 +193,7 @@ export const HeroMetricTypeSchema = z.enum([
 ]);
 
 export const DashboardConfigSchema = z.object({
-  heroMetrics: z.tuple([HeroMetricTypeSchema, HeroMetricTypeSchema, HeroMetricTypeSchema]),
+  heroMetrics: z.array(HeroMetricTypeSchema).min(1).max(5),
 });
 
 // --- IHT ---
@@ -250,7 +250,7 @@ export const HouseholdDataSchema = z.object({
   emergencyFund: EmergencyFundConfigSchema,
   committedOutgoings: z.array(CommittedOutgoingSchema).default([]),
   dashboardConfig: DashboardConfigSchema.default({
-    heroMetrics: ["net_worth", "cash_position", "retirement_countdown"],
+    heroMetrics: ["net_worth", "period_change", "projected_retirement_income", "savings_rate", "retirement_countdown"],
   }),
   iht: IHTConfigSchema,
 });

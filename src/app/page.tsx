@@ -901,7 +901,7 @@ export default function Home() {
                           {metric.trend === "down" && <TrendingDown className="size-4 text-red-500" />}
                         </div>
                         {metric.subtext && (
-                          <span className="mt-0.5 block text-[11px] text-muted-foreground truncate">{metric.subtext}</span>
+                          <span className="mt-0.5 block text-[11px] text-muted-foreground line-clamp-2">{metric.subtext}</span>
                         )}
                       </CardContent>
                     </Card>
@@ -913,25 +913,28 @@ export default function Home() {
         );
       })()}
 
-      {/* REC-E: Next Cash Events strip */}
+      {/* REC-E: Next Cash Events strip — links to Income page for detail */}
       {cashEvents.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-muted-foreground/10 bg-muted/30 px-4 py-3">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <CalendarDays className="size-4 text-muted-foreground" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Next Events</span>
-          </div>
-          {cashEvents.slice(0, 3).map((event, i) => (
-            <div key={i} className="flex items-center gap-2 text-sm">
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(event.date)}
-              </span>
-              <span className="text-xs">{event.label}</span>
-              <span className={`text-xs font-semibold tabular-nums ${event.type === "inflow" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                {event.type === "inflow" ? "+" : ""}{formatCurrencyCompact(Math.abs(event.amount))}
-              </span>
+        <Link href="/income" className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-muted-foreground/10 bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <CalendarDays className="size-4 text-muted-foreground" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Next Events</span>
             </div>
-          ))}
-        </div>
+            {cashEvents.slice(0, 3).map((event, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(event.date)}
+                </span>
+                <span className="text-xs">{event.label}</span>
+                <span className={`text-xs font-semibold tabular-nums ${event.type === "inflow" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                  {event.type === "inflow" ? "+" : ""}{formatCurrencyCompact(Math.abs(event.amount))}
+                </span>
+              </div>
+            ))}
+            <ArrowRight className="ml-auto size-3.5 text-muted-foreground shrink-0" />
+          </div>
+        </Link>
       )}
 
       {/* RECOMMENDATIONS — with urgency tiers (REC-F), capped on mobile (REC-D)
@@ -1084,18 +1087,11 @@ export default function Home() {
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Liquid vs Illiquid" summary="Accessible wealth vs locked pensions" storageKey="liquidity">
-        <Card>
-          <CardContent className="pt-6">
-            <LiquiditySplitChart accounts={filteredAccounts} />
-          </CardContent>
-        </Card>
-      </CollapsibleSection>
-
       {selectedView === "household" && (
         <CollapsibleSection
           title="Net Worth by Person"
           summary={byPerson.map((p) => `${p.name}: ${formatCurrencyCompact(p.value)}`).join(", ")}
+          defaultOpen
           storageKey="by-person"
         >
           <Card>
@@ -1105,6 +1101,14 @@ export default function Home() {
           </Card>
         </CollapsibleSection>
       )}
+
+      <CollapsibleSection title="Liquid vs Illiquid" summary="Accessible wealth vs locked pensions" defaultOpen storageKey="liquidity">
+        <Card>
+          <CardContent className="pt-6">
+            <LiquiditySplitChart accounts={filteredAccounts} />
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {household.committedOutgoings.length > 0 && (() => {
         const categoryTotals = household.committedOutgoings.reduce<Record<string, number>>((acc, o) => {

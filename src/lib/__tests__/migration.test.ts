@@ -138,7 +138,7 @@ describe("migrateHouseholdData", () => {
       expect(migrated.committedOutgoings).toEqual([]);
     });
 
-    it("adds default dashboardConfig if missing", () => {
+    it("adds default dashboardConfig with 5 hero metrics if missing", () => {
       const data = {
         contributions: [],
         emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
@@ -146,7 +146,9 @@ describe("migrateHouseholdData", () => {
 
       const migrated = migrateHouseholdData(data);
       const dc = migrated.dashboardConfig as Record<string, unknown>;
-      expect(dc.heroMetrics).toEqual(["net_worth", "cash_position", "retirement_countdown"]);
+      expect(dc.heroMetrics).toEqual([
+        "net_worth", "period_change", "projected_retirement_income", "savings_rate", "retirement_countdown",
+      ]);
     });
   });
 
@@ -223,6 +225,58 @@ describe("migrateHouseholdData", () => {
       const migrated = migrateHouseholdData(legacy);
       const persons = migrated.persons as Array<Record<string, unknown>>;
       expect(persons[0].studentLoanPlan).toBe("none");
+    });
+  });
+
+  describe("hero metrics 5-slot expansion (migration 10)", () => {
+    it("expands old 3-item heroMetrics to 5 items", () => {
+      const data = {
+        contributions: [],
+        emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+        dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
+      };
+
+      const migrated = migrateHouseholdData(data);
+      const dc = migrated.dashboardConfig as Record<string, unknown>;
+      const metrics = dc.heroMetrics as string[];
+      expect(metrics).toHaveLength(5);
+      // Existing selections preserved in slots 0–2
+      expect(metrics[0]).toBe("net_worth");
+      expect(metrics[1]).toBe("cash_position");
+      expect(metrics[2]).toBe("retirement_countdown");
+      // Slots 3–4 filled with non-duplicate additions
+      expect(metrics[3]).toBe("period_change");
+      expect(metrics[4]).toBe("projected_retirement_income");
+    });
+
+    it("is idempotent — 5-item arrays are not modified", () => {
+      const existing = ["net_worth", "period_change", "projected_retirement_income", "savings_rate", "retirement_countdown"];
+      const data = {
+        contributions: [],
+        emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+        dashboardConfig: { heroMetrics: existing },
+      };
+
+      const migrated = migrateHouseholdData(data);
+      const dc = migrated.dashboardConfig as Record<string, unknown>;
+      expect(dc.heroMetrics).toEqual(existing);
+    });
+
+    it("respects user customisation — does not override existing slot values", () => {
+      const data = {
+        contributions: [],
+        emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+        dashboardConfig: { heroMetrics: ["iht_liability", "savings_rate", "cash_runway"] },
+      };
+
+      const migrated = migrateHouseholdData(data);
+      const dc = migrated.dashboardConfig as Record<string, unknown>;
+      const metrics = dc.heroMetrics as string[];
+      expect(metrics).toHaveLength(5);
+      // Original 3 preserved
+      expect(metrics.slice(0, 3)).toEqual(["iht_liability", "savings_rate", "cash_runway"]);
+      // No duplicates in the final array
+      expect(new Set(metrics).size).toBe(5);
     });
   });
 });

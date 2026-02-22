@@ -730,7 +730,7 @@ export default function TaxPlanningPage() {
       </CollapsibleSection>
 
       {/* ISA & Pension Allowance Trackers */}
-      <CollapsibleSection title="Allowance Trackers" summary="ISA & pension usage" storageKey="tax-allowances">
+      <CollapsibleSection title="Allowance Trackers" summary="ISA & pension usage" defaultOpen storageKey="tax-allowances">
         <Card>
           <CardHeader>
             <CardTitle>ISA &amp; Pension Allowance Trackers</CardTitle>

@@ -14,7 +14,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (556 tests)
+- **Testing:** Vitest + Testing Library (568 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
@@ -267,16 +267,17 @@ Single source of truth. Never hardcode rates elsewhere.
 - Per-entity: `PersonSchema`, `AccountSchema`, `PersonIncomeSchema`, `BonusStructureSchema`, `ContributionSchema`, `RetirementConfigSchema`, `EmergencyFundConfigSchema`, `CommittedOutgoingSchema`, `ChildSchema`, `GiftSchema`, `IHTConfigSchema`, `DashboardConfigSchema`
 
 #### `migration.ts` — localStorage Schema Migrations
-- `migrateHouseholdData(raw) → record` — 9 idempotent migrations:
+- `migrateHouseholdData(raw) → record` — 10 idempotent migrations:
   1. `annualContributions → contributions`
   2. `estimatedAnnualExpenses → monthlyLifestyleSpending`
   3. Ensure `monthlyLifestyleSpending` in emergencyFund
   4. Default `committedOutgoings[]`
-  5. Default `dashboardConfig`
+  5. Default `dashboardConfig` (5-slot heroMetrics default)
   6. Default `plannedRetirementAge`, `niQualifyingYears`, `studentLoanPlan`, `pensionAccessAge`, `stateRetirementAge` on persons
   7. `deferredTranches[] → deferredBonusAnnual` (simplified)
   8. Default `children[]`
   9. `deferredBonusAnnual → totalBonusAnnual` (total model)
+  10. Expand `heroMetrics` from old 3-slot tuple to 5-slot array (adds `period_change`, `projected_retirement_income`)
 
 #### `utils.ts` — Tailwind Utilities
 - `cn(...inputs)` — clsx + twMerge
@@ -296,7 +297,7 @@ Single source of truth. Never hardcode rates elsewhere.
 - `EmergencyFundConfig` — monthlyEssentialExpenses, targetMonths, monthlyLifestyleSpending
 - `Child` — id, name, dateOfBirth, schoolFeeAnnual, feeInflationRate, schoolStartAge, schoolEndAge
 - `CommittedOutgoing` — id, category, label, amount, frequency, startDate?, endDate?, inflationRate?, linkedChildId?
-- `Gift`, `IHTConfig`, `DashboardConfig`, `NetWorthSnapshot`, `HouseholdData`, `SnapshotsData`
+- `Gift`, `IHTConfig`, `DashboardConfig` (`heroMetrics: HeroMetricType[]` — index 0 primary, max 5), `NetWorthSnapshot`, `HouseholdData`, `SnapshotsData`
 
 **Helper functions:**
 - `getAccountTaxWrapper(type) → TaxWrapper`
