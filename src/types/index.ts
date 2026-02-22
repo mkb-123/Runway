@@ -87,6 +87,8 @@ export interface PersonIncome {
   salaryGrowthRate?: number;
   /** Expected annual bonus growth rate as a decimal (e.g. 0.05 for 5%). Defaults to 0. */
   bonusGrowthRate?: number;
+  /** FEAT-002: Prior 3 years' total pension contributions [year-1, year-2, year-3] for carry-forward */
+  priorYearPensionContributions?: number[];
 }
 
 // --- Contributions & Planning ---
@@ -267,7 +269,10 @@ export type HeroMetricType =
   | "fire_progress"
   | "net_worth_after_commitments"
   | "projected_retirement_income"
-  | "cash_runway";
+  | "cash_runway"
+  | "school_fee_countdown"
+  | "pension_bridge_gap"
+  | "per_person_retirement";
 
 export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   net_worth: "Total Net Worth",
@@ -280,6 +285,9 @@ export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   net_worth_after_commitments: "Net Worth After Commitments",
   projected_retirement_income: "Projected Retirement Income",
   cash_runway: "Cash Runway",
+  school_fee_countdown: "School Fee Countdown",
+  pension_bridge_gap: "Pension Bridge Gap",
+  per_person_retirement: "Per-Person Retirement",
 };
 
 export interface DashboardConfig {

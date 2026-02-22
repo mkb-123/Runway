@@ -19,6 +19,7 @@ import {
   Shield,
   Sunrise,
   FlaskConical,
+  GraduationCap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,6 +89,12 @@ interface HeroMetricData {
   projectedRetirementIncomeStatePension: number;
   targetAnnualIncome: number;
   cashRunway: number;
+  /** FEAT-020: School fee countdown — years until last child finishes */
+  schoolFeeYearsRemaining: number;
+  /** FEAT-020: Pension bridge gap — years of accessible savings needed before pension access */
+  pensionBridgeYears: number;
+  /** FEAT-020: Per-person retirement breakdown */
+  perPersonRetirement: Array<{ name: string; years: number; months: number }>;
 }
 
 interface ResolvedMetric {
@@ -242,6 +249,53 @@ function resolveMetric(
         icon: Shield,
       };
     }
+    case "school_fee_countdown": {
+      const yrs = data.schoolFeeYearsRemaining;
+      return {
+        label: "School Fees End",
+        value: yrs <= 0 ? "Done" : `${yrs}yr`,
+        rawValue: yrs,
+        format: (n: number) => n <= 0 ? "Done" : `${n}yr`,
+        subtext: yrs <= 0 ? "No children in school" : "until last child finishes",
+        color: yrs <= 0 ? "text-emerald-600 dark:text-emerald-400" : "",
+        icon: GraduationCap,
+      };
+    }
+    case "pension_bridge_gap": {
+      const yrs = data.pensionBridgeYears;
+      return {
+        label: "Pension Bridge",
+        value: yrs <= 0 ? "None" : `${yrs}yr`,
+        rawValue: yrs,
+        format: (n: number) => n <= 0 ? "None" : `${n}yr`,
+        subtext: yrs <= 0 ? "Pension accessible at retirement" : "gap before pension access",
+        color: yrs > 5 ? "text-amber-600 dark:text-amber-400" : yrs > 0 ? "" : "text-emerald-600 dark:text-emerald-400",
+        icon: Clock,
+      };
+    }
+    case "per_person_retirement": {
+      const parts = data.perPersonRetirement;
+      if (parts.length === 0) {
+        return {
+          label: "Retirement",
+          value: "N/A",
+          rawValue: 0,
+          format: () => "N/A",
+          color: "",
+          icon: Clock,
+        };
+      }
+      const primary = parts[0];
+      return {
+        label: "Retirement",
+        value: `${primary.years}y ${primary.months}m`,
+        rawValue: primary.years * 12 + primary.months,
+        format: (n: number) => `${Math.floor(n / 12)}y ${n % 12}m`,
+        subtext: parts.map((p) => `${p.name}: ${p.years}y ${p.months}m`).join(" · "),
+        color: "",
+        icon: Clock,
+      };
+    }
   }
 }
 
@@ -275,7 +329,11 @@ const priorityConfig: Record<
   },
 };
 
-function RecommendationCard({ rec }: { rec: Recommendation }) {
+function RecommendationCard({ rec, scenarioBadge, onDismiss }: {
+  rec: Recommendation;
+  scenarioBadge?: "new" | "resolved";
+  onDismiss?: (id: string) => void;
+}) {
   const config = priorityConfig[rec.priority];
   const content = (
     <div className="flex items-start gap-3">
@@ -291,17 +349,37 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
               {rec.personName}
             </Badge>
           )}
+          {scenarioBadge === "new" && (
+            <Badge className="bg-amber-500 text-[10px] text-white">
+              New in scenario
+            </Badge>
+          )}
+          {scenarioBadge === "resolved" && (
+            <Badge className="bg-emerald-500 text-[10px] text-white">
+              Resolved by scenario
+            </Badge>
+          )}
         </div>
         <p className="text-xs text-muted-foreground">{rec.description}</p>
         {rec.plainAction && (
           <p className="text-xs text-foreground/80 italic">{rec.plainAction}</p>
         )}
         <p className="text-xs font-medium">{rec.impact}</p>
-        {rec.actionUrl && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
-            Take action <ArrowRight className="size-3" />
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {rec.actionUrl && (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+              Take action <ArrowRight className="size-3" />
+            </span>
+          )}
+          {onDismiss && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDismiss(rec.id); }}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-3" /> Done
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -333,6 +411,29 @@ export default function Home() {
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
   const baseHousehold = scenarioData.baseHousehold;
+
+  // FEAT-006: Dismissed recommendations
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = localStorage.getItem("nw-dismissed-recs");
+      return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const dismissRecommendation = useCallback((id: string) => {
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      localStorage.setItem("nw-dismissed-recs", JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+  const undismissAll = useCallback(() => {
+    setDismissedIds(new Set());
+    localStorage.removeItem("nw-dismissed-recs");
+  }, []);
   const totalNetWorth = scenarioData.getTotalNetWorth();
   const byPerson = scenarioData.getNetWorthByPerson();
   const byWrapper = scenarioData.getNetWorthByWrapper();
@@ -399,14 +500,38 @@ export default function Home() {
     [household]
   );
 
+  // FEAT-021: Generate base recommendations for scenario diff
+  const baseRecommendations = useMemo(
+    () => isScenarioMode ? generateRecommendations(baseHousehold) : [],
+    [baseHousehold, isScenarioMode]
+  );
+
+  // FEAT-021: Compute recommendation diff (new/resolved in scenario)
+  const { newInScenario, resolvedByScenario } = useMemo(() => {
+    if (!isScenarioMode) return { newInScenario: new Set<string>(), resolvedByScenario: new Set<string>() };
+    const baseIds = new Set(baseRecommendations.map((r) => r.title));
+    const scenarioIds = new Set(recommendations.map((r) => r.title));
+    return {
+      newInScenario: new Set([...scenarioIds].filter((id) => !baseIds.has(id))),
+      resolvedByScenario: new Set([...baseIds].filter((id) => !scenarioIds.has(id))),
+    };
+  }, [recommendations, baseRecommendations, isScenarioMode]);
+
   const filteredRecommendations = useMemo(() => {
-    if (selectedView === "household") return recommendations;
-    return recommendations.filter(
-      (r) =>
-        !r.personName ||
-        r.personName === household.persons.find((p) => p.id === selectedView)?.name
-    );
-  }, [recommendations, selectedView, household.persons]);
+    let recs = recommendations;
+    // FEAT-006: Exclude dismissed recommendations
+    if (dismissedIds.size > 0) {
+      recs = recs.filter((r) => !dismissedIds.has(r.id));
+    }
+    if (selectedView !== "household") {
+      recs = recs.filter(
+        (r) =>
+          !r.personName ||
+          r.personName === household.persons.find((p) => p.id === selectedView)?.name
+      );
+    }
+    return recs;
+  }, [recommendations, selectedView, household.persons, dismissedIds]);
 
   // showAllRecs removed — recommendations now in CollapsibleSection
 
@@ -563,9 +688,43 @@ export default function Home() {
     };
   }, [baseHousehold, baseTotalNetWorth, baseStatePensionAnnual]);
 
-  // --- Cash runway ---
-  const cashRunway = useMemo(() => calculateCashRunway(household), [household]);
-  const baseCashRunway = useMemo(() => calculateCashRunway(baseHousehold), [baseHousehold]);
+  // --- Cash runway (FEAT-018: person-view filtered) ---
+  const cashRunwayPersonId = selectedView === "household" ? undefined : selectedView;
+  const cashRunway = useMemo(
+    () => calculateCashRunway(household, cashRunwayPersonId),
+    [household, cashRunwayPersonId]
+  );
+  const baseCashRunway = useMemo(
+    () => calculateCashRunway(baseHousehold, cashRunwayPersonId),
+    [baseHousehold, cashRunwayPersonId]
+  );
+
+  // --- FEAT-020: Life-stage metrics ---
+  const schoolFeeYearsRemaining = useMemo(() => {
+    const lastYear = findLastSchoolFeeYear(household.children);
+    if (!lastYear) return 0;
+    return Math.max(0, lastYear - new Date().getFullYear());
+  }, [household.children]);
+
+  const pensionBridgeYears = useMemo(() => {
+    const primary = household.persons.find((p) => p.relationship === "self");
+    if (!primary) return 0;
+    const retireAt = primary.plannedRetirementAge;
+    const pensionAt = primary.pensionAccessAge;
+    return Math.max(0, pensionAt - retireAt);
+  }, [household.persons]);
+
+  const perPersonRetirement = useMemo(() => {
+    return household.persons.map((person) => {
+      const age = calculateAge(person.dateOfBirth);
+      const yearsLeft = Math.max(0, person.plannedRetirementAge - age);
+      return {
+        name: person.name,
+        years: Math.floor(yearsLeft),
+        months: Math.round((yearsLeft - Math.floor(yearsLeft)) * 12),
+      };
+    });
+  }, [household.persons]);
 
   // --- Hero data ---
   const heroData: HeroMetricData = useMemo(
@@ -587,6 +746,9 @@ export default function Home() {
       projectedRetirementIncomeStatePension,
       targetAnnualIncome: household.retirement.targetAnnualIncome,
       cashRunway,
+      schoolFeeYearsRemaining,
+      pensionBridgeYears,
+      perPersonRetirement,
     }),
     [
       totalNetWorth, filteredNetWorth, selectedView, cashPosition,
@@ -595,6 +757,7 @@ export default function Home() {
       savingsRate, personalSavingsRate, fireProgress, totalAnnualCommitments,
       projectedRetirementIncome, projectedRetirementIncomeStatePension,
       household.retirement.targetAnnualIncome, cashRunway,
+      schoolFeeYearsRemaining, pensionBridgeYears, perPersonRetirement,
     ]
   );
 
@@ -618,6 +781,9 @@ export default function Home() {
       projectedRetirementIncomeStatePension: baseProjectedRetirementIncomeStatePension,
       targetAnnualIncome: baseHousehold.retirement.targetAnnualIncome,
       cashRunway: baseCashRunway,
+      schoolFeeYearsRemaining,
+      pensionBridgeYears,
+      perPersonRetirement,
     }),
     [
       baseTotalNetWorth, baseFilteredNetWorth, selectedView, baseCashPosition,
@@ -626,6 +792,7 @@ export default function Home() {
       baseSavingsRate, basePersonalSavingsRate, baseFireProgress, baseCommitments,
       baseProjectedRetirementIncome, baseProjectedRetirementIncomeStatePension,
       baseHousehold.retirement.targetAnnualIncome, baseCashRunway,
+      schoolFeeYearsRemaining, pensionBridgeYears, perPersonRetirement,
     ]
   );
 
@@ -890,18 +1057,43 @@ export default function Home() {
         </div>
       )}
 
-      {/* RECOMMENDATIONS — collapsible */}
-      {filteredRecommendations.length > 0 && (
+      {/* RECOMMENDATIONS — collapsible (FEAT-021: scenario diff badges) */}
+      {(filteredRecommendations.length > 0 || resolvedByScenario.size > 0) && (
         <CollapsibleSection
           title="Recommendations"
-          summary={`${filteredRecommendations.length} suggestion${filteredRecommendations.length !== 1 ? "s" : ""}`}
+          summary={`${filteredRecommendations.length} suggestion${filteredRecommendations.length !== 1 ? "s" : ""}${isScenarioMode && resolvedByScenario.size > 0 ? ` · ${resolvedByScenario.size} resolved` : ""}`}
           defaultOpen
           storageKey="recommendations"
         >
           <div className="grid gap-3">
             {filteredRecommendations.map((rec) => (
-              <RecommendationCard key={rec.id} rec={rec} />
+              <RecommendationCard
+                key={rec.id}
+                rec={rec}
+                scenarioBadge={newInScenario.has(rec.title) ? "new" : undefined}
+                onDismiss={dismissRecommendation}
+              />
             ))}
+            {/* FEAT-021: Show resolved recommendations with badge */}
+            {isScenarioMode && baseRecommendations
+              .filter((r) => resolvedByScenario.has(r.title))
+              .map((rec) => (
+                <RecommendationCard
+                  key={`resolved-${rec.id}`}
+                  rec={rec}
+                  scenarioBadge="resolved"
+                />
+              ))
+            }
+            {/* FEAT-006: Show undo link when recommendations are dismissed */}
+            {dismissedIds.size > 0 && (
+              <button
+                onClick={undismissAll}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Show {dismissedIds.size} dismissed recommendation{dismissedIds.size !== 1 ? "s" : ""}
+              </button>
+            )}
           </div>
         </CollapsibleSection>
       )}

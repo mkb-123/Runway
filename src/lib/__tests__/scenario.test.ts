@@ -4,6 +4,7 @@ import {
   scaleSavingsRateContributions,
   calculateScenarioImpact,
   buildAvoidTaperPreset,
+  generateScenarioDescription,
   type ScenarioOverrides,
 } from "@/lib/scenario";
 import type { HouseholdData } from "@/types";
@@ -510,5 +511,71 @@ describe("target income scenario override (integration)", () => {
     expect(result.persons[0].plannedRetirementAge).toBe(55);
     // Person 2 unchanged
     expect(result.persons[1].plannedRetirementAge).toBe(60);
+  });
+});
+
+describe("FEAT-019: generateScenarioDescription", () => {
+  it("describes income changes", () => {
+    const desc = generateScenarioDescription(
+      { income: [{ personId: "p1", grossSalary: 50000 }] },
+      makeHousehold()
+    );
+    expect(desc).toContain("Alice");
+    expect(desc).toContain("salary");
+    expect(desc).toContain("£50.0k");
+  });
+
+  it("describes pension changes", () => {
+    const desc = generateScenarioDescription(
+      { income: [{ personId: "p1", employeePensionContribution: 20000 }] },
+      makeHousehold()
+    );
+    expect(desc).toContain("Alice");
+    expect(desc).toContain("pension");
+    expect(desc).toContain("£20.0k");
+  });
+
+  it("describes retirement age changes", () => {
+    const desc = generateScenarioDescription(
+      { personOverrides: [{ id: "p1", plannedRetirementAge: 55 }] },
+      makeHousehold()
+    );
+    expect(desc).toContain("Alice retires at 55");
+    expect(desc).toContain("was 60");
+  });
+
+  it("describes market shock", () => {
+    const desc = generateScenarioDescription(
+      { marketShockPercent: -0.3 },
+      makeHousehold()
+    );
+    expect(desc).toContain("Market: -30%");
+  });
+
+  it("describes target income", () => {
+    const desc = generateScenarioDescription(
+      { retirement: { targetAnnualIncome: 50000 } },
+      makeHousehold()
+    );
+    expect(desc).toContain("Target income");
+    expect(desc).toContain("£50.0k");
+  });
+
+  it("returns 'No changes' for empty overrides", () => {
+    const desc = generateScenarioDescription({}, makeHousehold());
+    expect(desc).toBe("No changes");
+  });
+
+  it("combines multiple changes with separator", () => {
+    const desc = generateScenarioDescription(
+      {
+        marketShockPercent: -0.5,
+        retirement: { targetAnnualIncome: 30000 },
+      },
+      makeHousehold()
+    );
+    expect(desc).toContain("·");
+    expect(desc).toContain("Market: -50%");
+    expect(desc).toContain("Target income");
   });
 });

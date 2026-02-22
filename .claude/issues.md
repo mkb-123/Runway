@@ -100,7 +100,7 @@ Gifts within 7 years are applied in full against NRB. Per IHTA 1984 s.7(4), gift
 
 ### FEAT-002: Add pension carry-forward rules [MEDIUM]
 
-**Status:** OPEN
+**Status:** CLOSED
 **Reported by:** Financial Advisor
 **Files:** `src/lib/recommendations.ts`, `src/lib/tax-constants.ts`
 
@@ -110,7 +110,7 @@ Unused pension annual allowance from previous 3 tax years can be carried forward
 
 ### FEAT-006: Dismissable recommendations with "done" state [LOW]
 
-**Status:** OPEN
+**Status:** CLOSED
 **Reported by:** HNW Customer (Sarah)
 **Files:** `src/app/page.tsx`, `src/lib/recommendations.ts`
 
@@ -130,7 +130,7 @@ Save and compare multiple named scenarios side by side (e.g., "Current Plan" vs 
 
 ### FEAT-015: Surplus income not reinvested in lifetime cashflow [LOW]
 
-**Status:** OPEN
+**Status:** CLOSED
 **Reported by:** Devil's Advocate (Round 5)
 **Files:** `src/lib/lifetime-cashflow.ts`
 
@@ -140,7 +140,7 @@ When total income exceeds expenditure, the surplus is reported but not reinveste
 
 ### FEAT-016: Pension contributions don't grow with salary [LOW]
 
-**Status:** OPEN
+**Status:** CLOSED
 **Reported by:** Devil's Advocate (Round 5)
 **Files:** `src/lib/lifetime-cashflow.ts`
 
@@ -150,7 +150,7 @@ Employment pension contributions are fixed at today's amount even when salaryGro
 
 ### FEAT-017: Lifestyle spending not inflation-adjusted in lifetime cashflow [LOW]
 
-**Status:** OPEN
+**Status:** CLOSED
 **Reported by:** Devil's Advocate (Round 5)
 **Files:** `src/lib/lifetime-cashflow.ts`
 
@@ -160,7 +160,7 @@ Employment pension contributions are fixed at today's amount even when salaryGro
 
 ### FEAT-018: Cash runway metric not person-view filtered [LOW]
 
-**Status:** OPEN
+**Status:** CLOSED
 **Reported by:** QA Engineer (Round 5)
 **Files:** `src/app/page.tsx`, `src/lib/cash-flow.ts`
 
@@ -170,7 +170,7 @@ The `calculateCashRunway` function uses all household accounts regardless of per
 
 ### FEAT-019: Saved scenario descriptions and preview [MEDIUM]
 
-**Status:** OPEN
+**Status:** CLOSED
 **Reported by:** HNW Customer (James), HNW Customer (Priya)
 **Files:** `src/context/scenario-context.tsx`, `src/components/scenario-panel.tsx`
 
@@ -180,7 +180,7 @@ Saved scenarios show only the name (e.g. "Custom Scenario") with no description 
 
 ### FEAT-020: Life-stage dashboard metrics (school fees, pension bridge, next bonus) [MEDIUM]
 
-**Status:** OPEN
+**Status:** CLOSED
 **Reported by:** HNW Customer (James), HNW Customer (Priya)
 **Files:** `src/app/page.tsx`, `src/types/index.ts`
 
@@ -194,7 +194,7 @@ Expand `HeroMetricType` with life-stage-appropriate metrics:
 
 ### FEAT-021: Scenario-aware recommendations diff [MEDIUM]
 
-**Status:** OPEN
+**Status:** CLOSED
 **Reported by:** HNW Customer (James), HNW Customer (Priya)
 **Files:** `src/app/page.tsx`, `src/lib/recommendations.ts`
 

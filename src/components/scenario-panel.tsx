@@ -23,6 +23,9 @@ import {
   Percent,
   CalendarClock,
   Target,
+  Save,
+  Trash2,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,6 +48,7 @@ import {
   scaleSavingsRateContributions,
   calculateScenarioImpact,
   buildAvoidTaperPreset,
+  generateScenarioDescription,
 } from "@/lib/scenario";
 
 // --- Smart Presets ---
@@ -205,11 +209,17 @@ export function ScenarioPanel() {
   const { household } = useData();
   const {
     isScenarioMode,
+    overrides: activeOverrides,
     enableScenario,
     disableScenario,
+    savedScenarios,
+    saveScenario,
+    loadScenario,
+    deleteScenario,
   } = useScenario();
 
   const [open, setOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
 
   // Track pension overrides for live preview
   const [pensionOverrides, setPensionOverrides] = useState<Record<string, number>>({});
@@ -509,6 +519,48 @@ export function ScenarioPanel() {
               })}
             </div>
           </div>
+
+          {/* FEAT-019: Saved Scenarios */}
+          {savedScenarios.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Saved Scenarios
+              </h3>
+              <div className="space-y-2">
+                {savedScenarios.map((scenario) => (
+                  <div
+                    key={scenario.name}
+                    className="flex items-start gap-2 rounded-lg border p-3"
+                  >
+                    <BookOpen className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <button
+                        onClick={() => {
+                          loadScenario(scenario.name);
+                          setOpen(false);
+                        }}
+                        className="text-left"
+                      >
+                        <p className="text-sm font-medium">{scenario.name}</p>
+                        {scenario.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {scenario.description}
+                          </p>
+                        )}
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => deleteScenario(scenario.name)}
+                      className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
+                      aria-label={`Delete ${scenario.name}`}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="border-t" />
 
@@ -843,8 +895,39 @@ export function ScenarioPanel() {
             </div>
           </Section>
 
-          {/* Apply / Reset — sticky footer with safe-area padding for mobile browser chrome */}
+          {/* Apply / Save / Reset — sticky footer with safe-area padding for mobile browser chrome */}
           <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {/* FEAT-019: Save current scenario */}
+            {isScenarioMode && (
+              <div className="mb-2 flex gap-2">
+                <Input
+                  placeholder="Save as..."
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  className="text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && saveName.trim()) {
+                      const desc = generateScenarioDescription(activeOverrides, household);
+                      saveScenario(saveName.trim(), desc);
+                      setSaveName("");
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!saveName.trim()}
+                  onClick={() => {
+                    const desc = generateScenarioDescription(activeOverrides, household);
+                    saveScenario(saveName.trim(), desc);
+                    setSaveName("");
+                  }}
+                >
+                  <Save className="mr-1 size-3.5" />
+                  Save
+                </Button>
+              </div>
+            )}
             <div className="flex gap-2">
               <Button
                 onClick={() => {

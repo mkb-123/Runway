@@ -288,4 +288,55 @@ describe("calculateCashRunway", () => {
     const runway = calculateCashRunway(household);
     expect(runway).toBe(999);
   });
+
+  it("FEAT-018: filters to person's accounts when personId provided", () => {
+    const household = buildMinimalHousehold();
+    household.persons.push({
+      id: "person-2",
+      name: "Spouse",
+      relationship: "spouse",
+      dateOfBirth: "1992-01-01",
+      plannedRetirementAge: 60,
+      pensionAccessAge: 57,
+      stateRetirementAge: 67,
+      niQualifyingYears: 15,
+      studentLoanPlan: "none",
+    });
+    household.accounts = [
+      { id: "a1", personId: "person-1", type: "cash_savings", provider: "X", name: "Cash", currentValue: 30000 },
+      { id: "a2", personId: "person-2", type: "cash_savings", provider: "Y", name: "Cash", currentValue: 10000 },
+    ];
+    household.committedOutgoings = [
+      { id: "o1", category: "mortgage", label: "Mortgage", amount: 2000, frequency: "monthly" },
+    ];
+    // Monthly outgoings = 2000 (mortgage, household-wide) + 1500 (lifestyle) = 3500
+
+    const householdRunway = calculateCashRunway(household);
+    expect(householdRunway).toBeCloseTo(40000 / 3500, 1);
+
+    // Person-1 only has 30000 in cash
+    const person1Runway = calculateCashRunway(household, "person-1");
+    expect(person1Runway).toBeCloseTo(30000 / 3500, 1);
+
+    // Person-2 only has 10000 in cash
+    const person2Runway = calculateCashRunway(household, "person-2");
+    expect(person2Runway).toBeCloseTo(10000 / 3500, 1);
+  });
+
+  it("FEAT-018: excludes other person's outgoings when filtering", () => {
+    const household = buildMinimalHousehold();
+    household.accounts = [
+      { id: "a1", personId: "person-1", type: "cash_savings", provider: "X", name: "Cash", currentValue: 30000 },
+    ];
+    household.committedOutgoings = [
+      { id: "o1", category: "mortgage", label: "Mortgage", amount: 1000, frequency: "monthly" },
+      { id: "o2", category: "insurance", label: "Life Insurance", amount: 100, frequency: "monthly", personId: "person-2" },
+    ];
+    // Person-1 should NOT include person-2's life insurance
+    const person1Runway = calculateCashRunway(household, "person-1");
+    expect(person1Runway).toBeCloseTo(30000 / 2500, 1); // 1000 + 1500 lifestyle
+
+    const householdRunway = calculateCashRunway(household);
+    expect(householdRunway).toBeCloseTo(30000 / 2600, 1); // 1000 + 100 + 1500 lifestyle
+  });
 });

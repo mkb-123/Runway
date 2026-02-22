@@ -704,3 +704,120 @@ describe("generateLifetimeCashFlow property: income consistency", () => {
     }
   });
 });
+
+describe("FEAT-015: surplus income reinvestment", () => {
+  it("surplus income during working years increases total wealth available for retirement", () => {
+    // High-earner with low spending — surplus should be reinvested
+    const household = makeHousehold({
+      emergencyFund: {
+        monthlyEssentialExpenses: 2_000,
+        targetMonths: 6,
+        monthlyLifestyleSpending: 500, // very low lifestyle
+      },
+      committedOutgoings: [
+        { id: "o1", category: "mortgage", label: "Mortgage", amount: 500, frequency: "monthly" },
+      ],
+    });
+
+    const result = generateLifetimeCashFlow(household, 0.05);
+
+    // During working years, employment income should exceed expenditure
+    const workingYears = result.data.filter((d) => d.age < 60);
+    const surplusYears = workingYears.filter((d) => d.surplus > 0);
+    expect(surplusYears.length).toBeGreaterThan(0);
+
+    // Total income across all retirement years should be >= total expenditure
+    // because surplus was reinvested and grew
+    const retiredYears = result.data.filter((d) => d.age >= 60);
+    const totalRetirementIncome = retiredYears.reduce((s, d) => s + d.totalIncome, 0);
+    const totalRetirementExpenditure = retiredYears.reduce((s, d) => s + d.totalExpenditure, 0);
+
+    // With surplus reinvestment, total retirement income should cover most of expenditure
+    // even at modest growth rates (the reinvested surplus adds to the accessible wealth pool)
+    expect(totalRetirementIncome).toBeGreaterThan(totalRetirementExpenditure * 0.8);
+  });
+});
+
+describe("FEAT-016: pension contributions grow with salary", () => {
+  it("total lifetime income is higher when pension contributions grew with salary", () => {
+    // With salary growth, pension contributions grow → bigger pot →
+    // more total income available across lifetime (esp. late retirement years)
+    const withGrowth = makeHousehold({
+      accounts: [
+        { id: "a1", personId: "p1", type: "workplace_pension", provider: "P", name: "Pension", currentValue: 10_000 },
+      ],
+      income: [{
+        personId: "p1",
+        grossSalary: 60_000,
+        employerPensionContribution: 3_000,
+        employeePensionContribution: 3_000,
+        pensionContributionMethod: "salary_sacrifice" as const,
+        salaryGrowthRate: 0.05,
+        bonusGrowthRate: 0,
+      }],
+      contributions: [],
+    });
+
+    const withoutGrowth = makeHousehold({
+      accounts: [
+        { id: "a1", personId: "p1", type: "workplace_pension", provider: "P", name: "Pension", currentValue: 10_000 },
+      ],
+      income: [{
+        personId: "p1",
+        grossSalary: 60_000,
+        employerPensionContribution: 3_000,
+        employeePensionContribution: 3_000,
+        pensionContributionMethod: "salary_sacrifice" as const,
+        salaryGrowthRate: 0, // same salary, but contributions DON'T grow with salary growth=0
+        bonusGrowthRate: 0,
+      }],
+      contributions: [],
+    });
+
+    const resultGrowth = generateLifetimeCashFlow(withGrowth, 0.05);
+    const resultNoGrowth = generateLifetimeCashFlow(withoutGrowth, 0.05);
+
+    // Total income across all years should be higher with growing contributions
+    const growthTotalIncome = resultGrowth.data.reduce((s, d) => s + d.totalIncome, 0);
+    const noGrowthTotalIncome = resultNoGrowth.data.reduce((s, d) => s + d.totalIncome, 0);
+
+    expect(growthTotalIncome).toBeGreaterThan(noGrowthTotalIncome);
+  });
+});
+
+describe("FEAT-017: lifestyle spending inflation", () => {
+  it("lifestyle spending inflates over time in calculateExpenditure", () => {
+    const outgoings: CommittedOutgoing[] = [];
+    // Base year 2025, lifestyle = 2000/month = 24000/yr
+    const base = calculateExpenditure(outgoings, 2000, 2025, 2025);
+    const in10years = calculateExpenditure(outgoings, 2000, 2035, 2025);
+
+    expect(base).toBe(24_000);
+    // After 10 years at 2% CPI: 24000 * 1.02^10 ≈ 29,254
+    expect(in10years).toBeGreaterThan(base);
+    expect(in10years).toBeCloseTo(24_000 * Math.pow(1.02, 10), 0);
+  });
+
+  it("no inflation in base year (yearOffset = 0)", () => {
+    const result = calculateExpenditure([], 2000, 2025, 2025);
+    expect(result).toBe(24_000);
+  });
+
+  it("expenditure in lifetime cashflow increases over time due to lifestyle inflation", () => {
+    // Household with only lifestyle spending (no committed outgoings)
+    const household = makeHousehold({
+      committedOutgoings: [],
+      emergencyFund: {
+        monthlyEssentialExpenses: 2_000,
+        targetMonths: 6,
+        monthlyLifestyleSpending: 3_000,
+      },
+    });
+    const result = generateLifetimeCashFlow(household, 0.05);
+    const year0 = result.data[0];
+    const year20 = result.data[20];
+
+    // Expenditure should be higher 20 years later due to inflation
+    expect(year20.totalExpenditure).toBeGreaterThan(year0.totalExpenditure);
+  });
+});

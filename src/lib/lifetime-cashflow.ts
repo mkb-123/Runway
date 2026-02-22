@@ -200,12 +200,16 @@ export function generateLifetimeCashFlow(
     );
 
     // 4. During working years: add contributions to pots
+    // FEAT-016: Pension contributions grow with salary growth rate
     for (const state of personStates) {
       const personAge = state.currentAge + yearOffset;
       if (personAge < state.person.plannedRetirementAge) {
-        // Employment pension + discretionary SIPP go to pension pot (locked until access age)
-        state.pensionPot += state.annualPensionContribution + state.annualDiscretionaryPension;
-        // ISA/GIA contributions go to accessible wealth
+        const salaryGrowthRate = state.personIncome?.salaryGrowthRate ?? 0;
+        const growthFactor = Math.pow(1 + salaryGrowthRate, yearOffset);
+        // Employment pension contributions grow with salary
+        const grownPensionContrib = state.annualPensionContribution * growthFactor;
+        // Discretionary SIPP and ISA/GIA contributions don't auto-grow (they're fixed amounts)
+        state.pensionPot += grownPensionContrib + state.annualDiscretionaryPension;
         state.accessibleWealth += state.annualSavingsContribution;
       }
     }
@@ -226,6 +230,18 @@ export function generateLifetimeCashFlow(
     for (const state of personStates) {
       state.pensionPot *= 1 + growthRate;
       state.accessibleWealth *= 1 + growthRate;
+    }
+
+    // FEAT-015: Reinvest surplus income into accessible wealth
+    const incomeBeforeSurplus = employmentIncome + netPensionDrawn + statePensionIncome + investmentDrawn;
+    const surplus = incomeBeforeSurplus - totalExpenditure;
+    if (surplus > 0) {
+      // Distribute surplus proportionally across persons into accessible wealth
+      const totalAccessible = personStates.reduce((s, st) => s + Math.max(0, st.accessibleWealth), 0);
+      for (const state of personStates) {
+        const share = totalAccessible > 0 ? state.accessibleWealth / totalAccessible : 1 / personStates.length;
+        state.accessibleWealth += surplus * share;
+      }
     }
 
     // Round components first, then derive totals from rounded values for internal consistency
@@ -328,7 +344,13 @@ export function calculateExpenditure(
     total += inflatedAmount;
   }
 
-  total += monthlyLifestyleSpending * 12;
+  // FEAT-017: Apply inflation to lifestyle spending (using general CPI-like 2% default)
+  const yearsElapsed = calendarYear - effectiveBaseYear;
+  const lifestyleInflationRate = 0.02; // general CPI assumption
+  const inflatedLifestyle = yearsElapsed > 0
+    ? monthlyLifestyleSpending * 12 * Math.pow(1 + lifestyleInflationRate, yearsElapsed)
+    : monthlyLifestyleSpending * 12;
+  total += inflatedLifestyle;
   return total;
 }
 

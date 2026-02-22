@@ -223,14 +223,26 @@ function calculateOutgoingsForMonth(
 /**
  * Calculate cash runway in months — how long accessible liquid assets
  * can cover total monthly outgoings (committed + lifestyle).
+ *
+ * FEAT-018: When personId is provided, filters to that person's accounts
+ * and person-specific outgoings only.
  */
-export function calculateCashRunway(household: HouseholdData): number {
-  const cashAccounts = household.accounts.filter((a) =>
+export function calculateCashRunway(household: HouseholdData, personId?: string): number {
+  const accounts = personId
+    ? household.accounts.filter((a) => a.personId === personId)
+    : household.accounts;
+
+  const cashAccounts = accounts.filter((a) =>
     ["cash_savings", "cash_isa", "premium_bonds"].includes(a.type)
   );
   const totalCash = cashAccounts.reduce((s, a) => s + a.currentValue, 0);
 
-  const monthlyCommitted = household.committedOutgoings.reduce((sum, outgoing) => {
+  // FEAT-018: Filter committed outgoings by person when viewing individual
+  const outgoings = personId
+    ? household.committedOutgoings.filter((o) => !o.personId || o.personId === personId)
+    : household.committedOutgoings;
+
+  const monthlyCommitted = outgoings.reduce((sum, outgoing) => {
     return sum + annualiseOutgoing(outgoing.amount, outgoing.frequency) / 12;
   }, 0);
   const monthlyLifestyle = household.emergencyFund.monthlyLifestyleSpending;
