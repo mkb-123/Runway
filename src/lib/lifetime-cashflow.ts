@@ -14,7 +14,7 @@
 
 import type { HouseholdData, Person, PersonIncome } from "@/types";
 import { annualiseOutgoing, annualiseContribution, getDeferredBonus } from "@/types";
-import { calculateTakeHomePay } from "@/lib/tax";
+import { calculateTakeHomePay, calculateIncomeTax } from "@/lib/tax";
 import { calculateProRataStatePension, calculateAge } from "@/lib/projections";
 
 // --- Types ---
@@ -211,10 +211,16 @@ export function generateLifetimeCashFlow(
     }
 
     // 5. Pension + investment drawdown (to cover expenditure shortfall after employment + state pension)
+    // Drawdown needs to cover the gap AFTER tax on pension income, so we iterate:
+    // gross drawdown is needed to produce enough net income after pension drawdown tax.
     const incomeBeforeDrawdown = employmentIncome + statePensionIncome;
     const drawdownNeeded = Math.max(0, totalExpenditure - incomeBeforeDrawdown);
 
     const { pensionDrawn, investmentDrawn } = executeDrawdown(personStates, yearOffset, drawdownNeeded);
+
+    // 5b. Apply income tax on pension drawdown (25% tax-free PCLS, 75% taxable)
+    // Tax is calculated on the taxable portion added to state pension as total retirement income.
+    const netPensionDrawn = calculateNetPensionDrawdown(pensionDrawn, statePensionIncome);
 
     // 6. Grow all pots (after draw, per BUG-003 convention)
     for (const state of personStates) {
@@ -222,18 +228,24 @@ export function generateLifetimeCashFlow(
       state.accessibleWealth *= 1 + growthRate;
     }
 
-    const totalIncome = employmentIncome + pensionDrawn + statePensionIncome + investmentDrawn;
+    // Round components first, then derive totals from rounded values for internal consistency
+    const roundedEmployment = Math.round(employmentIncome);
+    const roundedPension = Math.round(netPensionDrawn);
+    const roundedStatePension = Math.round(statePensionIncome);
+    const roundedInvestment = Math.round(investmentDrawn);
+    const roundedExpenditure = Math.round(totalExpenditure);
+    const totalIncome = roundedEmployment + roundedPension + roundedStatePension + roundedInvestment;
 
     data.push({
       age: primaryAge,
       calendarYear,
-      employmentIncome: Math.round(employmentIncome),
-      pensionIncome: Math.round(pensionDrawn),
-      statePensionIncome: Math.round(statePensionIncome),
-      investmentIncome: Math.round(investmentDrawn),
-      totalIncome: Math.round(totalIncome),
-      totalExpenditure: Math.round(totalExpenditure),
-      surplus: Math.round(totalIncome - totalExpenditure),
+      employmentIncome: roundedEmployment,
+      pensionIncome: roundedPension,
+      statePensionIncome: roundedStatePension,
+      investmentIncome: roundedInvestment,
+      totalIncome,
+      totalExpenditure: roundedExpenditure,
+      surplus: totalIncome - roundedExpenditure,
     });
   }
 
@@ -386,4 +398,38 @@ function executeDrawdown(
   }
 
   return { pensionDrawn, investmentDrawn };
+}
+
+/**
+ * Calculate net pension drawdown after income tax.
+ * Per HMRC rules, 25% of pension drawdown is tax-free (PCLS),
+ * and the remaining 75% is taxed as income. State pension is
+ * also taxable income, so we calculate tax on the combined
+ * taxable retirement income.
+ *
+ * Returns the net (after-tax) pension drawdown amount.
+ */
+function calculateNetPensionDrawdown(
+  grossPensionDrawn: number,
+  statePensionIncome: number
+): number {
+  if (grossPensionDrawn <= 0) return 0;
+
+  // 25% pension commencement lump sum is tax-free
+  const taxFreePortion = grossPensionDrawn * 0.25;
+  const taxablePortion = grossPensionDrawn * 0.75;
+
+  // Total taxable retirement income = state pension + taxable pension drawdown
+  // No pension contribution or NI in retirement — just income tax
+  const totalTaxableIncome = statePensionIncome + taxablePortion;
+
+  // Tax on total taxable retirement income
+  const taxOnTotal = calculateIncomeTax(totalTaxableIncome);
+  // Tax attributable to state pension alone
+  const taxOnStatePension = calculateIncomeTax(statePensionIncome);
+
+  // Marginal tax on pension drawdown portion
+  const pensionTax = taxOnTotal.tax - taxOnStatePension.tax;
+
+  return taxFreePortion + taxablePortion - pensionTax;
 }

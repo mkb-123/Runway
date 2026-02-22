@@ -60,7 +60,7 @@ export interface BonusStructure {
   personId: string;
   /** Total annual bonus (cash + deferred). Grows at bonusGrowthRate. */
   totalBonusAnnual: number;
-  /** Fixed cash portion paid immediately each year. Does NOT grow. */
+  /** Cash portion paid immediately each year. Base amount; grows at bonusGrowthRate in projections. */
   cashBonusAnnual: number;
   /** Number of years for equal vesting (e.g. 3 = 1/3 vests each year) */
   vestingYears: number;

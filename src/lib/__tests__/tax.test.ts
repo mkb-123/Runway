@@ -85,6 +85,26 @@ describe("calculateIncomeTax", () => {
     expect(result.tax).toBe(6486);
   });
 
+  it("relief at source reduces adjusted net income for PA taper", () => {
+    // £110,000 salary, £8,000 net pension contribution (relief at source)
+    // Gross pension contribution: £8,000 / 0.8 = £10,000
+    // Adjusted net income for PA taper: £110,000 - £10,000 = £100,000
+    // PA taper threshold is £100,000 — so PA should NOT be tapered
+    const withRelief = calculateIncomeTax(110000, 8000, "relief_at_source");
+    const paBreakdown = withRelief.breakdown.find((b) => b.band === "Personal Allowance");
+    // Full personal allowance should be preserved (not tapered)
+    expect(paBreakdown?.taxableAmount).toBe(12_570);
+
+    // Without pension contribution, PA would be heavily tapered
+    const withoutPension = calculateIncomeTax(110000, 0, "salary_sacrifice");
+    const paWithout = withoutPension.breakdown.find((b) => b.band === "Personal Allowance");
+    // £110k - £100k = £10k excess, lose £5k of PA => PA = £12,570 - £5,000 = £7,570
+    expect(paWithout?.taxableAmount).toBe(7_570);
+
+    // Relief at source with contribution should pay less tax
+    expect(withRelief.tax).toBeLessThan(withoutPension.tax);
+  });
+
   it("extends basic rate band for relief at source pension", () => {
     // £55,000 salary, £4,000 net pension contribution
     // Gross pension contribution: £4,000 / 0.8 = £5,000

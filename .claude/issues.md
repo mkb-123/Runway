@@ -264,3 +264,110 @@ Save and compare multiple named scenarios side by side (e.g., "Current Plan" vs 
 **Resolved:** ISA top-up recommendation claims remaining allowance first; Bed & ISA only uses what's left (preventing combined recommendations from exceeding £20k).
 
 ---
+
+### FEAT-015: Surplus income not reinvested in lifetime cashflow [LOW]
+
+**Status:** OPEN
+**Reported by:** Devil's Advocate (Round 5)
+**Files:** `src/lib/lifetime-cashflow.ts`
+
+When total income exceeds expenditure, the surplus is reported but not reinvested into accessible wealth. In reality, surplus cash would accumulate and grow. This means the model understates wealth in later years.
+
+---
+
+### FEAT-016: Pension contributions don't grow with salary [LOW]
+
+**Status:** OPEN
+**Reported by:** Devil's Advocate (Round 5)
+**Files:** `src/lib/lifetime-cashflow.ts`
+
+Employment pension contributions are fixed at today's amount even when salaryGrowthRate is set. If salary grows 3%/yr, pension contributions should also grow proportionally (especially for salary sacrifice where the contribution is usually a % of salary).
+
+---
+
+### FEAT-017: Lifestyle spending not inflation-adjusted in lifetime cashflow [LOW]
+
+**Status:** OPEN
+**Reported by:** Devil's Advocate (Round 5)
+**Files:** `src/lib/lifetime-cashflow.ts`
+
+`monthlyLifestyleSpending * 12` is constant across all years. Committed outgoings support per-item `inflationRate`, but lifestyle spending has no inflation adjustment. Over 30+ years this significantly understates expenditure.
+
+---
+
+### FEAT-018: Cash runway metric not person-view filtered [LOW]
+
+**Status:** OPEN
+**Reported by:** QA Engineer (Round 5)
+**Files:** `src/app/page.tsx`, `src/lib/cash-flow.ts`
+
+The `calculateCashRunway` function uses all household accounts regardless of person-view selection. When viewing a single person's dashboard, cash runway should reflect only that person's liquid assets.
+
+---
+
+### BUG-018: Pension drawdown shown gross (no income tax applied) [CLOSED]
+
+**Status:** CLOSED
+**Reported by:** Financial Advisor (Audit)
+**Severity:** HIGH
+**Resolved:** `calculateNetPensionDrawdown()` in `lifetime-cashflow.ts` applies 25% PCLS tax-free, taxes remaining 75% as income using marginal rate against state pension. Net pension drawdown now shown in all lifetime cashflow outputs.
+
+---
+
+### BUG-019: Relief at source pension does not reduce adjusted net income for PA taper [CLOSED]
+
+**Status:** CLOSED
+**Reported by:** Financial Advisor (Audit)
+**Severity:** MEDIUM
+**Resolved:** `calculatePersonalAllowance()` in `tax.ts` now accepts `reliefAtSourceGrossContribution` parameter. For relief_at_source pensions, the gross contribution (net/0.8) reduces adjusted net income for the £100k PA taper calculation, matching HMRC rules.
+
+---
+
+### BUG-020: cashBonusAnnual type doc says "Does NOT grow" but code applies bonusGrowthRate [CLOSED]
+
+**Status:** CLOSED
+**Reported by:** Financial Advisor (Audit)
+**Severity:** MEDIUM
+**Resolved:** Updated type documentation to match actual behavior: `cashBonusAnnual` grows at `bonusGrowthRate` in projections. The growth behavior is correct for career progression modeling.
+
+---
+
+### BUG-021: CGT rate is all-or-nothing (single rate based on total income) [LOW]
+
+**Status:** OPEN
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/cgt.ts`
+
+The code applies a single CGT rate (basic or higher) based on total income, rather than splitting gains across the basic/higher rate bands. This is conservative — it overstates CGT for taxpayers near the basic rate boundary.
+
+---
+
+### BUG-022: Projection model uses inconsistent compounding (monthly vs annual) [LOW]
+
+**Status:** OPEN
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/projections.ts`
+
+`projectCompoundGrowth` uses monthly compounding while `projectCompoundGrowthWithGrowingContributions` uses annual compounding. Results from these two functions are not directly comparable for the same inputs.
+
+---
+
+### BUG-023: Pension bridge does not account for investment growth [LOW]
+
+**Status:** OPEN
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/projections.ts`
+
+The bridge calculation uses flat `years * annualSpend` without investment growth during the bridge period. Conservative but could overstate required bridge funding.
+
+---
+
+### BUG-024: Bed & ISA annualTaxSaved naming is misleading [LOW]
+
+**Status:** OPEN
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/cgt.ts`
+
+The field name suggests an annual saving, but it actually represents the total CGT that would be payable on the full unrealised gain — a one-time crystallised avoidance, not an annual figure.
+
+---
