@@ -63,8 +63,10 @@ interface PersonState {
   /** Annual deferred bonus (in steady state, this vests each year) */
   annualDeferredBonus: number;
   statePensionAnnual: number;
-  /** Annual pension contribution (employee + employer) */
+  /** Annual pension contribution (employee + employer from employment) */
   annualPensionContribution: number;
+  /** Annual discretionary pension contribution (SIPP top-ups) */
+  annualDiscretionaryPension: number;
   /** Annual ISA/GIA contribution */
   annualSavingsContribution: number;
 }
@@ -114,12 +116,16 @@ export function generateLifetimeCashFlow(
       ? personIncome.employeePensionContribution + personIncome.employerPensionContribution
       : 0;
 
-    // Discretionary contributions to ISA/GIA
+    // Discretionary contributions split by destination
     const personContribs = contributions.filter((c) => c.personId === person.id);
-    const annualSavingsContribution = personContribs.reduce(
-      (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
-      0
-    );
+    // SIPP/additional pension contributions go to pension pot (locked until pensionAccessAge)
+    const annualDiscretionaryPension = personContribs
+      .filter((c) => c.target === "pension")
+      .reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+    // ISA/GIA contributions go to accessible wealth
+    const annualSavingsContribution = personContribs
+      .filter((c) => c.target !== "pension")
+      .reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
 
     return {
       person,
@@ -131,6 +137,7 @@ export function generateLifetimeCashFlow(
       annualDeferredBonus,
       statePensionAnnual: calculateProRataStatePension(person.niQualifyingYears),
       annualPensionContribution,
+      annualDiscretionaryPension,
       annualSavingsContribution,
     };
   });
@@ -196,7 +203,9 @@ export function generateLifetimeCashFlow(
     for (const state of personStates) {
       const personAge = state.currentAge + yearOffset;
       if (personAge < state.person.plannedRetirementAge) {
-        state.pensionPot += state.annualPensionContribution;
+        // Employment pension + discretionary SIPP go to pension pot (locked until access age)
+        state.pensionPot += state.annualPensionContribution + state.annualDiscretionaryPension;
+        // ISA/GIA contributions go to accessible wealth
         state.accessibleWealth += state.annualSavingsContribution;
       }
     }
