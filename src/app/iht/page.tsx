@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
@@ -369,12 +370,16 @@ export default function IHTPage() {
                 <p>
                   <span className="font-medium">RNRB: {formatCurrency(UK_TAX_CONSTANTS.iht.residenceNilRateBand)}</span>
                   {numberOfPersons > 1 && ` × ${numberOfPersons} = ${formatCurrency(UK_TAX_CONSTANTS.iht.residenceNilRateBand * numberOfPersons)}`}
-                  {" "}— estate passes to direct descendants, residence nil-rate band applies to property.
+                  {" "}— estate passes to{" "}
+                  <Link href="/settings?tab=iht" className="underline underline-offset-2 hover:text-primary">direct descendants</Link>,
+                  {" "}residence nil-rate band applies to property.
                 </p>
               ) : (
                 <p className="text-muted-foreground">
                   <span className="font-medium">RNRB: £0 (not applicable)</span>
-                  {" "}— no direct descendants. The £{(UK_TAX_CONSTANTS.iht.residenceNilRateBand / 1000).toFixed(0)}k residence nil-rate band does not apply, reducing your threshold by {formatCurrency(UK_TAX_CONSTANTS.iht.residenceNilRateBand * numberOfPersons)}.
+                  {" "}— no{" "}
+                  <Link href="/settings?tab=iht" className="underline underline-offset-2 hover:text-primary">direct descendants</Link>.
+                  {" "}The £{(UK_TAX_CONSTANTS.iht.residenceNilRateBand / 1000).toFixed(0)}k residence nil-rate band does not apply, reducing your threshold by {formatCurrency(UK_TAX_CONSTANTS.iht.residenceNilRateBand * numberOfPersons)}.
                 </p>
               )}
             </div>
@@ -401,9 +406,9 @@ export default function IHTPage() {
                 </span>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className={`flex items-center justify-between rounded-lg border p-3${!ihtConfig.passingToDirectDescendants ? " opacity-50" : ""}`}>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">
+                  <span className={`text-sm${!ihtConfig.passingToDirectDescendants ? " line-through" : ""}`}>
                     Residence Nil Rate Band (
                     {formatCurrency(residenceNilRateBandPerPerson)} per person x{" "}
                     {numberOfPersons})
@@ -414,7 +419,7 @@ export default function IHTPage() {
                     <Badge variant="outline">Not applicable</Badge>
                   )}
                 </div>
-                <span className="font-semibold">
+                <span className={`font-semibold${!ihtConfig.passingToDirectDescendants ? " line-through" : ""}`}>
                   {formatCurrency(totalResidenceNilRateBand)}
                 </span>
               </div>

@@ -875,7 +875,14 @@ export default function Home() {
                 <CardTitle>Net Worth History</CardTitle>
               </CardHeader>
               <CardContent>
-                <NetWorthHistoryChart snapshots={snapshots} />
+                <NetWorthHistoryChart
+                  snapshots={snapshots}
+                  propertyAddedDate={
+                    household.properties.reduce((s, p) => s + p.estimatedValue, 0) > 0
+                      ? new Date().toISOString().slice(0, 7)
+                      : undefined
+                  }
+                />
               </CardContent>
             </Card>
           )}
