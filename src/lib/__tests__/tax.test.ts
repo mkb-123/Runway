@@ -181,9 +181,9 @@ describe("calculateStudentLoan", () => {
   });
 
   it("calculates Plan 1 repayment correctly", () => {
-    // £50,000 salary, Plan 1 threshold: £22,015, rate: 9%
-    // Repayable: (£50,000 - £22,015) = £27,985 * 0.09 = £2,518.65
-    expect(calculateStudentLoan(50000, "plan1")).toBe(2518.65);
+    // £50,000 salary, Plan 1 threshold: £24,990, rate: 9%
+    // Repayable: (£50,000 - £24,990) = £25,010 * 0.09 = £2,250.90
+    expect(calculateStudentLoan(50000, "plan1")).toBe(2250.9);
   });
 
   it("calculates Plan 2 repayment correctly", () => {
@@ -193,9 +193,9 @@ describe("calculateStudentLoan", () => {
   });
 
   it("calculates Plan 4 repayment correctly", () => {
-    // £50,000, Plan 4 threshold: £27,660
-    // (£50,000 - £27,660) = £22,340 * 0.09 = £2,010.60
-    expect(calculateStudentLoan(50000, "plan4")).toBe(2010.6);
+    // £50,000, Plan 4 threshold: £31,395
+    // (£50,000 - £31,395) = £18,605 * 0.09 = £1,674.45
+    expect(calculateStudentLoan(50000, "plan4")).toBe(1674.45);
   });
 
   it("calculates Plan 5 repayment correctly", () => {

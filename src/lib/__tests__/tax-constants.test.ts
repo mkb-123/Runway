@@ -29,9 +29,9 @@ describe("UK_TAX_CONSTANTS", () => {
   });
 
   it("has correct student loan thresholds", () => {
-    expect(UK_TAX_CONSTANTS.studentLoan.plan1.threshold).toBe(22015);
+    expect(UK_TAX_CONSTANTS.studentLoan.plan1.threshold).toBe(24990);
     expect(UK_TAX_CONSTANTS.studentLoan.plan2.threshold).toBe(27295);
-    expect(UK_TAX_CONSTANTS.studentLoan.plan4.threshold).toBe(27660);
+    expect(UK_TAX_CONSTANTS.studentLoan.plan4.threshold).toBe(31395);
     expect(UK_TAX_CONSTANTS.studentLoan.plan5.threshold).toBe(25000);
     expect(UK_TAX_CONSTANTS.studentLoan.postgrad.threshold).toBe(21000);
     expect(UK_TAX_CONSTANTS.studentLoan.postgrad.rate).toBe(0.06);

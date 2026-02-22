@@ -371,3 +371,62 @@ The bridge calculation uses flat `years * annualSpend` without investment growth
 The field name suggests an annual saving, but it actually represents the total CGT that would be payable on the full unrealised gain — a one-time crystallised avoidance, not an annual figure.
 
 ---
+
+### BUG-025: Student loan Plan 1 and Plan 4 thresholds were wrong (2023/24 values) [CLOSED]
+
+**Status:** CLOSED
+**Reported by:** Financial Advisor (Audit)
+**Severity:** HIGH
+**Resolved:** Updated `tax-constants.ts`: Plan 1 threshold 22,015 → 24,990, Plan 4 threshold 27,660 → 31,395 to match HMRC 2024/25 rates. Plan 1 borrowers were being overcharged ~£268/yr, Plan 4 ~£336/yr.
+
+---
+
+### BUG-026: Required pot does not account for tax on pension drawdown [MEDIUM]
+
+**Status:** OPEN
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/projections.ts`
+
+`calculateRequiredPot(annualIncome, rate)` returns `annualIncome / rate` assuming gross = net. In reality, pension drawdown is taxed (25% PCLS tax-free, 75% at income tax rates). A £40k target income requires a larger gross drawdown (~£47k for basic rate taxpayers), meaning the required pot is understated by 15-20%.
+
+---
+
+### BUG-027: RNRB not capped at property value [MEDIUM]
+
+**Status:** OPEN
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/iht.ts`
+
+The Residence Nil-Rate Band is applied at the full £175k per person regardless of actual property value. Per IHTA 1984 s.8FE, RNRB is limited to the lower of £175k and the property value passing to direct descendants. For a £150k property, the RNRB should be £150k, not £175k.
+
+---
+
+### BUG-028: IHT gift taper relief not modelled [MEDIUM]
+
+**Status:** OPEN
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/iht.ts`
+
+Gifts within 7 years are applied in full against NRB. Per IHTA 1984 s.7(4), gifts 3-7 years old benefit from taper relief: 3-4yr = 80%, 4-5yr = 60%, 5-6yr = 40%, 6-7yr = 20% of the IHT rate. Current model overstates IHT for older gifts.
+
+---
+
+### BUG-029: Bed & ISA recommendation always uses higher CGT rate [MEDIUM]
+
+**Status:** OPEN
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/recommendations.ts`
+
+`estimatedCGT = taxableGain * higherRate (24%)` regardless of the person's actual tax band. Basic rate taxpayers should use 18%. This overstates CGT cost for basic rate taxpayers.
+
+---
+
+### BUG-030: Relief at source not accounted for in CGT rate determination [LOW]
+
+**Status:** OPEN
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/cgt.ts`
+
+`determineCgtRate` does not account for the basic rate band extension from relief at source pension contributions. Could incorrectly assign higher CGT rate to someone whose extended basic rate band covers their gains.
+
+---
