@@ -655,6 +655,13 @@ describe("resolveMetricData", () => {
     expect(result.iconKey).toBe("shield");
   });
 
+  it("resolves investable_net_worth metric", () => {
+    const result = resolveMetricData("investable_net_worth", heroData);
+    expect(result.label).toBe("Investable Assets");
+    expect(result.iconKey).toBe("banknote");
+    expect(result.rawValue).toBe(heroData.investableNetWorth);
+  });
+
   it("returns a valid fallback for unknown metric types", () => {
     // Test the default branch with a cast
     const result = resolveMetricData("unknown_type" as never, heroData);

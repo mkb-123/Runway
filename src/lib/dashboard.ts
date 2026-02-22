@@ -9,7 +9,7 @@
 // period change attribution (REC-H).
 
 import type { HouseholdData, NetWorthSnapshot, HeroMetricType } from "@/types";
-import { annualiseOutgoing, getHouseholdGrossIncome, getPersonGrossIncome } from "@/types";
+import { annualiseOutgoing, getHouseholdGrossIncome, getPersonGrossIncome, getTotalPropertyEquity, getPropertyEquity } from "@/types";
 import {
   calculateRetirementCountdown,
   calculateAdjustedRequiredPot,
@@ -71,6 +71,10 @@ export interface HeroMetricData {
   isPersonView: boolean;
   /** IHT liability (£) based on current estate value, persons, gifts, and RNRB eligibility */
   ihtLiability: number;
+  /** Investable net worth (accounts only, excluding property) */
+  investableNetWorth: number;
+  /** Total property equity */
+  totalPropertyEquity: number;
 }
 
 /** REC-E: Upcoming cash event */
@@ -261,6 +265,12 @@ export function computeHeroData(
     monthlyContributionRate: totalContrib / 12,
     isPersonView,
     ihtLiability: ihtResult.ihtLiability,
+    investableNetWorth: totalNetWorth,
+    totalPropertyEquity: personId
+      ? household.properties
+          .filter((p) => p.ownerPersonIds.includes(personId))
+          .reduce((sum, p) => sum + getPropertyEquity(p) / Math.max(1, p.ownerPersonIds.length), 0)
+      : getTotalPropertyEquity(household.properties),
   };
 }
 
@@ -876,6 +886,21 @@ export function resolveMetricData(
                 ? "text-emerald-600 dark:text-emerald-400"
                 : "",
         iconKey: "shield",
+      };
+    }
+    case "investable_net_worth": {
+      const investable = data.investableNetWorth;
+      const propertyEquity = data.totalPropertyEquity;
+      return {
+        label: "Investable Assets",
+        value: formatCompact(investable),
+        rawValue: investable,
+        format: formatCompact,
+        subtext: propertyEquity > 0
+          ? `excl. ${formatCompact(propertyEquity)} property equity`
+          : "liquid financial assets",
+        color: "",
+        iconKey: "banknote",
       };
     }
     default:

@@ -147,7 +147,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (630 tests)
+- **Testing:** Vitest + Testing Library (656 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
@@ -358,6 +358,14 @@ Single source of truth. Never hardcode rates elsewhere.
 - `getRecommendationUrgency(recId) → RecommendationUrgency` — act_now / act_this_month / standing
 - Types: `HeroMetricData`, `CashEvent`, `StatusSentence`, `LifeStage`, `RecommendationUrgency`
 
+#### `property.ts` — Property & Mortgage Projection Engine
+- `projectPropertyEquity(property, years, now?) → PropertyProjectionYear[]` — value, mortgage, equity by year
+- `projectMortgageBalance(property, years, now?) → number[]` — annual mortgage balance with amortization
+- `generateAmortizationSchedule(property, now?) → MortgageAmortizationMonth[]` — monthly schedule
+- `projectTotalPropertyEquity(properties[], yearOffset, now?) → number` — combined equity at year N
+- `projectEstatePropertyValue(properties[], yearOffset, now?) → number` — for IHT projections
+- `calculateMortgagePayoffYears(property, now?) → number | null`
+
 #### `school-fees.ts` — School Fee Projections
 - `calculateSchoolStartDate(child)`, `calculateSchoolEndDate(child)`, `calculateSchoolYearsRemaining(child)`, `calculateTotalSchoolFeeCost(child)`, `generateSchoolFeeOutgoing(child) → CommittedOutgoing`, `generateSchoolFeeTimeline(children[]) → SchoolFeeTimelineYear[]`, `findLastSchoolFeeYear(children[])`
 
@@ -417,11 +425,11 @@ Single source of truth. Never hardcode rates elsewhere.
 
 ### src/types/index.ts — Domain Type Definitions
 
-**Enums:** `AccountType`, `TaxWrapper`, `StudentLoanPlan`, `PensionContributionMethod`, `OutgoingFrequency`, `CommittedOutgoingCategory`, `ContributionTarget`, `HeroMetricType` (includes `projected_retirement_income`)
+**Enums:** `AccountType`, `TaxWrapper`, `StudentLoanPlan`, `PensionContributionMethod`, `OutgoingFrequency`, `CommittedOutgoingCategory`, `ContributionTarget`, `HeroMetricType` (includes `projected_retirement_income`, `investable_net_worth`)
 
 **Core types:**
 - `Person` — id, name, relationship, dateOfBirth, plannedRetirementAge, pensionAccessAge, stateRetirementAge, niQualifyingYears, studentLoanPlan
-- `Property` — id, label, estimatedValue, ownerPersonIds[], mortgageBalance
+- `Property` — id, label, estimatedValue, ownerPersonIds[], mortgageBalance, appreciationRate?, mortgageRate?, mortgageTerm?, mortgageStartDate?
 - `Account` — id, personId, type (AccountType), provider, name, currentValue, costBasis?
 - `PersonIncome` — personId, grossSalary, employer/employeePensionContribution, pensionMethod, salaryGrowthRate, bonusGrowthRate, priorYearPensionContributions?
 - `BonusStructure` — personId, totalBonusAnnual, cashBonusAnnual, vestingYears, vestingGapYears, estimatedAnnualReturn
@@ -438,6 +446,8 @@ Single source of truth. Never hardcode rates elsewhere.
 - `getTotalPropertyEquity(properties[]) → number` — sum of equity across all properties
 - `getTotalPropertyValue(properties[]) → number` — sum of estimated values
 - `getTotalMortgageBalance(properties[]) → number` — sum of outstanding mortgages
+- `getMortgageRemainingMonths(property, now?) → number` — months left on mortgage term
+- `getAnnualMortgagePayment(property, now?) → number` — annuity-formula annual payment
 - `getAccountTaxWrapper(type) → TaxWrapper`
 - `isAccountAccessible(type) → boolean` — pension = inaccessible
 - `getDeferredBonus(bonus) → number` — `max(0, totalBonusAnnual - cashBonusAnnual)`
@@ -479,7 +489,8 @@ Single source of truth. Never hardcode rates elsewhere.
 | `planning-tab.tsx` | Planning | Target annual income (input + slider), withdrawal rate, state pension toggle, scenario growth rates |
 | `children-tab.tsx` | Children | Child name, DOB, school fee, inflation rate, start/end ages |
 | `commitments-tab.tsx` | Commitments | Committed outgoings (category, label, amount, frequency, dates), auto-synced school fees |
-| `iht-tab.tsx` | IHT | Property value, direct descendants toggle, gifts register |
+| `property-tab.tsx` | Property | Properties with CRUD, mortgage details (rate/term/start), appreciation rate, owner toggles |
+| `iht-tab.tsx` | IHT | Direct descendants toggle, gifts register (property summary links to Property tab) |
 | `accounts-tab.tsx` | (inline) | Account type, provider, name, balance, cost basis |
 | `emma-import-dialog.tsx` | — | Emma CSV import dialog: upload, review spending analysis, apply outgoings |
 | `field-helpers.tsx` | — | Shared form input components (currency, date, percentage fields) |
@@ -566,6 +577,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | `test-fixtures.ts` | Shared test fixture factories: `makeTestHousehold`, `makeEmptyHousehold`, `makePerson`, `makeProperty`, `makeAccount`, `makeIncome`, `makeSnapshot` — single source of truth for HouseholdData test objects |
 | `tax-constants.test.ts` | Constants structure validation |
 | `property.test.ts` | Property equity, mortgage balance, net worth with property, per-person split |
+| `property-projections.test.ts` | Property appreciation, mortgage amortization, payoff calculation, IHT integration with property growth |
 | `emma-import.test.ts` | CSV parsing, date/amount parsing, spending analysis, recurring payment detection, category classification |
 
 ### Key Data Flows

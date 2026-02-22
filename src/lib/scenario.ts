@@ -4,7 +4,7 @@
 // Extracted from scenario-context.tsx for testability.
 // Each override type has explicit merge semantics.
 
-import type { HouseholdData, Person, PersonIncome, Contribution, BonusStructure } from "@/types";
+import type { HouseholdData, Person, PersonIncome, Contribution, BonusStructure, Property } from "@/types";
 import { getPersonContributionTotals, getPersonGrossIncome } from "@/types";
 import { calculateIncomeTax, calculateNI } from "@/lib/tax";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
@@ -22,6 +22,13 @@ export interface ContributionOverride {
   giaContribution?: number;
 }
 
+export interface PropertyOverride {
+  propertyId: string;
+  estimatedValue?: number;
+  mortgageBalance?: number;
+  appreciationRate?: number;
+}
+
 export interface ScenarioOverrides {
   /** Partial person-level overrides (e.g. plannedRetirementAge), merged by personId */
   personOverrides?: PersonOverride[];
@@ -32,6 +39,8 @@ export interface ScenarioOverrides {
   accountValues?: Record<string, number>;
   /** Apply a percentage shock to all account values (e.g. -0.30 for a 30% crash) */
   marketShockPercent?: number;
+  /** Override property values (e.g. downsizing scenario) */
+  propertyOverrides?: PropertyOverride[];
 }
 
 // --- Core apply function ---
@@ -59,6 +68,7 @@ export function applyScenarioOverrides(
   result = applyContributionOverrides(result, overrides.contributionOverrides);
   result = applyRetirementOverrides(result, overrides.retirement);
   result = applyAccountOverrides(result, overrides.accountValues, overrides.marketShockPercent);
+  result = applyPropertyOverrides(result, overrides.propertyOverrides);
 
   return result;
 }
@@ -187,6 +197,27 @@ function applyAccountOverrides(
         return { ...acc, currentValue: Math.max(0, value) };
       }
       return acc;
+    }),
+  };
+}
+
+function applyPropertyOverrides(
+  household: HouseholdData,
+  propertyOverrides?: PropertyOverride[]
+): HouseholdData {
+  if (!propertyOverrides || propertyOverrides.length === 0) return household;
+
+  return {
+    ...household,
+    properties: household.properties.map((prop) => {
+      const override = propertyOverrides.find((o) => o.propertyId === prop.id);
+      if (!override) return prop;
+      return {
+        ...prop,
+        ...(override.estimatedValue !== undefined && { estimatedValue: override.estimatedValue }),
+        ...(override.mortgageBalance !== undefined && { mortgageBalance: override.mortgageBalance }),
+        ...(override.appreciationRate !== undefined && { appreciationRate: override.appreciationRate }),
+      };
     }),
   };
 }
@@ -429,6 +460,22 @@ export function generateScenarioDescription(
       if (co.pensionContribution !== undefined) items.push(`Pension ${formatCurrencyCompact(co.pensionContribution)}`);
       if (co.giaContribution !== undefined) items.push(`GIA ${formatCurrencyCompact(co.giaContribution)}`);
       if (items.length > 0) parts.push(`${person.name} contributions: ${items.join(", ")}`);
+    }
+  }
+
+  // Property overrides
+  if (overrides.propertyOverrides) {
+    for (const po of overrides.propertyOverrides) {
+      const prop = household.properties.find((p) => p.id === po.propertyId);
+      if (!prop) continue;
+      const items: string[] = [];
+      if (po.estimatedValue !== undefined && po.estimatedValue !== prop.estimatedValue) {
+        items.push(`value ${formatCurrencyCompact(prop.estimatedValue)} → ${formatCurrencyCompact(po.estimatedValue)}`);
+      }
+      if (po.mortgageBalance !== undefined && po.mortgageBalance !== prop.mortgageBalance) {
+        items.push(`mortgage ${formatCurrencyCompact(prop.mortgageBalance)} → ${formatCurrencyCompact(po.mortgageBalance)}`);
+      }
+      if (items.length > 0) parts.push(`${prop.label}: ${items.join(", ")}`);
     }
   }
 

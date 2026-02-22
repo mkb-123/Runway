@@ -14,7 +14,8 @@ import {
   calculateYearsUntilIHTExceeded,
   yearsSince,
 } from "@/lib/iht";
-import { getAccountTaxWrapper, annualiseContribution } from "@/types";
+import { projectTotalPropertyEquity } from "@/lib/property";
+import { getAccountTaxWrapper, annualiseContribution, getTotalPropertyEquity } from "@/types";
 import type { TaxWrapper } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -165,11 +166,19 @@ export default function IHTPage() {
       );
     // Use mid scenario growth rate for estate projection
     const midGrowthRate = getMidScenarioRate(household.retirement.scenarioRates, 0.05);
+    // Property equity projection function for estate growth (includes appreciation + amortization)
+    const currentPropertyEquity = getTotalPropertyEquity(household.properties);
+    const hasPropertyGrowth = household.properties.some((p) => p.appreciationRate || (p.mortgageRate && p.mortgageTerm));
+    const propertyEquityAtYear = hasPropertyGrowth
+      ? (year: number) => projectTotalPropertyEquity(household.properties, year)
+      : undefined;
     const yearsUntilExceeded = calculateYearsUntilIHTExceeded(
       inEstate,
       combinedThreshold,
       annualSavingsInEstate,
-      midGrowthRate
+      midGrowthRate,
+      propertyEquityAtYear,
+      currentPropertyEquity
     );
 
     // Data for the sheltered vs exposed pie chart
@@ -222,6 +231,7 @@ export default function IHTPage() {
       shelteredVsExposedData,
       estateBreakdown,
       numberOfPersons,
+      hasPropertyGrowth,
     };
   }, [household, filteredAccounts, selectedView]);
 
@@ -249,6 +259,7 @@ export default function IHTPage() {
     shelteredVsExposedData,
     estateBreakdown,
     numberOfPersons,
+    hasPropertyGrowth,
   } = ihtData;
 
   return (
@@ -350,6 +361,24 @@ export default function IHTPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* RNRB status note on property */}
+          {propertyValue > 0 && (
+            <div className="mt-4 rounded-lg border p-3 text-sm">
+              {ihtConfig.passingToDirectDescendants ? (
+                <p>
+                  <span className="font-medium">RNRB: {formatCurrency(UK_TAX_CONSTANTS.iht.residenceNilRateBand)}</span>
+                  {numberOfPersons > 1 && ` × ${numberOfPersons} = ${formatCurrency(UK_TAX_CONSTANTS.iht.residenceNilRateBand * numberOfPersons)}`}
+                  {" "}— estate passes to direct descendants, residence nil-rate band applies to property.
+                </p>
+              ) : (
+                <p className="text-muted-foreground">
+                  <span className="font-medium">RNRB: £0 (not applicable)</span>
+                  {" "}— estate is not passing to direct descendants. The £{(UK_TAX_CONSTANTS.iht.residenceNilRateBand / 1000).toFixed(0)}k residence nil-rate band does not apply.
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
       </CollapsibleSection>
@@ -577,6 +606,19 @@ export default function IHTPage() {
                 </div>
               </div>
 
+              {hasPropertyGrowth && (
+                <div className="rounded-lg border p-4 mb-4">
+                  <p className="text-sm text-muted-foreground">
+                    Property Appreciation
+                  </p>
+                  <p className="text-lg font-semibold tabular-nums">
+                    {household.properties.filter((p) => p.appreciationRate).map((p) =>
+                      `${p.label}: ${formatPercent(p.appreciationRate ?? 0)}/yr`
+                    ).join(", ") || "Mortgage amortization only"}
+                  </p>
+                </div>
+              )}
+
               <div className="rounded-lg border bg-muted/50 p-4">
                 {yearsUntilExceeded === 0 ? (
                   <p className="text-sm">
@@ -592,7 +634,9 @@ export default function IHTPage() {
                     At the current savings rate of{" "}
                     {formatCurrency(annualSavingsInEstate)} per year into
                     estate-exposed accounts, with assumed investment growth of{" "}
-                    {formatPercent(midGrowthRate)}/yr, your estate will exceed the{" "}
+                    {formatPercent(midGrowthRate)}/yr
+                    {hasPropertyGrowth && " and property appreciation"}
+                    , your estate will exceed the{" "}
                     {formatCurrency(combinedThreshold)} IHT threshold in
                     approximately{" "}
                     <span className="font-medium">
@@ -604,7 +648,9 @@ export default function IHTPage() {
                 ) : (
                   <p className="text-sm">
                     Even with assumed investment growth of{" "}
-                    {formatPercent(midGrowthRate)}/yr, your estate is projected
+                    {formatPercent(midGrowthRate)}/yr
+                    {hasPropertyGrowth && " and property appreciation"}
+                    , your estate is projected
                     to remain below the IHT threshold for the foreseeable future.
                   </p>
                 )}

@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from "recharts";
 import type { NetWorthSnapshot, TaxWrapper } from "@/types";
 import { TAX_WRAPPER_LABELS } from "@/types";
@@ -15,6 +16,8 @@ import { formatCurrencyAxis, formatCurrencyTooltip } from "@/lib/format";
 
 interface NetWorthHistoryChartProps {
   snapshots: NetWorthSnapshot[];
+  /** Date (ISO string like "2026-02") when property tracking was added, for annotation */
+  propertyAddedDate?: string;
 }
 
 const WRAPPER_ORDER: TaxWrapper[] = [
@@ -43,6 +46,7 @@ function formatDateLabel(dateStr: string): string {
 
 export function NetWorthHistoryChart({
   snapshots,
+  propertyAddedDate,
 }: NetWorthHistoryChartProps) {
   const chartData = snapshots.map((snapshot) => {
     const entry: Record<string, number | string> = {
@@ -102,6 +106,20 @@ export function NetWorthHistoryChart({
               TAX_WRAPPER_LABELS[value as TaxWrapper] ?? value
             }
           />
+
+          {propertyAddedDate && (
+            <ReferenceLine
+              x={formatDateLabel(propertyAddedDate)}
+              stroke="var(--border)"
+              strokeDasharray="4 4"
+              label={{
+                value: "Property added",
+                position: "top",
+                fill: "var(--muted-foreground)",
+                fontSize: 11,
+              }}
+            />
+          )}
 
           {WRAPPER_ORDER.map((wrapper) => (
             <Area
