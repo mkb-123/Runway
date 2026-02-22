@@ -82,6 +82,7 @@ interface HeroMetricData {
   totalAnnualCommitments: number;
   projectedRetirementIncome: number;
   projectedRetirementIncomeStatePension: number;
+  targetAnnualIncome: number;
   cashRunway: number;
 }
 
@@ -122,16 +123,17 @@ function resolveMetric(
     case "retirement_countdown": {
       const y = data.retirementCountdownYears;
       const m = data.retirementCountdownMonths;
+      const onTrack = y === 0 && m === 0;
       return {
         label: "Retirement",
-        value: y === 0 && m === 0 ? "On track" : `${y}y ${m}m`,
+        value: onTrack ? "On track" : `${y}y ${m}m`,
         rawValue: y * 12 + m,
         format: (n: number) => {
           if (n === 0) return "On track";
           return `${Math.floor(n / 12)}y ${n % 12}m`;
         },
-        subtext: y === 0 && m === 0 ? "Target pot reached" : "to target",
-        color: "",
+        subtext: onTrack ? "Target pot reached" : "to target",
+        color: onTrack ? "text-emerald-600 dark:text-emerald-400" : "",
         icon: Clock,
       };
     }
@@ -170,7 +172,11 @@ function resolveMetric(
         rawValue: data.savingsRate,
         format: (n: number) => `${n.toFixed(1)}%`,
         subtext: "of gross income",
-        color: "",
+        color: data.savingsRate >= 20
+          ? "text-emerald-600 dark:text-emerald-400"
+          : data.savingsRate < 10
+            ? "text-amber-600 dark:text-amber-400"
+            : "",
         icon: PiggyBank,
       };
     case "fire_progress":
@@ -180,7 +186,11 @@ function resolveMetric(
         rawValue: data.fireProgress,
         format: (n: number) => `${n.toFixed(1)}%`,
         subtext: "of target pot",
-        color: data.fireProgress >= 100 ? "text-emerald-600 dark:text-emerald-400" : "",
+        color: data.fireProgress >= 100
+          ? "text-emerald-600 dark:text-emerald-400"
+          : data.fireProgress < 25
+            ? "text-amber-600 dark:text-amber-400"
+            : "",
         icon: Target,
       };
     case "net_worth_after_commitments":
@@ -193,18 +203,28 @@ function resolveMetric(
         color: "",
         icon: Shield,
       };
-    case "projected_retirement_income":
+    case "projected_retirement_income": {
+      const target = data.targetAnnualIncome;
+      const projected = data.projectedRetirementIncome;
+      const incomeColor = target > 0 && projected >= target
+        ? "text-emerald-600 dark:text-emerald-400"
+        : target > 0 && projected < target * 0.5
+          ? "text-red-600 dark:text-red-400"
+          : target > 0 && projected < target * 0.75
+            ? "text-amber-600 dark:text-amber-400"
+            : "";
       return {
         label: "Retirement Income",
-        value: `${formatCurrencyCompact(data.projectedRetirementIncome)}/yr`,
-        rawValue: data.projectedRetirementIncome,
+        value: `${formatCurrencyCompact(projected)}/yr`,
+        rawValue: projected,
         format: (n: number) => `${formatCurrencyCompact(n)}/yr`,
         subtext: data.projectedRetirementIncomeStatePension > 0
           ? `incl. ${formatCurrencyCompact(data.projectedRetirementIncomeStatePension)} state pension`
           : "from projected pot at retirement",
-        color: "",
+        color: incomeColor,
         icon: Sunrise,
       };
+    }
     case "cash_runway": {
       const months = data.cashRunway;
       const color = months < 6 ? "text-red-600 dark:text-red-400" : months < 12 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
@@ -278,7 +298,7 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
             {rec.actionUrl && (
               <Link
                 href={rec.actionUrl}
-                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline py-1.5"
               >
                 Take action <ArrowRight className="size-3" />
               </Link>
@@ -542,6 +562,7 @@ export default function Home() {
       totalAnnualCommitments,
       projectedRetirementIncome,
       projectedRetirementIncomeStatePension,
+      targetAnnualIncome: household.retirement.targetAnnualIncome,
       cashRunway,
     }),
     [
@@ -550,7 +571,7 @@ export default function Home() {
       retirementCountdownYears, retirementCountdownMonths,
       savingsRate, fireProgress, totalAnnualCommitments,
       projectedRetirementIncome, projectedRetirementIncomeStatePension,
-      cashRunway,
+      household.retirement.targetAnnualIncome, cashRunway,
     ]
   );
 
@@ -571,6 +592,7 @@ export default function Home() {
       totalAnnualCommitments: baseCommitments,
       projectedRetirementIncome: baseProjectedRetirementIncome,
       projectedRetirementIncomeStatePension: baseProjectedRetirementIncomeStatePension,
+      targetAnnualIncome: baseHousehold.retirement.targetAnnualIncome,
       cashRunway: baseCashRunway,
     }),
     [
@@ -579,7 +601,7 @@ export default function Home() {
       baseRetCountdownYears, baseRetCountdownMonths,
       baseSavingsRate, baseFireProgress, baseCommitments,
       baseProjectedRetirementIncome, baseProjectedRetirementIncomeStatePension,
-      baseCashRunway,
+      baseHousehold.retirement.targetAnnualIncome, baseCashRunway,
     ]
   );
 
@@ -670,7 +692,7 @@ export default function Home() {
         <div className="relative rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
           <button
             onClick={dismissBanner}
-            className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
+            className="absolute right-3 top-3 rounded-md p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
             aria-label="Dismiss getting started banner"
           >
             <X className="size-4" />
@@ -726,9 +748,9 @@ export default function Home() {
           <div className="space-y-4">
             {/* Primary metric — the headline number */}
             <Card className="relative overflow-hidden border-primary/15 bg-gradient-to-br from-primary/10 via-primary/5 to-card">
-              <div className="pointer-events-none absolute -right-8 -top-8 size-40 rounded-full bg-primary/[0.04]" />
-              <div className="pointer-events-none absolute right-12 -bottom-6 size-24 rounded-full bg-primary/[0.03]" />
-              <CardContent className="relative pt-6 pb-5">
+              <div className="pointer-events-none absolute -right-8 -top-8 size-40 rounded-full bg-primary/[0.04] hidden sm:block" />
+              <div className="pointer-events-none absolute right-12 -bottom-6 size-24 rounded-full bg-primary/[0.03] hidden sm:block" />
+              <CardContent className="relative pt-4 pb-3 sm:pt-6 sm:pb-5">
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
@@ -740,7 +762,7 @@ export default function Home() {
                       </span>
                     </div>
                     <div className="flex items-baseline gap-3">
-                      <span className={`text-4xl sm:text-5xl font-bold tracking-tight tabular-nums ${primary.color}`}>
+                      <span className={`text-4xl sm:text-5xl font-bold tracking-tight leading-none tabular-nums ${primary.color}`}>
                         <ScenarioDelta base={basePrimary.rawValue} scenario={primary.rawValue} format={primary.format} />
                       </span>
                       {primary.trend === "up" && <TrendingUp className="size-6 text-emerald-500" />}
@@ -796,7 +818,7 @@ export default function Home() {
                   const baseMetric = baseSecondaryMetrics[i];
                   return (
                     <Card key={i} className="border-muted-foreground/10 transition-shadow duration-200 hover:shadow-md">
-                      <CardContent className="pt-4 pb-3">
+                      <CardContent className="pt-3 pb-2 sm:pt-4 sm:pb-3">
                         <div className="flex items-center gap-2 mb-1.5">
                           <div className="flex size-6 items-center justify-center rounded-md bg-muted">
                             <MetricIcon className="size-3.5 text-muted-foreground" />
