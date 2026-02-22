@@ -71,7 +71,6 @@ export default function ProjectionsPage() {
     if (totalGross <= 0) return 0;
     return household.income.reduce((s, i) => {
       const bonus = household.bonusStructures.find((b) => b.personId === i.personId);
-      const personGross = i.grossSalary + (bonus?.cashBonusAnnual ?? 0);
       const salaryWeight = i.grossSalary / totalGross;
       const bonusWeight = (bonus?.cashBonusAnnual ?? 0) / totalGross;
       return s + (i.salaryGrowthRate ?? 0) * salaryWeight + (i.bonusGrowthRate ?? 0) * bonusWeight;

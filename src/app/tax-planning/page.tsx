@@ -201,7 +201,7 @@ export default function TaxPlanningPage() {
           baseTotalUnrealisedGain,
         };
       }),
-    [persons, income, contributions, household.accounts, household.bonusStructures, isaAllowance, pensionAllowance, cgtAnnualExempt, baseIncomeLookup, baseHousehold.contributions, baseHousehold.accounts, baseHousehold.bonusStructures]
+    [persons, income, contributions, household.accounts, household.bonusStructures, isaAllowance, cgtAnnualExempt, baseIncomeLookup, baseHousehold.contributions, baseHousehold.accounts, baseHousehold.bonusStructures]
   );
 
   // Pension modelling scenarios

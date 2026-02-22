@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   generateLifetimeCashFlow,
   calculateExpenditure,
-  type LifetimeCashFlowYear,
 } from "@/lib/lifetime-cashflow";
 import type { HouseholdData, CommittedOutgoing } from "@/types";
 

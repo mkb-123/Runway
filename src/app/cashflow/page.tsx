@@ -125,6 +125,17 @@ export default function CashFlowPage() {
     return { currentYear, shortfallYears };
   }, [baseData]);
 
+  // School fee timeline data (must be above early returns to satisfy rules-of-hooks)
+  const schoolFeeTimeline = useMemo(
+    () => generateSchoolFeeTimeline(household.children),
+    [household.children]
+  );
+  const lastSchoolFeeYear = useMemo(
+    () => findLastSchoolFeeYear(household.children),
+    [household.children]
+  );
+  const hasSchoolFees = household.children.length > 0 && household.children.some((c) => c.schoolFeeAnnual > 0);
+
   if (filteredHousehold.persons.length === 0) {
     return (
       <div className="space-y-8">
@@ -142,17 +153,6 @@ export default function CashFlowPage() {
       </div>
     );
   }
-
-  // School fee timeline data
-  const schoolFeeTimeline = useMemo(
-    () => generateSchoolFeeTimeline(household.children),
-    [household.children]
-  );
-  const lastSchoolFeeYear = useMemo(
-    () => findLastSchoolFeeYear(household.children),
-    [household.children]
-  );
-  const hasSchoolFees = household.children.length > 0 && household.children.some((c) => c.schoolFeeAnnual > 0);
 
   const primaryPerson = filteredHousehold.persons.find((p) => p.relationship === "self") ?? filteredHousehold.persons[0];
   const currentAge = calculateAge(primaryPerson.dateOfBirth);

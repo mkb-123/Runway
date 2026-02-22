@@ -16,6 +16,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import type { ReactNode } from "react";
 
@@ -40,31 +41,34 @@ export function usePrivacy() {
   return useContext(PrivacyContext);
 }
 
+/** Read initial blur state from localStorage. SSR-safe snapshot. */
+function getInitialBlurred(): boolean {
+  if (typeof window === "undefined") return false;
+  const stored = localStorage.getItem(STORAGE_KEY);
+  const lastVisit = localStorage.getItem(LAST_VISIT_KEY);
+  const now = Date.now();
+
+  // If not opened in a while, default to blurred
+  if (lastVisit) {
+    const elapsed = now - Number(lastVisit);
+    if (elapsed > STALE_VISIT_MS) return true;
+  }
+
+  return stored === "true";
+}
+
+// Subscribe helper — initial state is read once, no external subscription needed
+const noopSubscribe = () => () => {};
+
 export function PrivacyProvider({ children }: { children: ReactNode }) {
-  const [blurred, setBlurredState] = useState(false);
+  // useSyncExternalStore avoids the setState-in-effect pattern for SSR-safe reads
+  const initialBlurred = useSyncExternalStore(noopSubscribe, getInitialBlurred, () => false);
+  const [blurred, setBlurredState] = useState(initialBlurred);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Initialise from localStorage
+  // Record this visit on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    const lastVisit = localStorage.getItem(LAST_VISIT_KEY);
-    const now = Date.now();
-
-    // If not opened in a while, default to blurred
-    if (lastVisit) {
-      const elapsed = now - Number(lastVisit);
-      if (elapsed > STALE_VISIT_MS) {
-        setBlurredState(true);
-        return;
-      }
-    }
-
-    if (stored === "true") {
-      setBlurredState(true);
-    }
-
-    // Record this visit
-    localStorage.setItem(LAST_VISIT_KEY, String(now));
+    localStorage.setItem(LAST_VISIT_KEY, String(Date.now()));
   }, []);
 
   // Sync to DOM and localStorage

@@ -1,26 +1,36 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { TAX_YEAR, TAX_YEAR_END } from "@/lib/tax-constants";
 import { AlertTriangle, X } from "lucide-react";
 
+/** Check if the tax year is stale (current date >= tax year end). SSR-safe. */
+function getIsStale(): boolean {
+  if (typeof window === "undefined") return false;
+  return new Date() >= new Date(TAX_YEAR_END);
+}
+
+/** Check if banner was dismissed this session. SSR-safe. */
+function getIsDismissed(): boolean {
+  if (typeof window === "undefined") return false;
+  const key = `nw-tax-year-dismissed-${TAX_YEAR}`;
+  try {
+    return sessionStorage.getItem(key) === "true";
+  } catch {
+    return false;
+  }
+}
+
+// Subscribe helper that never changes (no external store changes to listen to)
+const noop = () => () => {};
+
 export function TaxYearBanner() {
-  const [isStale, setIsStale] = useState(false);
+  // useSyncExternalStore avoids the setState-in-effect pattern for SSR-safe reads
+  const isStale = useSyncExternalStore(noop, getIsStale, () => false);
+  const wasDismissedOnMount = useSyncExternalStore(noop, getIsDismissed, () => false);
   const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
-    const now = new Date();
-    const endDate = new Date(TAX_YEAR_END);
-    setIsStale(now >= endDate);
-
-    // Check if dismissed this session
-    const key = `nw-tax-year-dismissed-${TAX_YEAR}`;
-    if (sessionStorage.getItem(key) === "true") {
-      setDismissed(true);
-    }
-  }, []);
-
-  if (!isStale || dismissed) return null;
+  if (!isStale || dismissed || wasDismissedOnMount) return null;
 
   function handleDismiss() {
     setDismissed(true);

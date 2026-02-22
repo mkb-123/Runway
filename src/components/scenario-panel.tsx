@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/sheet";
 import { useScenario, type ScenarioOverrides } from "@/context/scenario-context";
 import { useData } from "@/context/data-context";
-import { getPersonContributionTotals, getPersonGrossIncome, isAccountAccessible } from "@/types";
+import { getPersonContributionTotals, getPersonGrossIncome } from "@/types";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/format";
 import { calculateAge, projectFinalValue, calculateSWR, calculateProRataStatePension } from "@/lib/projections";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
@@ -45,7 +45,6 @@ import {
   scaleSavingsRateContributions,
   calculateScenarioImpact,
   buildAvoidTaperPreset,
-  type ImpactPreview,
 } from "@/lib/scenario";
 
 // --- Smart Presets ---
@@ -360,7 +359,7 @@ export function ScenarioPanel() {
     }
 
     enableScenario("Custom Scenario", newOverrides);
-  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, totalGrossIncome, contribsByPerson, retirementAgeOverrides, targetIncomeOverride, enableScenario]);
+  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, totalGrossIncome, retirementAgeOverrides, targetIncomeOverride, enableScenario]);
 
   const applyPreset = useCallback(
     (preset: SmartPreset) => {
