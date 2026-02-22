@@ -374,7 +374,7 @@ export default function IHTPage() {
               ) : (
                 <p className="text-muted-foreground">
                   <span className="font-medium">RNRB: £0 (not applicable)</span>
-                  {" "}— estate is not passing to direct descendants. The £{(UK_TAX_CONSTANTS.iht.residenceNilRateBand / 1000).toFixed(0)}k residence nil-rate band does not apply.
+                  {" "}— no direct descendants. The £{(UK_TAX_CONSTANTS.iht.residenceNilRateBand / 1000).toFixed(0)}k residence nil-rate band does not apply, reducing your threshold by {formatCurrency(UK_TAX_CONSTANTS.iht.residenceNilRateBand * numberOfPersons)}.
                 </p>
               )}
             </div>

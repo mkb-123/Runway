@@ -107,6 +107,19 @@ const SMART_PRESETS: SmartPreset[] = [
     icon: TrendingDown,
     getOverrides: () => ({ marketShockPercent: -0.5 }),
   },
+  {
+    id: "downsize",
+    label: "Downsize Property",
+    description: "Reduce property value by ~30% and clear mortgage",
+    icon: Home,
+    getOverrides: (household) => ({
+      propertyOverrides: household.properties.map((prop) => ({
+        propertyId: prop.id,
+        estimatedValue: Math.round(prop.estimatedValue * 0.7),
+        mortgageBalance: 0,
+      })),
+    }),
+  },
 ];
 
 // --- Collapsible Section ---
@@ -525,7 +538,9 @@ export function ScenarioPanel() {
               Quick Scenarios
             </h3>
             <div className="grid grid-cols-1 gap-2">
-              {SMART_PRESETS.map((preset) => {
+              {SMART_PRESETS.filter((preset) =>
+                preset.id !== "downsize" || household.properties.length > 0
+              ).map((preset) => {
                 const Icon = preset.icon;
                 return (
                   <button

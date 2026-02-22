@@ -107,7 +107,7 @@ export function PropertyTab({ household, updateHousehold }: PropertyTabProps) {
                     />
                   )}
                   {renderField(
-                    "Estimated Value",
+                    "Current Market Value",
                     <Input
                       type="number"
                       step="1000"
@@ -117,7 +117,7 @@ export function PropertyTab({ household, updateHousehold }: PropertyTabProps) {
                       }
                       placeholder="0"
                     />,
-                    "Current market value"
+                    "What you believe the property is worth today"
                   )}
                   {renderField(
                     "Annual Appreciation Rate (%)",
@@ -130,7 +130,7 @@ export function PropertyTab({ household, updateHousehold }: PropertyTabProps) {
                       }
                       placeholder="e.g. 3.0"
                     />,
-                    "Expected annual property price growth"
+                    "UK average ~3-4%, London ~4-5%"
                   )}
                 </div>
 
