@@ -277,39 +277,48 @@ const priorityConfig: Record<
 
 function RecommendationCard({ rec }: { rec: Recommendation }) {
   const config = priorityConfig[rec.priority];
+  const content = (
+    <div className="flex items-start gap-3">
+      <Lightbulb className={`mt-0.5 size-4 shrink-0 ${config.color}`} />
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold">{rec.title}</h3>
+          <Badge variant="outline" className={`text-[10px] ${config.color}`}>
+            {config.label}
+          </Badge>
+          {rec.personName && (
+            <Badge variant="secondary" className="text-[10px]">
+              {rec.personName}
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">{rec.description}</p>
+        {rec.plainAction && (
+          <p className="text-xs text-foreground/80 italic">{rec.plainAction}</p>
+        )}
+        <p className="text-xs font-medium">{rec.impact}</p>
+        {rec.actionUrl && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+            Take action <ArrowRight className="size-3" />
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  if (rec.actionUrl) {
+    return (
+      <Link href={rec.actionUrl} className="block">
+        <Card className={`border ${config.border} ${config.bg} transition-shadow hover:shadow-md active:shadow-sm`}>
+          <CardContent className="py-4">{content}</CardContent>
+        </Card>
+      </Link>
+    );
+  }
+
   return (
     <Card className={`border ${config.border} ${config.bg}`}>
-      <CardContent className="py-3">
-        <div className="flex items-start gap-3">
-          <Lightbulb className={`mt-0.5 size-4 shrink-0 ${config.color}`} />
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-semibold">{rec.title}</h3>
-              <Badge variant="outline" className={`text-[10px] ${config.color}`}>
-                {config.label}
-              </Badge>
-              {rec.personName && (
-                <Badge variant="secondary" className="text-[10px]">
-                  {rec.personName}
-                </Badge>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">{rec.description}</p>
-            {rec.plainAction && (
-              <p className="text-xs text-foreground/80 italic">{rec.plainAction}</p>
-            )}
-            <p className="text-xs font-medium">{rec.impact}</p>
-            {rec.actionUrl && (
-              <Link
-                href={rec.actionUrl}
-                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline py-1.5"
-              >
-                Take action <ArrowRight className="size-3" />
-              </Link>
-            )}
-          </div>
-        </div>
-      </CardContent>
+      <CardContent className="py-4">{content}</CardContent>
     </Card>
   );
 }
@@ -927,20 +936,8 @@ export default function Home() {
         </CollapsibleSection>
       )}
 
-      {/* PRIMARY CHARTS — 2-col on desktop, with accent top border */}
+      {/* PRIMARY CHARTS — trajectory first (more actionable), wrapper second */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="border-t border-t-primary/20">
-          <CardHeader>
-            <div className="flex items-baseline justify-between">
-              <CardTitle>Net Worth by Wrapper</CardTitle>
-              <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <WrapperSplitChart data={byWrapper} />
-          </CardContent>
-        </Card>
-
         <Card className="border-t border-t-primary/20">
           <CardHeader>
             <div className="flex items-baseline justify-between">
@@ -955,6 +952,18 @@ export default function Home() {
             <p className="mt-3 text-[11px] text-muted-foreground">
               Projections are estimates, not guarantees. Capital is at risk. Past performance does not predict future returns.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-t border-t-primary/20">
+          <CardHeader>
+            <div className="flex items-baseline justify-between">
+              <CardTitle>Net Worth by Wrapper</CardTitle>
+              <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <WrapperSplitChart data={byWrapper} />
           </CardContent>
         </Card>
       </div>
