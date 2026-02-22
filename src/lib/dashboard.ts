@@ -225,7 +225,7 @@ export function computeHeroData(
   const estateValue = estateAccountsValue + household.iht.estimatedPropertyValue;
   const numberOfPersons = household.persons.length;
   const giftsWithin7Years = household.iht.gifts
-    .filter((g) => yearsSince(g.date) <= 7)
+    .filter((g) => yearsSince(g.date) < 7)
     .reduce((s, g) => s + g.amount, 0);
   const ihtResult = calculateIHT(
     estateValue,

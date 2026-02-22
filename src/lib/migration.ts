@@ -168,7 +168,10 @@ function migrateDashboardConfigDefault(data: Record<string, unknown>): Record<st
 }
 
 /**
- * Migration 6: Add plannedRetirementAge and default niQualifyingYears to persons
+ * Migration 6: Add default values for person fields added over time.
+ * Handles: plannedRetirementAge, niQualifyingYears, studentLoanPlan,
+ *          pensionAccessAge, stateRetirementAge.
+ * All checks are idempotent — already-set values are preserved.
  */
 function migratePersonDefaults(data: Record<string, unknown>): Record<string, unknown> {
   const persons = data.persons;
@@ -179,14 +182,25 @@ function migratePersonDefaults(data: Record<string, unknown>): Record<string, un
     const person = p as Record<string, unknown>;
     const result = { ...person };
 
-    // Default plannedRetirementAge if missing
     if (typeof result.plannedRetirementAge !== "number") {
       result.plannedRetirementAge = 60;
     }
 
-    // Default niQualifyingYears to full if missing
     if (typeof result.niQualifyingYears !== "number") {
       result.niQualifyingYears = 35;
+    }
+
+    if (typeof result.studentLoanPlan !== "string") {
+      result.studentLoanPlan = "none";
+    }
+
+    // pensionAccessAge and stateRetirementAge were added later — back-fill UK defaults
+    if (typeof result.pensionAccessAge !== "number") {
+      result.pensionAccessAge = 57;
+    }
+
+    if (typeof result.stateRetirementAge !== "number") {
+      result.stateRetirementAge = 67;
     }
 
     return result;

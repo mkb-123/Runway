@@ -66,7 +66,11 @@ export default function TaxPlanningPage() {
 
   const currentTaxYear = (() => {
     const now = new Date();
-    const y = now.getMonth() >= 3 && now.getDate() > 5 ? now.getFullYear() : now.getFullYear() - 1;
+    const month = now.getMonth(); // 0-indexed: 3 = April
+    const day = now.getDate();
+    // UK tax year starts 6 April. After 5 Apr = new year; before 6 Apr = previous year.
+    const pastTaxYearStart = month > 3 || (month === 3 && day >= 6);
+    const y = pastTaxYearStart ? now.getFullYear() : now.getFullYear() - 1;
     return `${y}/${(y + 1) % 100}`;
   })();
   const isaAllowance = UK_TAX_CONSTANTS.isaAnnualAllowance;

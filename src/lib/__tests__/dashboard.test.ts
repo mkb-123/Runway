@@ -361,6 +361,30 @@ describe("computeHeroData", () => {
       const noGiftResult = computeHeroData(hNoGift, [], "household");
       expect(oldGiftResult.ihtLiability).toBe(noGiftResult.ihtLiability);
     });
+
+    it("treats a gift at exactly 7 years as fallen-out (< 7 boundary)", () => {
+      // A gift made exactly 7 years ago should NOT count against the NRB.
+      // yearsSince uses 365.25-day years; we subtract just over 7 years of ms.
+      const now = new Date();
+      const sevenYearsMs = 7 * 365.25 * 24 * 60 * 60 * 1000;
+      const justOver7YearsAgo = new Date(now.getTime() - sevenYearsMs - 1000);
+      const hBoundaryGift = makeHousehold({
+        persons: [makeHousehold().persons[0]],
+        iht: {
+          estimatedPropertyValue: 1_500_000,
+          passingToDirectDescendants: false,
+          gifts: [{ id: "g1", date: justOver7YearsAgo.toISOString().split("T")[0], amount: 100_000, recipient: "Nephew", description: "Boundary gift" }],
+        },
+      });
+      const hNoGift = makeHousehold({
+        persons: [makeHousehold().persons[0]],
+        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+      });
+      const boundaryResult = computeHeroData(hBoundaryGift, [], "household");
+      const noGiftResult = computeHeroData(hNoGift, [], "household");
+      // Gift at >= 7 years should not erode NRB
+      expect(boundaryResult.ihtLiability).toBe(noGiftResult.ihtLiability);
+    });
   });
 });
 

@@ -273,7 +273,7 @@ Single source of truth. Never hardcode rates elsewhere.
   3. Ensure `monthlyLifestyleSpending` in emergencyFund
   4. Default `committedOutgoings[]`
   5. Default `dashboardConfig`
-  6. Default `plannedRetirementAge` + `niQualifyingYears` on persons
+  6. Default `plannedRetirementAge`, `niQualifyingYears`, `studentLoanPlan`, `pensionAccessAge`, `stateRetirementAge` on persons
   7. `deferredTranches[] → deferredBonusAnnual` (simplified)
   8. Default `children[]`
   9. `deferredBonusAnnual → totalBonusAnnual` (total model)
@@ -286,9 +286,9 @@ Single source of truth. Never hardcode rates elsewhere.
 **Enums:** `AccountType`, `TaxWrapper`, `StudentLoanPlan`, `PensionContributionMethod`, `OutgoingFrequency`, `CommittedOutgoingCategory`, `ContributionTarget`, `HeroMetricType` (includes `projected_retirement_income`)
 
 **Core types:**
-- `Person` — id, name, relationship, dateOfBirth, plannedRetirementAge, niQualifyingYears, studentLoanPlan?
+- `Person` — id, name, relationship, dateOfBirth, plannedRetirementAge, pensionAccessAge, stateRetirementAge, niQualifyingYears, studentLoanPlan
 - `Account` — id, personId, type (AccountType), provider, name, currentValue, costBasis?
-- `PersonIncome` — personId, grossSalary, employer/employeePensionContribution, pensionMethod, salaryGrowthRate, bonusGrowthRate
+- `PersonIncome` — personId, grossSalary, employer/employeePensionContribution, pensionMethod, salaryGrowthRate, bonusGrowthRate, priorYearPensionContributions?
 - `BonusStructure` — personId, totalBonusAnnual, cashBonusAnnual, vestingYears, vestingGapYears, estimatedAnnualReturn
 - `DeferredBonusTranche` — grantDate, vestingDate, amount, estimatedAnnualReturn
 - `Contribution` — id, personId, label, target (isa|pension|gia), amount, frequency

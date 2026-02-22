@@ -55,10 +55,12 @@ export const PersonSchema = z.object({
   relationship: RelationshipSchema,
   dateOfBirth: z.string(),
   plannedRetirementAge: z.number().int().min(0).max(120).default(60),
-  pensionAccessAge: z.number().int().min(0).max(120),
-  stateRetirementAge: z.number().int().min(0).max(120),
+  // Default 57: minimum pension access age from April 2028 (was 55, rises to 57)
+  pensionAccessAge: z.number().int().min(0).max(120).default(57),
+  // Default 67: current state pension age for those born after April 1960
+  stateRetirementAge: z.number().int().min(0).max(120).default(67),
   niQualifyingYears: z.number().int().min(0).max(100).default(35),
-  studentLoanPlan: StudentLoanPlanSchema,
+  studentLoanPlan: StudentLoanPlanSchema.default("none"),
 });
 
 export const AccountSchema = z.object({
@@ -98,6 +100,7 @@ export const PersonIncomeSchema = z.object({
   pensionContributionMethod: PensionContributionMethodSchema,
   salaryGrowthRate: z.number().min(-0.5).max(0.5).optional(),
   bonusGrowthRate: z.number().min(-0.5).max(0.5).optional(),
+  priorYearPensionContributions: z.array(z.number().min(0)).max(3).optional(),
 });
 
 // --- Contributions & Planning ---
