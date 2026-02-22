@@ -218,11 +218,14 @@ export function computeHeroData(
   });
 
   // --- IHT liability (household-level, always computed against full estate) ---
-  // In-estate assets: all non-pension accounts + estimated property value
+  // In-estate assets: all non-pension accounts + property equity (value - mortgage)
   const estateAccountsValue = household.accounts
     .filter((a) => a.type !== "workplace_pension" && a.type !== "sipp")
     .reduce((s, a) => s + a.currentValue, 0);
-  const estateValue = estateAccountsValue + household.iht.estimatedPropertyValue;
+  const propertyEquity = household.properties.reduce(
+    (s, p) => s + Math.max(0, p.estimatedValue - p.mortgageBalance), 0
+  );
+  const estateValue = estateAccountsValue + propertyEquity;
   const numberOfPersons = household.persons.length;
   const giftsWithin7Years = household.iht.gifts
     .filter((g) => yearsSince(g.date) < 7)

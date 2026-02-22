@@ -88,8 +88,9 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
       targetMonths: 6,
       monthlyLifestyleSpending: 2000,
     },
+    properties: [{ id: "prop-1", label: "Family Home", estimatedValue: 600000, ownerPersonIds: ["p1", "p2"], mortgageBalance: 0 }],
     iht: {
-      estimatedPropertyValue: 600000,
+      estimatedPropertyValue: 0,
       passingToDirectDescendants: true,
       gifts: [],
     },
@@ -298,7 +299,8 @@ describe("computeHeroData", () => {
           { id: "a3", personId: "p1", type: "stocks_and_shares_isa" as const, provider: "Vanguard", name: "ISA", currentValue: 200_000 },
           { id: "a4", personId: "p1", type: "cash_savings" as const, provider: "Marcus", name: "Cash", currentValue: 50_000 },
         ],
-        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
       });
       const result = computeHeroData(h, [], "household");
       // Non-pension accounts: ISA 200k + cash 50k = 250k; estate = 250k + 1500k = 1750k
@@ -313,6 +315,7 @@ describe("computeHeroData", () => {
           { id: "a1", personId: "p1", type: "sipp", provider: "AJ Bell", name: "SIPP", currentValue: 2_000_000 },
           { id: "a2", personId: "p1", type: "cash_savings", provider: "Marcus", name: "Cash", currentValue: 50_000 },
         ],
+        properties: [],
         iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
       });
       const result = computeHeroData(h, [], "household");
@@ -326,15 +329,17 @@ describe("computeHeroData", () => {
       recentDate.setFullYear(recentDate.getFullYear() - 3);
       const hWithGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
         iht: {
-          estimatedPropertyValue: 1_500_000,
+          estimatedPropertyValue: 0,
           passingToDirectDescendants: false,
           gifts: [{ id: "g1", date: recentDate.toISOString().split("T")[0], amount: 100_000, recipient: "Nephew", description: "Gift" }],
         },
       });
       const hNoGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
-        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
       });
       const withGift = computeHeroData(hWithGift, [], "household");
       const noGift = computeHeroData(hNoGift, [], "household");
@@ -348,15 +353,17 @@ describe("computeHeroData", () => {
       oldDate.setFullYear(oldDate.getFullYear() - 8);
       const hOldGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
         iht: {
-          estimatedPropertyValue: 1_500_000,
+          estimatedPropertyValue: 0,
           passingToDirectDescendants: false,
           gifts: [{ id: "g1", date: oldDate.toISOString().split("T")[0], amount: 100_000, recipient: "Nephew", description: "Old gift" }],
         },
       });
       const hNoGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
-        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
       });
       const oldGiftResult = computeHeroData(hOldGift, [], "household");
       const noGiftResult = computeHeroData(hNoGift, [], "household");
@@ -371,15 +378,17 @@ describe("computeHeroData", () => {
       const justOver7YearsAgo = new Date(now.getTime() - sevenYearsMs - 1000);
       const hBoundaryGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
         iht: {
-          estimatedPropertyValue: 1_500_000,
+          estimatedPropertyValue: 0,
           passingToDirectDescendants: false,
           gifts: [{ id: "g1", date: justOver7YearsAgo.toISOString().split("T")[0], amount: 100_000, recipient: "Nephew", description: "Boundary gift" }],
         },
       });
       const hNoGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
-        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
       });
       const boundaryResult = computeHeroData(hBoundaryGift, [], "household");
       const noGiftResult = computeHeroData(hNoGift, [], "household");

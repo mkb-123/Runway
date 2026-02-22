@@ -219,8 +219,17 @@
     "targetMonths": 6,
     "monthlyLifestyleSpending": 2800
   },
+  "properties": [
+    {
+      "id": "property-1",
+      "label": "Primary Residence",
+      "estimatedValue": 450000,
+      "ownerPersonIds": ["person-1", "person-2"],
+      "mortgageBalance": 280000
+    }
+  ],
   "iht": {
-    "estimatedPropertyValue": 450000,
+    "estimatedPropertyValue": 0,
     "passingToDirectDescendants": true,
     "gifts": [
       {

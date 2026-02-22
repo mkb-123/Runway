@@ -38,6 +38,7 @@ export function migrateHouseholdData(raw: Record<string, unknown>): Record<strin
   data = migrateChildrenDefault(data);
   data = migrateBonusTotalModel(data);
   data = migrateHeroMetricsFiveSlots(data);
+  data = migratePropertyFirstClass(data);
   return data;
 }
 
@@ -365,4 +366,51 @@ function migrateHeroMetricsFiveSlots(data: Record<string, unknown>): Record<stri
   // Only write back if changed
   if (JSON.stringify(working) === JSON.stringify(metrics)) return data;
   return { ...data, dashboardConfig: { ...dc, heroMetrics: working } };
+}
+
+/**
+ * Migration 11: Promote property from IHT scalar to first-class properties[].
+ *
+ * Old format:
+ *   iht: { estimatedPropertyValue: 450000, ... }
+ *   (no properties array)
+ *
+ * New format:
+ *   properties: [{ id, label, estimatedValue: 450000, ownerPersonIds, mortgageBalance: 0 }]
+ *   iht: { estimatedPropertyValue: 0, ... }
+ *
+ * If the old estimatedPropertyValue is 0 or missing, just ensures properties[] exists.
+ * Idempotent: if properties[] already exists, no-op.
+ */
+function migratePropertyFirstClass(data: Record<string, unknown>): Record<string, unknown> {
+  // Already migrated — has properties array
+  if (Array.isArray(data.properties)) return data;
+
+  const iht = data.iht as Record<string, unknown> | undefined;
+  const oldPropertyValue = typeof iht?.estimatedPropertyValue === "number" ? iht.estimatedPropertyValue : 0;
+
+  // Collect person IDs for joint ownership default
+  const persons = Array.isArray(data.persons) ? data.persons : [];
+  const ownerIds = persons
+    .filter((p: unknown) => typeof p === "object" && p !== null && typeof (p as Record<string, unknown>).id === "string")
+    .map((p: unknown) => (p as Record<string, unknown>).id as string);
+
+  if (oldPropertyValue > 0) {
+    // Create a property from the old scalar and zero out the IHT field
+    const properties = [{
+      id: "property-migrated-1",
+      label: "Primary Residence",
+      estimatedValue: oldPropertyValue,
+      ownerPersonIds: ownerIds,
+      mortgageBalance: 0,
+    }];
+    return {
+      ...data,
+      properties,
+      iht: { ...iht, estimatedPropertyValue: 0 },
+    };
+  }
+
+  // No old property value — just ensure the array exists
+  return { ...data, properties: [] };
 }

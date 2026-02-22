@@ -195,6 +195,16 @@ export const DashboardConfigSchema = z.object({
   heroMetrics: z.array(HeroMetricTypeSchema).min(1).max(5),
 });
 
+// --- Property & Mortgage ---
+
+export const PropertySchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  estimatedValue: z.number().min(0),
+  ownerPersonIds: z.array(z.string().min(1)).default([]),
+  mortgageBalance: z.number().min(0).default(0),
+});
+
 // --- IHT ---
 
 export const GiftSchema = z.object({
@@ -247,6 +257,7 @@ export const HouseholdDataSchema = z.object({
   contributions: z.array(ContributionSchema),
   retirement: RetirementConfigSchema,
   emergencyFund: EmergencyFundConfigSchema,
+  properties: z.array(PropertySchema).default([]),
   committedOutgoings: z.array(CommittedOutgoingSchema).default([]),
   dashboardConfig: DashboardConfigSchema.default({
     heroMetrics: ["projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway"],

@@ -58,7 +58,10 @@ export default function IHTPage() {
     const giaVal = wrapperTotals.get("gia") ?? 0;
     const cashVal = wrapperTotals.get("cash") ?? 0;
     const pbVal = wrapperTotals.get("premium_bonds") ?? 0;
-    const baseInEstate = baseHousehold.iht.estimatedPropertyValue + isaVal + giaVal + cashVal + pbVal;
+    const basePropertyEquity = baseHousehold.properties.reduce(
+      (s, p) => s + Math.max(0, p.estimatedValue - p.mortgageBalance), 0
+    );
+    const baseInEstate = basePropertyEquity + isaVal + giaVal + cashVal + pbVal;
     const numberOfPersons = selectedView === "household" ? baseHousehold.persons.length : 1;
     const giftsWithin7Years = baseHousehold.iht.gifts
       .filter((g) => yearsSince(g.date) < 7)
@@ -71,9 +74,11 @@ export default function IHTPage() {
     const baseAnnualSavingsInEstate = baseContribs
       .filter((c) => c.target === "isa" || c.target === "gia")
       .reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+    const basePropertyValue = baseHousehold.properties.reduce((s, p) => s + p.estimatedValue, 0);
+    const baseMortgageBalance = baseHousehold.properties.reduce((s, p) => s + p.mortgageBalance, 0);
     return {
       totalNetWorth: totalNW, inEstate: baseInEstate, taxableAmount: result.taxableAmount, ihtLiability: result.ihtLiability,
-      propertyValue: baseHousehold.iht.estimatedPropertyValue, isaValue: isaVal, giaValue: giaVal, cashValue: cashVal,
+      propertyValue: basePropertyValue, mortgageBalance: baseMortgageBalance, isaValue: isaVal, giaValue: giaVal, cashValue: cashVal,
       premiumBondsValue: pbVal, pensionValue: pensionVal, outsideEstate: pensionVal, annualSavingsInEstate: baseAnnualSavingsInEstate,
     };
   }, [baseHousehold, selectedView]);
@@ -98,11 +103,13 @@ export default function IHTPage() {
     const giaValue = wrapperTotals.get("gia") ?? 0;
     const cashValue = wrapperTotals.get("cash") ?? 0;
     const premiumBondsValue = wrapperTotals.get("premium_bonds") ?? 0;
-    const propertyValue = ihtConfig.estimatedPropertyValue;
+    const propertyValue = household.properties.reduce((s, p) => s + p.estimatedValue, 0);
+    const mortgageBalance = household.properties.reduce((s, p) => s + p.mortgageBalance, 0);
+    const propertyEquity = Math.max(0, propertyValue - mortgageBalance);
 
-    // Pensions are normally outside the estate
+    // Pensions are normally outside the estate; mortgage reduces estate
     const inEstate =
-      propertyValue + isaValue + giaValue + cashValue + premiumBondsValue;
+      propertyEquity + isaValue + giaValue + cashValue + premiumBondsValue;
     const outsideEstate = pensionValue;
 
     // --- 7-Year Gift Tracker ---
@@ -182,6 +189,7 @@ export default function IHTPage() {
     // Breakdown for estate composition
     const estateBreakdown = [
       { label: "Property", value: propertyValue, inEstate: true },
+      ...(mortgageBalance > 0 ? [{ label: "Mortgage", value: -mortgageBalance, inEstate: true }] : []),
       { label: "ISA", value: isaValue, inEstate: true },
       { label: "GIA", value: giaValue, inEstate: true },
       { label: "Cash Savings", value: cashValue, inEstate: true },
@@ -193,6 +201,7 @@ export default function IHTPage() {
       ihtConfig,
       totalNetWorth,
       propertyValue,
+      mortgageBalance,
       pensionValue,
       inEstate,
       outsideEstate,
@@ -220,6 +229,7 @@ export default function IHTPage() {
     ihtConfig,
     totalNetWorth,
     propertyValue,
+    mortgageBalance,
     inEstate,
     outsideEstate,
     nilRateBandPerPerson,
@@ -249,7 +259,8 @@ export default function IHTPage() {
 
       <SettingsBar label="IHT assumptions" settingsTab="iht">
         <Badge variant="secondary" className="text-xs">
-          Property: {formatCurrency(ihtData.propertyValue)}
+          Property: {formatCurrency(propertyValue)}
+          {mortgageBalance > 0 && ` (${formatCurrency(mortgageBalance)} mortgage)`}
         </Badge>
         <Badge variant="secondary" className="text-xs">
           {ihtData.ihtConfig.passingToDirectDescendants ? "RNRB applies" : "No RNRB"}
@@ -312,6 +323,7 @@ export default function IHTPage() {
                 {estateBreakdown.map((item) => {
                   const baseValueMap: Record<string, number> = {
                     "Property": baseIhtData.propertyValue,
+                    "Mortgage": -(baseIhtData.mortgageBalance ?? 0),
                     "ISA": baseIhtData.isaValue,
                     "GIA": baseIhtData.giaValue,
                     "Cash Savings": baseIhtData.cashValue,

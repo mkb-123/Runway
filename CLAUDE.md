@@ -21,7 +21,8 @@ HouseholdData {
   retirement         — targetAnnualIncome, withdrawalRate, includeStatePension, scenarioRates[]
   emergencyFund      — monthlyEssentialExpenses, targetMonths, monthlyLifestyleSpending
   committedOutgoings[] — id, category, label, amount, frequency (monthly|termly|annually), startDate?, endDate?
-  iht                — estimatedPropertyValue, passingToDirectDescendants, gifts[]
+  properties[]       — id, label, estimatedValue, ownerPersonIds[], mortgageBalance
+  iht                — passingToDirectDescendants, gifts[] (estimatedPropertyValue deprecated → use properties[])
   dashboardConfig    — heroMetrics: HeroMetricType[] (max 5; index 0 = primary)
 }
 ```
@@ -103,7 +104,7 @@ To **remove** a hero metric: reverse the above + add replacement mapping in migr
 | Add a recommendation analyzer | `src/lib/recommendations.ts` (add fn + call in generateRecommendations), `src/lib/__tests__/recommendations.test.ts` |
 | Change a tax rate or threshold | `src/lib/tax-constants.ts` only, then update `src/lib/__tests__/tax-constants.test.ts` |
 | Add a new page | `src/app/<route>/page.tsx`, update `src/components/layout/navigation.tsx`, update CLAUDE.md page table |
-| Change localStorage schema | `src/lib/schemas.ts` (Zod field + default), `src/lib/migration.ts` (new migration), `src/types/index.ts` (type), `src/lib/__tests__/migration.test.ts` |
+| Change localStorage schema | `src/lib/schemas.ts` (Zod field + default), `src/lib/migration.ts` (new migration), `src/types/index.ts` (type), `src/lib/__tests__/migration.test.ts`, update `src/lib/__tests__/test-fixtures.ts` |
 | Change dashboard section order | `src/app/page.tsx` — CollapsibleSection blocks |
 | Change collapsible open/closed default | `defaultOpen` prop on `CollapsibleSection` in the relevant page file |
 | Add a person field | `src/types/index.ts` (Person type), `src/lib/schemas.ts` (PersonSchema + default), `src/lib/migration.ts` (migratePersonDefaults), settings UI in `src/app/settings/components/household-tab.tsx` |
@@ -146,7 +147,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (568 tests)
+- **Testing:** Vitest + Testing Library (630 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
@@ -398,7 +399,7 @@ Single source of truth. Never hardcode rates elsewhere.
 - Per-entity: `PersonSchema`, `AccountSchema`, `PersonIncomeSchema`, `BonusStructureSchema`, `ContributionSchema`, `RetirementConfigSchema`, `EmergencyFundConfigSchema`, `CommittedOutgoingSchema`, `ChildSchema`, `GiftSchema`, `IHTConfigSchema`, `DashboardConfigSchema`
 
 #### `migration.ts` — localStorage Schema Migrations
-- `migrateHouseholdData(raw) → record` — 10 idempotent migrations:
+- `migrateHouseholdData(raw) → record` — 11 idempotent migrations:
   1. `annualContributions → contributions`
   2. `estimatedAnnualExpenses → monthlyLifestyleSpending`
   3. Ensure `monthlyLifestyleSpending` in emergencyFund
@@ -409,6 +410,7 @@ Single source of truth. Never hardcode rates elsewhere.
   8. Default `children[]`
   9. `deferredBonusAnnual → totalBonusAnnual` (total model)
   10. Expand `heroMetrics` from old 3-slot tuple to 5-slot array (adds `period_change`, `projected_retirement_income`)
+  11. Promote property from `iht.estimatedPropertyValue` scalar to first-class `properties[]` array (creates property entry, zeros old field)
 
 #### `utils.ts` — Tailwind Utilities
 - `cn(...inputs)` — clsx + twMerge
@@ -419,6 +421,7 @@ Single source of truth. Never hardcode rates elsewhere.
 
 **Core types:**
 - `Person` — id, name, relationship, dateOfBirth, plannedRetirementAge, pensionAccessAge, stateRetirementAge, niQualifyingYears, studentLoanPlan
+- `Property` — id, label, estimatedValue, ownerPersonIds[], mortgageBalance
 - `Account` — id, personId, type (AccountType), provider, name, currentValue, costBasis?
 - `PersonIncome` — personId, grossSalary, employer/employeePensionContribution, pensionMethod, salaryGrowthRate, bonusGrowthRate, priorYearPensionContributions?
 - `BonusStructure` — personId, totalBonusAnnual, cashBonusAnnual, vestingYears, vestingGapYears, estimatedAnnualReturn
@@ -431,6 +434,10 @@ Single source of truth. Never hardcode rates elsewhere.
 - `Gift`, `IHTConfig`, `DashboardConfig` (`heroMetrics: HeroMetricType[]` — index 0 primary, max 5), `NetWorthSnapshot`, `HouseholdData`, `SnapshotsData`
 
 **Helper functions:**
+- `getPropertyEquity(property) → number` — estimatedValue - mortgageBalance (floored at 0)
+- `getTotalPropertyEquity(properties[]) → number` — sum of equity across all properties
+- `getTotalPropertyValue(properties[]) → number` — sum of estimated values
+- `getTotalMortgageBalance(properties[]) → number` — sum of outstanding mortgages
 - `getAccountTaxWrapper(type) → TaxWrapper`
 - `isAccountAccessible(type) → boolean` — pension = inaccessible
 - `getDeferredBonus(bonus) → number` — `max(0, totalBonusAnnual - cashBonusAnnual)`
@@ -555,8 +562,10 @@ Single source of truth. Never hardcode rates elsewhere.
 | `scenario.test.ts` | Scenario override merging (income, contributions, retirement, accounts, market shock), savings rate scaling, impact calculation, avoid-taper preset, target income override integration, combined integration |
 | `format.test.ts` | Currency, percentage, date, number formatting |
 | `cash-flow.test.ts` | 24-month timeline: salary growth, bonus months, deferred vesting, term fees |
-| `migration.test.ts` | All 9 data migrations: old formats → current schema |
+| `migration.test.ts` | All 11 data migrations: old formats → current schema |
+| `test-fixtures.ts` | Shared test fixture factories: `makeTestHousehold`, `makeEmptyHousehold`, `makePerson`, `makeProperty`, `makeAccount`, `makeIncome`, `makeSnapshot` — single source of truth for HouseholdData test objects |
 | `tax-constants.test.ts` | Constants structure validation |
+| `property.test.ts` | Property equity, mortgage balance, net worth with property, per-person split |
 | `emma-import.test.ts` | CSV parsing, date/amount parsing, spending analysis, recurring payment detection, category classification |
 
 ### Key Data Flows

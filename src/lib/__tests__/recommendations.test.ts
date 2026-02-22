@@ -101,6 +101,7 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
       monthlyEssentialExpenses: 2000,
       targetMonths: 6,
     },
+    properties: [],
     iht: {
       estimatedPropertyValue: 0,
       passingToDirectDescendants: false,

@@ -295,6 +295,36 @@ export interface DashboardConfig {
   heroMetrics: HeroMetricType[];
 }
 
+// --- Property & Mortgage ---
+
+export interface Property {
+  id: string;
+  label: string; // e.g. "Primary Residence", "Holiday Home"
+  estimatedValue: number; // current market value
+  ownerPersonIds: string[]; // person IDs (joint ownership supported)
+  mortgageBalance: number; // outstanding mortgage (0 if none)
+}
+
+/** Net property equity: estimated value minus outstanding mortgage */
+export function getPropertyEquity(property: Property): number {
+  return Math.max(0, property.estimatedValue - property.mortgageBalance);
+}
+
+/** Total property equity across all properties */
+export function getTotalPropertyEquity(properties: Property[]): number {
+  return properties.reduce((sum, p) => sum + getPropertyEquity(p), 0);
+}
+
+/** Total property value (before mortgage) */
+export function getTotalPropertyValue(properties: Property[]): number {
+  return properties.reduce((sum, p) => sum + p.estimatedValue, 0);
+}
+
+/** Total outstanding mortgage across all properties */
+export function getTotalMortgageBalance(properties: Property[]): number {
+  return properties.reduce((sum, p) => sum + p.mortgageBalance, 0);
+}
+
 // --- IHT ---
 
 export interface Gift {
@@ -306,7 +336,7 @@ export interface Gift {
 }
 
 export interface IHTConfig {
-  estimatedPropertyValue: number;
+  estimatedPropertyValue: number; // deprecated: use properties[] instead
   passingToDirectDescendants: boolean;
   gifts: Gift[];
 }
@@ -347,6 +377,7 @@ export interface HouseholdData {
   contributions: Contribution[];
   retirement: RetirementConfig;
   emergencyFund: EmergencyFundConfig;
+  properties: Property[];
   iht: IHTConfig;
   committedOutgoings: CommittedOutgoing[];
   dashboardConfig: DashboardConfig;
