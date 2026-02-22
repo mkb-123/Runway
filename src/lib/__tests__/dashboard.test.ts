@@ -280,6 +280,88 @@ describe("computeHeroData", () => {
     expect(result.savingsRate).toBe(0);
     expect(result.perPersonRetirement).toHaveLength(0);
   });
+
+  describe("ihtLiability", () => {
+    it("returns zero for a couple with estate below combined NRB+RNRB threshold", () => {
+      // Couple: NRB 2×325k=650k, RNRB 2×175k=350k, combined=1000k
+      // Estate: non-pension (200k ISA + 50k cash + 30k cash) + 600k property = 880k < 1000k
+      const h = makeHousehold();
+      const result = computeHeroData(h, [], "household");
+      expect(result.ihtLiability).toBe(0);
+    });
+
+    it("computes IHT for a single person with large estate and no RNRB", () => {
+      const h = makeHousehold({
+        persons: [makeHousehold().persons[0]],
+        accounts: [
+          { id: "a3", personId: "p1", type: "stocks_and_shares_isa" as const, provider: "Vanguard", name: "ISA", currentValue: 200_000 },
+          { id: "a4", personId: "p1", type: "cash_savings" as const, provider: "Marcus", name: "Cash", currentValue: 50_000 },
+        ],
+        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+      });
+      const result = computeHeroData(h, [], "household");
+      // Non-pension accounts: ISA 200k + cash 50k = 250k; estate = 250k + 1500k = 1750k
+      // 1 person, no RNRB: NRB = 325k; taxable = 1750k - 325k = 1425k; IHT = 570k
+      expect(result.ihtLiability).toBeCloseTo(570_000, -3);
+    });
+
+    it("excludes pension accounts (SIPP, workplace_pension) from estate", () => {
+      const h = makeHousehold({
+        persons: [makeHousehold().persons[0]],
+        accounts: [
+          { id: "a1", personId: "p1", type: "sipp", provider: "AJ Bell", name: "SIPP", currentValue: 2_000_000 },
+          { id: "a2", personId: "p1", type: "cash_savings", provider: "Marcus", name: "Cash", currentValue: 50_000 },
+        ],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
+      });
+      const result = computeHeroData(h, [], "household");
+      // Only 50k cash in estate, NRB = 325k → no IHT
+      expect(result.ihtLiability).toBe(0);
+    });
+
+    it("reduces effective NRB for gifts within 7 years", () => {
+      const now = new Date();
+      const recentDate = new Date(now);
+      recentDate.setFullYear(recentDate.getFullYear() - 3);
+      const hWithGift = makeHousehold({
+        persons: [makeHousehold().persons[0]],
+        iht: {
+          estimatedPropertyValue: 1_500_000,
+          passingToDirectDescendants: false,
+          gifts: [{ id: "g1", date: recentDate.toISOString().split("T")[0], amount: 100_000, recipient: "Nephew", description: "Gift" }],
+        },
+      });
+      const hNoGift = makeHousehold({
+        persons: [makeHousehold().persons[0]],
+        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+      });
+      const withGift = computeHeroData(hWithGift, [], "household");
+      const noGift = computeHeroData(hNoGift, [], "household");
+      // Gift within 7 years erodes NRB → higher taxable amount → IHT increases by 100k × 40% = 40k
+      expect(withGift.ihtLiability - noGift.ihtLiability).toBeCloseTo(40_000, -2);
+    });
+
+    it("ignores gifts older than 7 years", () => {
+      const now = new Date();
+      const oldDate = new Date(now);
+      oldDate.setFullYear(oldDate.getFullYear() - 8);
+      const hOldGift = makeHousehold({
+        persons: [makeHousehold().persons[0]],
+        iht: {
+          estimatedPropertyValue: 1_500_000,
+          passingToDirectDescendants: false,
+          gifts: [{ id: "g1", date: oldDate.toISOString().split("T")[0], amount: 100_000, recipient: "Nephew", description: "Old gift" }],
+        },
+      });
+      const hNoGift = makeHousehold({
+        persons: [makeHousehold().persons[0]],
+        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+      });
+      const oldGiftResult = computeHeroData(hOldGift, [], "household");
+      const noGiftResult = computeHeroData(hNoGift, [], "household");
+      expect(oldGiftResult.ihtLiability).toBe(noGiftResult.ihtLiability);
+    });
+  });
 });
 
 // ============================================================

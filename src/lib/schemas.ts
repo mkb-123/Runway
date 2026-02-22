@@ -183,6 +183,10 @@ export const HeroMetricTypeSchema = z.enum([
   "net_worth_after_commitments",
   "projected_retirement_income",
   "cash_runway",
+  "school_fee_countdown",
+  "pension_bridge_gap",
+  "per_person_retirement",
+  "iht_liability",
 ]);
 
 export const DashboardConfigSchema = z.object({

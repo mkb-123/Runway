@@ -209,16 +209,16 @@ function resolveMetric(
         icon: Target,
       };
     case "net_worth_after_commitments":
-      // REC-K: Show as "years of coverage" instead of misleading subtraction
+      // REC-K: "years of net worth vs annual outgoings"
       return {
-        label: "Commitment Coverage",
+        label: "Commitments Covered",
         value: data.commitmentCoverageYears >= 999
           ? "N/A"
           : `${data.commitmentCoverageYears.toFixed(1)}yr`,
         rawValue: data.commitmentCoverageYears,
         format: (n: number) => n >= 999 ? "N/A" : `${n.toFixed(1)}yr`,
         subtext: data.totalAnnualCommitments > 0
-          ? `${formatCurrencyCompact(data.totalNetWorth)} covers ${formatCurrencyCompact(data.totalAnnualCommitments)}/yr`
+          ? `yrs net worth covers ${formatCurrencyCompact(data.totalAnnualCommitments)}/yr outgoings`
           : "No committed outgoings",
         color: data.commitmentCoverageYears >= 15
           ? "text-emerald-600 dark:text-emerald-400"
@@ -257,7 +257,7 @@ function resolveMetric(
       // QA-4: Show "No outgoings" instead of green "∞" when nothing configured
       if (!data.hasOutgoings) {
         return {
-          label: "Cash Runway",
+          label: "Cash Cushion",
           value: "N/A",
           rawValue: 0,
           format: () => "N/A",
@@ -266,13 +266,13 @@ function resolveMetric(
           icon: Shield,
         };
       }
-      const color = months < 6 ? "text-red-600 dark:text-red-400" : months < 12 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
+      const color = months < 3 ? "text-red-600 dark:text-red-400" : months < 6 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
       return {
-        label: "Cash Runway",
+        label: "Cash Cushion",
         value: `${months.toFixed(1)}mo`,
         rawValue: months,
         format: (n: number) => `${n.toFixed(1)}mo`,
-        subtext: "of total outgoings covered",
+        subtext: "months of outgoings if income stopped",
         color,
         icon: Shield,
       };
@@ -326,6 +326,24 @@ function resolveMetric(
         subtext: subtextParts,
         color: "",
         icon: Clock,
+      };
+    }
+    case "iht_liability": {
+      const liability = data.ihtLiability;
+      return {
+        label: "IHT Liability",
+        value: liability <= 0 ? "£0" : formatCurrencyCompact(liability),
+        rawValue: liability,
+        format: (n: number) => n <= 0 ? "£0" : formatCurrencyCompact(n),
+        subtext: liability <= 0 ? "Below IHT threshold" : "estimated on current estate",
+        color: liability > 500_000
+          ? "text-red-600 dark:text-red-400"
+          : liability > 100_000
+            ? "text-amber-600 dark:text-amber-400"
+            : liability <= 0
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "",
+        icon: Shield,
       };
     }
   }
@@ -593,7 +611,7 @@ export default function Home() {
     [household.persons]
   );
 
-  const { scenarios, scenarioRates, projectionYears, milestones } = useMemo(() => {
+  const { scenarios, scenarioRates, projectionYears, milestones, retirementTargetYear } = useMemo(() => {
     const monthlyContrib = calculateTotalAnnualContributions(household.contributions, household.income) / 12;
     const rates = household.retirement.scenarioRates;
     const years = 30;
@@ -607,7 +625,21 @@ export default function Home() {
       { label: "\u00A31m", value: 1_000_000 },
       { label: "\u00A32m", value: 2_000_000 },
     ].filter((m) => m.value > 0);
-    return { scenarios: projScenarios, scenarioRates: rates, projectionYears: years, milestones: ms };
+
+    // Find the year the mid-scenario crosses the FIRE target (vertical marker on chart)
+    const currentYear = new Date().getFullYear();
+    let retirementTargetYear: number | null = null;
+    if (targetPot > 0 && projScenarios.length > 0) {
+      const midScenario = projScenarios[Math.floor(projScenarios.length / 2)];
+      for (let i = 0; i < midScenario.projections.length; i++) {
+        if (midScenario.projections[i].value >= targetPot) {
+          retirementTargetYear = currentYear + i + 1;
+          break;
+        }
+      }
+    }
+
+    return { scenarios: projScenarios, scenarioRates: rates, projectionYears: years, milestones: ms, retirementTargetYear };
   }, [household, totalNetWorth, totalStatePensionAnnual]);
 
   // =============================================
@@ -686,8 +718,8 @@ export default function Home() {
         </p>
       </div>
 
-      {/* Getting Started */}
-      {(!bannerDismissed || household.persons.length === 0) && (
+      {/* Getting Started — always shown when no accounts exist, otherwise dismissible */}
+      {(!bannerDismissed || household.persons.length === 0 || household.accounts.length === 0) && (
         <div className="relative rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
           <button
             onClick={dismissBanner}
@@ -903,33 +935,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* REC-D: What-If CTA — collapsed to small button after first use */}
-      {!isScenarioMode && (
-        hasUsedScenarios ? (
-          <div className="flex items-center gap-2">
-            <ScenarioPanel />
-            <span className="text-xs text-muted-foreground">Open scenario panel</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-              <FlaskConical className="size-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">What would happen if...?</p>
-              <p className="text-xs text-muted-foreground hidden sm:block">
-                Model salary changes, pension sacrifice, market crashes, or early retirement
-              </p>
-              <p className="text-xs text-muted-foreground sm:hidden">
-                Model scenarios and see the impact
-              </p>
-            </div>
-            <ScenarioPanel />
-          </div>
-        )
-      )}
-
-      {/* RECOMMENDATIONS — with urgency tiers (REC-F), capped on mobile (REC-D) */}
+      {/* RECOMMENDATIONS — with urgency tiers (REC-F), capped on mobile (REC-D)
+          Placed before charts: actionable content above exploratory content */}
       {(filteredRecommendations.length > 0 || resolvedByScenario.size > 0) && (
         <CollapsibleSection
           title="Recommendations"
@@ -1013,6 +1020,32 @@ export default function Home() {
         </CollapsibleSection>
       )}
 
+      {/* What-If CTA — after actionable content, before exploratory charts */}
+      {!isScenarioMode && (
+        hasUsedScenarios ? (
+          <div className="flex items-center gap-2">
+            <ScenarioPanel />
+            <span className="text-xs text-muted-foreground">Open scenario panel</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <FlaskConical className="size-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">What would happen if...?</p>
+              <p className="text-xs text-muted-foreground hidden sm:block">
+                Model salary changes, pension sacrifice, market crashes, or early retirement
+              </p>
+              <p className="text-xs text-muted-foreground sm:hidden">
+                Model scenarios and see the impact
+              </p>
+            </div>
+            <ScenarioPanel />
+          </div>
+        )
+      )}
+
       {/* PRIMARY CHARTS */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="border-t border-t-primary/20">
@@ -1025,7 +1058,7 @@ export default function Home() {
             </div>
           </CardHeader>
           <CardContent>
-            <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} />
+            <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} retirementTargetYear={retirementTargetYear} />
             <p className="mt-3 text-[11px] text-muted-foreground">
               Projections are estimates, not guarantees. Capital is at risk. Past performance does not predict future returns.
             </p>

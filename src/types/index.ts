@@ -272,7 +272,8 @@ export type HeroMetricType =
   | "cash_runway"
   | "school_fee_countdown"
   | "pension_bridge_gap"
-  | "per_person_retirement";
+  | "per_person_retirement"
+  | "iht_liability";
 
 export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   net_worth: "Total Net Worth",
@@ -282,12 +283,13 @@ export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   year_on_year_change: "Year-on-Year Change",
   savings_rate: "Savings Rate",
   fire_progress: "FIRE Progress",
-  net_worth_after_commitments: "Net Worth After Commitments",
+  net_worth_after_commitments: "Commitments Covered",
   projected_retirement_income: "Projected Retirement Income",
-  cash_runway: "Cash Runway",
+  cash_runway: "Cash Cushion",
   school_fee_countdown: "School Fee Countdown",
   pension_bridge_gap: "Pension Bridge Gap",
   per_person_retirement: "Per-Person Retirement",
+  iht_liability: "IHT Liability",
 };
 
 export interface DashboardConfig {

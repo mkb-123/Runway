@@ -27,6 +27,8 @@ import {
 } from "@/lib/aggregations";
 import { findLastSchoolFeeYear } from "@/lib/school-fees";
 import { generateDeferredTranches } from "@/lib/deferred-bonus";
+import { calculateIHT } from "@/lib/iht";
+import { yearsSince } from "@/lib/iht";
 
 // ============================================================
 // Types
@@ -67,6 +69,8 @@ export interface HeroMetricData {
   monthlyContributionRate: number;
   /** Whether this data is filtered to a specific person */
   isPersonView: boolean;
+  /** IHT liability (£) based on current estate value, persons, gifts, and RNRB eligibility */
+  ihtLiability: number;
 }
 
 /** REC-E: Upcoming cash event */
@@ -213,6 +217,23 @@ export function computeHeroData(
     };
   });
 
+  // --- IHT liability (household-level, always computed against full estate) ---
+  // In-estate assets: all non-pension accounts + estimated property value
+  const estateAccountsValue = household.accounts
+    .filter((a) => a.type !== "workplace_pension" && a.type !== "sipp")
+    .reduce((s, a) => s + a.currentValue, 0);
+  const estateValue = estateAccountsValue + household.iht.estimatedPropertyValue;
+  const numberOfPersons = household.persons.length;
+  const giftsWithin7Years = household.iht.gifts
+    .filter((g) => yearsSince(g.date) <= 7)
+    .reduce((s, g) => s + g.amount, 0);
+  const ihtResult = calculateIHT(
+    estateValue,
+    numberOfPersons,
+    giftsWithin7Years,
+    household.iht.passingToDirectDescendants
+  );
+
   return {
     totalNetWorth,
     cashPosition,
@@ -236,6 +257,7 @@ export function computeHeroData(
     perPersonRetirement,
     monthlyContributionRate: totalContrib / 12,
     isPersonView,
+    ihtLiability: ihtResult.ihtLiability,
   };
 }
 
