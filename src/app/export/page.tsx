@@ -12,13 +12,14 @@ import {
   annualiseContribution,
   annualiseOutgoing,
 } from "@/types";
-import type { TaxWrapper, HouseholdData } from "@/types";
-import { getDeferredBonus } from "@/types";
+import type { TaxWrapper, HouseholdData, SnapshotsData } from "@/types";
+import { getDeferredBonus, getPropertyEquity, getAnnualMortgagePayment, getMortgageRemainingMonths } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { formatCurrency, formatPercent, formatDate } from "@/lib/format";
+import { calculateSchoolYearsRemaining, calculateTotalSchoolFeeCost, calculateSchoolStartDate, calculateSchoolEndDate } from "@/lib/school-fees";
 import {
   calculateIncomeTax,
   calculateNI,
@@ -58,7 +59,7 @@ function curr(n: number): number {
 }
 
 /** Build the full financial report workbook from household data */
-function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
+function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
 
   const getPersonName = (personId: string) =>
@@ -503,21 +504,123 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(recRows), "Recommendations");
 
+  // ============================
+  // Sheet 12: Properties
+  // ============================
+  if (household.properties.length > 0) {
+    const propRows = household.properties.map((p) => {
+      const equity = getPropertyEquity(p);
+      const owners = p.ownerPersonIds
+        .map((id) => getPersonName(id))
+        .join(", ");
+      const annualPayment = getAnnualMortgagePayment(p);
+      const remainingMonths = getMortgageRemainingMonths(p);
+
+      return {
+        Property: p.label,
+        Owners: owners,
+        "Estimated Value (£)": curr(p.estimatedValue),
+        "Mortgage Balance (£)": curr(p.mortgageBalance),
+        "Equity (£)": curr(equity),
+        "Appreciation Rate": p.appreciationRate ? formatPercent(p.appreciationRate) : "—",
+        "Mortgage Rate": p.mortgageRate ? formatPercent(p.mortgageRate) : "—",
+        "Mortgage Term (years)": p.mortgageTerm ?? "—",
+        "Remaining (months)": remainingMonths > 0 ? remainingMonths : "—",
+        "Annual Payment (£)": annualPayment > 0 ? curr(annualPayment) : "—",
+      };
+    });
+
+    const totalValue = household.properties.reduce((s, p) => s + p.estimatedValue, 0);
+    const totalMortgage = household.properties.reduce((s, p) => s + p.mortgageBalance, 0);
+    const totalEquity = household.properties.reduce((s, p) => s + getPropertyEquity(p), 0);
+    propRows.push({
+      Property: "TOTAL",
+      Owners: "",
+      "Estimated Value (£)": curr(totalValue),
+      "Mortgage Balance (£)": curr(totalMortgage),
+      "Equity (£)": curr(totalEquity),
+      "Appreciation Rate": "",
+      "Mortgage Rate": "",
+      "Mortgage Term (years)": "" as string | number,
+      "Remaining (months)": "" as string | number,
+      "Annual Payment (£)": "" as string | number,
+    });
+
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(propRows), "Properties");
+  }
+
+  // ============================
+  // Sheet 13: Children & School Fees
+  // ============================
+  if (household.children.length > 0) {
+    const childRows: Record<string, string | number>[] = [];
+    for (const child of household.children) {
+      const yearsRemaining = calculateSchoolYearsRemaining(child);
+      const totalCost = calculateTotalSchoolFeeCost(child);
+      const startDate = calculateSchoolStartDate(child);
+      const endDate = calculateSchoolEndDate(child);
+
+      childRows.push(
+        { Item: child.name, "Value": "" },
+        { Item: "  Date of Birth", "Value": formatDate(child.dateOfBirth) },
+        { Item: "  Annual Fee", "Value": curr(child.schoolFeeAnnual) },
+        { Item: "  Fee Inflation Rate", "Value": child.feeInflationRate ? formatPercent(child.feeInflationRate) : "0%" },
+        { Item: "  School Start", "Value": `Age ${child.schoolStartAge} (${formatDate(startDate)})` },
+        { Item: "  School End", "Value": `Age ${child.schoolEndAge} (${formatDate(endDate)})` },
+        { Item: "  Years Remaining", "Value": yearsRemaining },
+        { Item: "  Total Remaining Cost", "Value": curr(totalCost) },
+        { Item: "", "Value": "" },
+      );
+    }
+
+    const totalAllChildren = household.children.reduce(
+      (s, c) => s + calculateTotalSchoolFeeCost(c),
+      0
+    );
+    childRows.push({ Item: "TOTAL School Fee Cost", "Value": curr(totalAllChildren) });
+
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(childRows), "Children & Fees");
+  }
+
+  // ============================
+  // Sheet 14: Snapshot History
+  // ============================
+  if (snapshots && snapshots.snapshots.length > 0) {
+    const snapRows = snapshots.snapshots
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((s) => {
+        const row: Record<string, string | number> = {
+          Date: formatDate(s.date),
+          "Total Net Worth (£)": curr(s.totalNetWorth),
+        };
+        for (const bp of s.byPerson) {
+          row[`${getPersonName(bp.personId)} (£)`] = curr(bp.value);
+        }
+        for (const bw of s.byWrapper) {
+          row[`${bw.wrapper.toUpperCase()} (£)`] = curr(bw.value);
+        }
+        return row;
+      });
+
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(snapRows), "Snapshot History");
+  }
+
   return wb;
 }
 
 export default function ExportPage() {
-  const { household } = useData();
+  const { household, snapshots } = useData();
   const scenarioData = useScenarioData();
   const scenarioHousehold = scenarioData.household;
 
   function exportFullReport() {
-    const wb = buildFullWorkbook(household);
+    const wb = buildFullWorkbook(household, snapshots);
     downloadWorkbook(wb, `runway-full-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   function exportScenarioComparison() {
-    const baseWb = buildFullWorkbook(household);
+    const baseWb = buildFullWorkbook(household, snapshots);
     const scenarioWb = buildFullWorkbook(scenarioHousehold);
 
     // Merge: take base workbook, add scenario sheets with "Scenario - " prefix
@@ -555,9 +658,9 @@ export default function ExportPage() {
             Full Financial Report
           </CardTitle>
           <CardDescription>
-            Comprehensive workbook with 11 sheets covering all computations: accounts, income &amp; tax,
+            Comprehensive workbook with up to 14 sheets covering all computations: accounts, income &amp; tax,
             contributions, pension allowances, retirement analysis, IHT, CGT &amp; Bed &amp; ISA,
-            committed outgoings, tax efficiency, and recommendations.
+            committed outgoings, tax efficiency, recommendations, properties, school fees, and snapshot history.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -650,6 +753,9 @@ export default function ExportPage() {
               "Outgoings",
               "Tax Efficiency",
               "Recommendations",
+              "Properties",
+              "Children & Fees",
+              "Snapshot History",
             ].map((sheet) => (
               <Badge key={sheet} variant="secondary" className="justify-center py-1.5">
                 {sheet}
