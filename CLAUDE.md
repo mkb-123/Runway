@@ -1,5 +1,35 @@
 # Runway - UK Household Net Worth Tracker
 
+## Quick Start for Agents
+
+**Read this file first — it is the complete index.** You should NOT need to read most source files before making changes; use this index to locate the right file and function, then read only what you need.
+
+### Most-changed files (highest churn — read before editing)
+- `src/app/page.tsx` — Dashboard: hero, metrics, collapsible sections, charts
+- `src/lib/dashboard.ts` — computeHeroData, getStatusSentence, getNextCashEvents
+- `src/lib/migration.ts` — 10 migrations, add new migration at bottom + call in main fn
+- `src/lib/schemas.ts` — Zod validation, DashboardConfigSchema, defaults
+- `src/types/index.ts` — All domain types; DashboardConfig.heroMetrics: HeroMetricType[]
+
+### Key invariants (do not break)
+- All financial math lives in `src/lib/` — never inline in components or useMemo
+- Every financial calculation has a test in `src/lib/__tests__/`
+- Tax constants are single-source in `src/lib/tax-constants.ts` — never hardcode rates
+- All pages use `CollapsibleSection` for content sections (not plain `Card`) — consistent UI
+- `heroMetrics[0]` = primary metric, `heroMetrics[1..4]` = secondary (max 5 total)
+- IHT 7-year gift filter uses `< 7` (not `<= 7`) — gifts at exactly 7 years are outside estate
+
+### Common tasks → file locations
+| Task | Files to read |
+|------|---------------|
+| Add a hero metric type | `src/types/index.ts` (HeroMetricType union + HERO_METRIC_LABELS), `src/app/page.tsx` (resolveMetric switch), `src/lib/dashboard.ts` (computeHeroData return value + HeroMetricData interface) |
+| Add a recommendation analyzer | `src/lib/recommendations.ts` (add analyzer fn + call in generateRecommendations), `src/lib/__tests__/recommendations.test.ts` |
+| Change a tax rate or threshold | `src/lib/tax-constants.ts` only, then update `src/lib/__tests__/tax-constants.test.ts` |
+| Add a new page | `src/app/<route>/page.tsx`, update navigation in `src/components/layout/navigation.tsx`, update CLAUDE.md page table |
+| Change localStorage schema | `src/lib/schemas.ts` (add Zod field + default), `src/lib/migration.ts` (add migration N+1), `src/types/index.ts` (type), `src/lib/__tests__/migration.test.ts` (test) |
+| Change dashboard section order | `src/app/page.tsx` — CollapsibleSection blocks near line 989–1160 |
+| Change collapsible open/closed default | `defaultOpen` prop on `CollapsibleSection` in relevant page file |
+
 ## Project Overview
 
 Runway is a comprehensive UK household net worth tracking and financial planning application. Built with Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, and Recharts. All data is stored client-side in localStorage — no backend.
