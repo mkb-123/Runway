@@ -14,7 +14,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (524 tests)
+- **Testing:** Vitest + Testing Library (556 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
@@ -216,6 +216,14 @@ Single source of truth. Never hardcode rates elsewhere.
 - `generateLifetimeCashFlow(household, growthRate, endAge?) → LifetimeCashFlowResult` — tracks employment income, pension drawdown, state pension, investment drawdown, expenditure to age 95
 - Types: `LifetimeCashFlowYear`, `LifetimeCashFlowResult`, `LifetimeCashFlowEvent`
 
+#### `dashboard.ts` — Dashboard Hero Metrics (Extracted)
+- `computeHeroData(household, snapshots, selectedView) → HeroMetricData` — all 14 hero metrics, person-view aware
+- `getNextCashEvents(household, maxEvents?) → CashEvent[]` — upcoming inflows/outflows (bonus, vesting, fees)
+- `getStatusSentence(heroData, household) → StatusSentence` — life-stage aware contextual status
+- `detectLifeStage(household) → LifeStage` — accumulator / school_fees / pre_retirement
+- `getRecommendationUrgency(recId) → RecommendationUrgency` — act_now / act_this_month / standing
+- Types: `HeroMetricData`, `CashEvent`, `StatusSentence`, `LifeStage`, `RecommendationUrgency`
+
 #### `school-fees.ts` — School Fee Projections
 - `calculateSchoolStartDate(child)`, `calculateSchoolEndDate(child)`, `calculateSchoolYearsRemaining(child)`, `calculateTotalSchoolFeeCost(child)`, `generateSchoolFeeOutgoing(child) → CommittedOutgoing`, `generateSchoolFeeTimeline(children[]) → SchoolFeeTimelineYear[]`, `findLastSchoolFeeYear(children[])`
 
@@ -408,6 +416,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | `pension-flow.test.ts` | Pension contributions, employer match, lump sum, drawdown, bridge |
 | `projection-consistency.test.ts` | Cross-function consistency checks |
 | `school-fees.test.ts` | Start/end dates, years remaining, total cost, timeline generation |
+| `dashboard.test.ts` | Hero metric computation (person-filtered, snapshot changes, QA edge cases), next cash events, status sentence, life-stage detection, recommendation urgency |
 | `deferred-bonus.test.ts` | Tranche generation, vesting schedule (including vestingGapYears), projected value |
 | `scenario.test.ts` | Scenario override merging (income, contributions, retirement, accounts, market shock), savings rate scaling, impact calculation, avoid-taper preset, target income override integration, combined integration |
 | `format.test.ts` | Currency, percentage, date, number formatting |

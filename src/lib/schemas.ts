@@ -243,7 +243,7 @@ export const HouseholdDataSchema = z.object({
   emergencyFund: EmergencyFundConfigSchema,
   committedOutgoings: z.array(CommittedOutgoingSchema).default([]),
   dashboardConfig: DashboardConfigSchema.default({
-    heroMetrics: ["net_worth", "fire_progress", "retirement_countdown"],
+    heroMetrics: ["net_worth", "cash_position", "retirement_countdown"],
   }),
   iht: IHTConfigSchema,
 });

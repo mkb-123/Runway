@@ -34,10 +34,12 @@ import type {
   ContributionFrequency,
   StudentLoanPlan,
   HouseholdData,
+  HeroMetricType,
 } from "@/types";
 import {
   CONTRIBUTION_TARGET_LABELS,
   CONTRIBUTION_FREQUENCY_LABELS,
+  HERO_METRIC_LABELS,
   annualiseContribution,
 } from "@/types";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
@@ -840,6 +842,60 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
       <Button onClick={addPerson} variant="outline">
         + Add Person
       </Button>
+
+      {/* REC-I: Hero Metrics Configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              Dashboard Hero Metrics
+              <Badge variant="secondary">3 slots</Badge>
+            </CardTitle>
+            <div className="flex items-center gap-3 text-xs shrink-0">
+              <span className="text-muted-foreground">Shown on:</span>
+              <Link href="/" className="text-primary hover:underline flex items-center gap-0.5">
+                Dashboard <ArrowRight className="size-3" />
+              </Link>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Choose which metrics appear in the hero section of your dashboard. The first metric is displayed prominently.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {([0, 1, 2] as const).map((slotIndex) => (
+              <div key={slotIndex}>
+                {renderField(
+                  slotIndex === 0 ? "Primary Metric" : `Secondary ${slotIndex}`,
+                  <Select
+                    value={household.dashboardConfig.heroMetrics[slotIndex]}
+                    onValueChange={(val) => {
+                      const updated = clone(household);
+                      const metrics = [...updated.dashboardConfig.heroMetrics] as [HeroMetricType, HeroMetricType, HeroMetricType];
+                      metrics[slotIndex] = val as HeroMetricType;
+                      updated.dashboardConfig.heroMetrics = metrics;
+                      updateHousehold(updated);
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(HERO_METRIC_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>,
+                  slotIndex === 0 ? "The headline number displayed largest" : undefined
+                )}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
