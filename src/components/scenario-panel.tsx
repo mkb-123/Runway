@@ -122,6 +122,7 @@ function Section({
     <div className="rounded-lg border bg-card">
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
         className="flex w-full items-center justify-between p-3 text-left"
       >
         <span className="flex items-center gap-2 text-sm font-medium">

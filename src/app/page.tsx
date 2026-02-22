@@ -308,7 +308,7 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
 
   if (rec.actionUrl) {
     return (
-      <Link href={rec.actionUrl} className="block">
+      <Link href={rec.actionUrl} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <Card className={`border ${config.border} ${config.bg} transition-shadow hover:shadow-md active:shadow-sm`}>
           <CardContent className="py-4">{content}</CardContent>
         </Card>
@@ -785,8 +785,8 @@ export default function Home() {
                         {primary.label}
                       </span>
                     </div>
-                    <div className="flex items-baseline gap-3">
-                      <span className={`text-4xl sm:text-5xl font-bold tracking-tight leading-none tabular-nums ${primary.color}`}>
+                    <div className="flex items-baseline gap-3 min-w-0">
+                      <span className={`${isScenarioMode ? "text-2xl sm:text-4xl" : "text-4xl sm:text-5xl"} font-bold tracking-tight leading-none tabular-nums ${primary.color}`}>
                         <ScenarioDelta base={basePrimary.rawValue} scenario={primary.rawValue} format={primary.format} />
                       </span>
                       {primary.trend === "up" && <TrendingUp className="size-6 text-emerald-500" />}
@@ -875,12 +875,15 @@ export default function Home() {
       {!isScenarioMode && (
         <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-            <FlaskConical className="size-4.5 text-primary" />
+            <FlaskConical className="size-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">What would happen if...?</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground hidden sm:block">
               Model salary changes, pension sacrifice, market crashes, or early retirement
+            </p>
+            <p className="text-xs text-muted-foreground sm:hidden">
+              Model scenarios and see the impact
             </p>
           </div>
           <ScenarioPanel />

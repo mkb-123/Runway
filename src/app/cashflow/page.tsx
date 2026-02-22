@@ -138,7 +138,7 @@ export default function CashFlowPage() {
 
   if (filteredHousehold.persons.length === 0) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <PageHeader title="Lifetime Cash Flow" description="Year-by-year income vs expenditure" />
         <EmptyState message="Add people and income in Settings to see your lifetime cash flow projection." />
       </div>
@@ -147,7 +147,7 @@ export default function CashFlowPage() {
 
   if (data.length === 0) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <PageHeader title="Lifetime Cash Flow" description="Year-by-year income vs expenditure" />
         <EmptyState message="Ensure at least one person has a date of birth configured in Settings." />
       </div>
