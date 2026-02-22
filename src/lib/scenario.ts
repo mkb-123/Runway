@@ -8,6 +8,7 @@ import type { HouseholdData, Person, PersonIncome, Contribution, BonusStructure 
 import { getPersonContributionTotals, getPersonGrossIncome } from "@/types";
 import { calculateIncomeTax, calculateNI } from "@/lib/tax";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
+import { formatCurrencyCompact } from "@/lib/format";
 
 // --- Override types ---
 
@@ -368,4 +369,68 @@ export function buildAvoidTaperPreset(
     }
   }
   return overrides;
+}
+
+/**
+ * FEAT-019: Generate a human-readable description of what a scenario changes.
+ * Used in saved scenario lists so users can see what changed at a glance.
+ */
+export function generateScenarioDescription(
+  overrides: ScenarioOverrides,
+  household: HouseholdData
+): string {
+  const parts: string[] = [];
+
+  // Income changes
+  if (overrides.income) {
+    for (const inc of overrides.income) {
+      const person = household.persons.find((p) => p.id === inc.personId);
+      const base = household.income.find((i) => i.personId === inc.personId);
+      if (!person || !base) continue;
+
+      if (inc.grossSalary !== undefined && inc.grossSalary !== base.grossSalary) {
+        parts.push(`${person.name} salary: ${formatCurrencyCompact(base.grossSalary)} → ${formatCurrencyCompact(inc.grossSalary)}`);
+      }
+      if (inc.employeePensionContribution !== undefined && inc.employeePensionContribution !== base.employeePensionContribution) {
+        parts.push(`${person.name} pension: ${formatCurrencyCompact(base.employeePensionContribution)} → ${formatCurrencyCompact(inc.employeePensionContribution)}`);
+      }
+    }
+  }
+
+  // Person overrides (retirement age)
+  if (overrides.personOverrides) {
+    for (const po of overrides.personOverrides) {
+      const person = household.persons.find((p) => p.id === po.id);
+      if (!person) continue;
+      if (po.plannedRetirementAge !== undefined && po.plannedRetirementAge !== person.plannedRetirementAge) {
+        parts.push(`${person.name} retires at ${po.plannedRetirementAge} (was ${person.plannedRetirementAge})`);
+      }
+    }
+  }
+
+  // Retirement target
+  if (overrides.retirement?.targetAnnualIncome !== undefined) {
+    parts.push(`Target income: ${formatCurrencyCompact(overrides.retirement.targetAnnualIncome)}/yr`);
+  }
+
+  // Market shock
+  if (overrides.marketShockPercent !== undefined) {
+    const pct = Math.round(overrides.marketShockPercent * 100);
+    parts.push(`Market: ${pct >= 0 ? "+" : ""}${pct}%`);
+  }
+
+  // Contribution overrides
+  if (overrides.contributionOverrides) {
+    for (const co of overrides.contributionOverrides) {
+      const person = household.persons.find((p) => p.id === co.personId);
+      if (!person) continue;
+      const items: string[] = [];
+      if (co.isaContribution !== undefined) items.push(`ISA ${formatCurrencyCompact(co.isaContribution)}`);
+      if (co.pensionContribution !== undefined) items.push(`Pension ${formatCurrencyCompact(co.pensionContribution)}`);
+      if (co.giaContribution !== undefined) items.push(`GIA ${formatCurrencyCompact(co.giaContribution)}`);
+      if (items.length > 0) parts.push(`${person.name} contributions: ${items.join(", ")}`);
+    }
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : "No changes";
 }

@@ -87,15 +87,25 @@ function getAdjustedGrossForNI(
 /**
  * Calculate the personal allowance taking into account the taper
  * for income over £100,000. For every £2 over £100k, lose £1 of allowance.
+ *
+ * For relief_at_source pensions, the gross contribution (net/0.8) is deducted
+ * from adjusted net income for taper purposes per HMRC rules, even though it
+ * doesn't reduce the taxable gross for band calculations.
  */
-function calculatePersonalAllowance(adjustedNetIncome: number): number {
+function calculatePersonalAllowance(
+  adjustedNetIncome: number,
+  reliefAtSourceGrossContribution: number = 0
+): number {
   const { personalAllowance, personalAllowanceTaperThreshold } = UK_TAX_CONSTANTS;
 
-  if (adjustedNetIncome <= personalAllowanceTaperThreshold) {
+  // For PA taper, adjusted net income is reduced by relief-at-source gross contribution
+  const incomeForTaper = adjustedNetIncome - reliefAtSourceGrossContribution;
+
+  if (incomeForTaper <= personalAllowanceTaperThreshold) {
     return personalAllowance;
   }
 
-  const excess = adjustedNetIncome - personalAllowanceTaperThreshold;
+  const excess = incomeForTaper - personalAllowanceTaperThreshold;
   const reduction = Math.floor(excess * UK_TAX_CONSTANTS.personalAllowanceTaperRate);
   return Math.max(0, personalAllowance - reduction);
 }
@@ -111,7 +121,14 @@ export function calculateIncomeTax(
   pensionMethod: PersonIncome["pensionContributionMethod"] = "salary_sacrifice"
 ): IncomeTaxResult {
   const adjustedGross = getAdjustedGrossForTax(grossSalary, pensionContribution, pensionMethod);
-  const personalAllowance = calculatePersonalAllowance(adjustedGross);
+
+  // For relief_at_source, the gross contribution reduces adjusted net income for PA taper
+  const reliefAtSourceGross =
+    pensionMethod === "relief_at_source" && pensionContribution > 0
+      ? pensionContribution / 0.8
+      : 0;
+  const personalAllowance = calculatePersonalAllowance(adjustedGross, reliefAtSourceGross);
+
   const { basicRate, basicRateUpperLimit, higherRate, higherRateUpperLimit, additionalRate } =
     UK_TAX_CONSTANTS.incomeTax;
 

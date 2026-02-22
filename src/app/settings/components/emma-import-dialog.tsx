@@ -44,6 +44,7 @@ export function EmmaImportDialog({ household, updateHousehold }: EmmaImportDialo
   const [error, setError] = useState<string | null>(null);
   const [appliedItems, setAppliedItems] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const idCounterRef = useRef(0);
 
   function reset() {
     setStep("upload");
@@ -109,7 +110,7 @@ export function EmmaImportDialog({ household, updateHousehold }: EmmaImportDialo
     const outgoing = outgoings[0];
     updated.committedOutgoings.push({
       ...outgoing,
-      id: `emma-${Date.now()}-${index}`,
+      id: `emma-${++idCounterRef.current}-${index}`,
     });
     updateHousehold(updated);
     setAppliedItems((prev) => new Set([...prev, `outgoing-${index}`]));
@@ -124,7 +125,7 @@ export function EmmaImportDialog({ household, updateHousehold }: EmmaImportDialo
     outgoings.forEach((outgoing, i) => {
       updated.committedOutgoings.push({
         ...outgoing,
-        id: `emma-${Date.now()}-${i}`,
+        id: `emma-${++idCounterRef.current}-${i}`,
       });
     });
     updateHousehold(updated);

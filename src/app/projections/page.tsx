@@ -71,7 +71,6 @@ export default function ProjectionsPage() {
     if (totalGross <= 0) return 0;
     return household.income.reduce((s, i) => {
       const bonus = household.bonusStructures.find((b) => b.personId === i.personId);
-      const personGross = i.grossSalary + (bonus?.cashBonusAnnual ?? 0);
       const salaryWeight = i.grossSalary / totalGross;
       const bonusWeight = (bonus?.cashBonusAnnual ?? 0) / totalGross;
       return s + (i.salaryGrowthRate ?? 0) * salaryWeight + (i.bonusGrowthRate ?? 0) * bonusWeight;
@@ -184,7 +183,7 @@ export default function ProjectionsPage() {
   );
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader title="Projections" description={`Growth projections across multiple return scenarios over ${PROJECTION_YEARS} years`}>
         <PersonToggle />
       </PageHeader>

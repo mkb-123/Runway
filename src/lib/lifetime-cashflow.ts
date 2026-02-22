@@ -14,7 +14,7 @@
 
 import type { HouseholdData, Person, PersonIncome } from "@/types";
 import { annualiseOutgoing, annualiseContribution, getDeferredBonus } from "@/types";
-import { calculateTakeHomePay } from "@/lib/tax";
+import { calculateTakeHomePay, calculateTakeHomePayWithStudentLoan, calculateIncomeTax } from "@/lib/tax";
 import { calculateProRataStatePension, calculateAge } from "@/lib/projections";
 
 // --- Types ---
@@ -63,8 +63,10 @@ interface PersonState {
   /** Annual deferred bonus (in steady state, this vests each year) */
   annualDeferredBonus: number;
   statePensionAnnual: number;
-  /** Annual pension contribution (employee + employer) */
+  /** Annual pension contribution (employee + employer from employment) */
   annualPensionContribution: number;
+  /** Annual discretionary pension contribution (SIPP top-ups) */
+  annualDiscretionaryPension: number;
   /** Annual ISA/GIA contribution */
   annualSavingsContribution: number;
 }
@@ -114,12 +116,16 @@ export function generateLifetimeCashFlow(
       ? personIncome.employeePensionContribution + personIncome.employerPensionContribution
       : 0;
 
-    // Discretionary contributions to ISA/GIA
+    // Discretionary contributions split by destination
     const personContribs = contributions.filter((c) => c.personId === person.id);
-    const annualSavingsContribution = personContribs.reduce(
-      (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
-      0
-    );
+    // SIPP/additional pension contributions go to pension pot (locked until pensionAccessAge)
+    const annualDiscretionaryPension = personContribs
+      .filter((c) => c.target === "pension")
+      .reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+    // ISA/GIA contributions go to accessible wealth
+    const annualSavingsContribution = personContribs
+      .filter((c) => c.target !== "pension")
+      .reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
 
     return {
       person,
@@ -131,6 +137,7 @@ export function generateLifetimeCashFlow(
       annualDeferredBonus,
       statePensionAnnual: calculateProRataStatePension(person.niQualifyingYears),
       annualPensionContribution,
+      annualDiscretionaryPension,
       annualSavingsContribution,
     };
   });
@@ -193,19 +200,31 @@ export function generateLifetimeCashFlow(
     );
 
     // 4. During working years: add contributions to pots
+    // FEAT-016: Pension contributions grow with salary growth rate
     for (const state of personStates) {
       const personAge = state.currentAge + yearOffset;
       if (personAge < state.person.plannedRetirementAge) {
-        state.pensionPot += state.annualPensionContribution;
+        const salaryGrowthRate = state.personIncome?.salaryGrowthRate ?? 0;
+        const growthFactor = Math.pow(1 + salaryGrowthRate, yearOffset);
+        // Employment pension contributions grow with salary
+        const grownPensionContrib = state.annualPensionContribution * growthFactor;
+        // Discretionary SIPP and ISA/GIA contributions don't auto-grow (they're fixed amounts)
+        state.pensionPot += grownPensionContrib + state.annualDiscretionaryPension;
         state.accessibleWealth += state.annualSavingsContribution;
       }
     }
 
     // 5. Pension + investment drawdown (to cover expenditure shortfall after employment + state pension)
+    // Drawdown needs to cover the gap AFTER tax on pension income, so we iterate:
+    // gross drawdown is needed to produce enough net income after pension drawdown tax.
     const incomeBeforeDrawdown = employmentIncome + statePensionIncome;
     const drawdownNeeded = Math.max(0, totalExpenditure - incomeBeforeDrawdown);
 
     const { pensionDrawn, investmentDrawn } = executeDrawdown(personStates, yearOffset, drawdownNeeded);
+
+    // 5b. Apply income tax on pension drawdown (25% tax-free PCLS, 75% taxable)
+    // Tax is calculated on the taxable portion added to state pension as total retirement income.
+    const netPensionDrawn = calculateNetPensionDrawdown(pensionDrawn, statePensionIncome);
 
     // 6. Grow all pots (after draw, per BUG-003 convention)
     for (const state of personStates) {
@@ -213,18 +232,36 @@ export function generateLifetimeCashFlow(
       state.accessibleWealth *= 1 + growthRate;
     }
 
-    const totalIncome = employmentIncome + pensionDrawn + statePensionIncome + investmentDrawn;
+    // FEAT-015: Reinvest surplus income into accessible wealth
+    const incomeBeforeSurplus = employmentIncome + netPensionDrawn + statePensionIncome + investmentDrawn;
+    const surplus = incomeBeforeSurplus - totalExpenditure;
+    if (surplus > 0) {
+      // Distribute surplus proportionally across persons into accessible wealth
+      const totalAccessible = personStates.reduce((s, st) => s + Math.max(0, st.accessibleWealth), 0);
+      for (const state of personStates) {
+        const share = totalAccessible > 0 ? state.accessibleWealth / totalAccessible : 1 / personStates.length;
+        state.accessibleWealth += surplus * share;
+      }
+    }
+
+    // Round components first, then derive totals from rounded values for internal consistency
+    const roundedEmployment = Math.round(employmentIncome);
+    const roundedPension = Math.round(netPensionDrawn);
+    const roundedStatePension = Math.round(statePensionIncome);
+    const roundedInvestment = Math.round(investmentDrawn);
+    const roundedExpenditure = Math.round(totalExpenditure);
+    const totalIncome = roundedEmployment + roundedPension + roundedStatePension + roundedInvestment;
 
     data.push({
       age: primaryAge,
       calendarYear,
-      employmentIncome: Math.round(employmentIncome),
-      pensionIncome: Math.round(pensionDrawn),
-      statePensionIncome: Math.round(statePensionIncome),
-      investmentIncome: Math.round(investmentDrawn),
-      totalIncome: Math.round(totalIncome),
-      totalExpenditure: Math.round(totalExpenditure),
-      surplus: Math.round(totalIncome - totalExpenditure),
+      employmentIncome: roundedEmployment,
+      pensionIncome: roundedPension,
+      statePensionIncome: roundedStatePension,
+      investmentIncome: roundedInvestment,
+      totalIncome,
+      totalExpenditure: roundedExpenditure,
+      surplus: totalIncome - roundedExpenditure,
     });
   }
 
@@ -259,7 +296,10 @@ function calculateEmploymentIncome(personStates: PersonState[], yearOffset: numb
 
     // Tax is calculated on the full gross (salary + bonus), preserving pension method
     const grownIncome: PersonIncome = { ...state.personIncome, grossSalary: totalGrossIncome };
-    const takeHome = calculateTakeHomePay(grownIncome);
+    const studentLoanPlan = state.person.studentLoanPlan ?? "none";
+    const takeHome = studentLoanPlan !== "none"
+      ? calculateTakeHomePayWithStudentLoan(grownIncome, studentLoanPlan)
+      : calculateTakeHomePay(grownIncome);
     total += takeHome.takeHome;
   }
   return total;
@@ -304,7 +344,13 @@ export function calculateExpenditure(
     total += inflatedAmount;
   }
 
-  total += monthlyLifestyleSpending * 12;
+  // FEAT-017: Apply inflation to lifestyle spending (using general CPI-like 2% default)
+  const yearsElapsed = calendarYear - effectiveBaseYear;
+  const lifestyleInflationRate = 0.02; // general CPI assumption
+  const inflatedLifestyle = yearsElapsed > 0
+    ? monthlyLifestyleSpending * 12 * Math.pow(1 + lifestyleInflationRate, yearsElapsed)
+    : monthlyLifestyleSpending * 12;
+  total += inflatedLifestyle;
   return total;
 }
 
@@ -377,4 +423,38 @@ function executeDrawdown(
   }
 
   return { pensionDrawn, investmentDrawn };
+}
+
+/**
+ * Calculate net pension drawdown after income tax.
+ * Per HMRC rules, 25% of pension drawdown is tax-free (PCLS),
+ * and the remaining 75% is taxed as income. State pension is
+ * also taxable income, so we calculate tax on the combined
+ * taxable retirement income.
+ *
+ * Returns the net (after-tax) pension drawdown amount.
+ */
+function calculateNetPensionDrawdown(
+  grossPensionDrawn: number,
+  statePensionIncome: number
+): number {
+  if (grossPensionDrawn <= 0) return 0;
+
+  // 25% pension commencement lump sum is tax-free
+  const taxFreePortion = grossPensionDrawn * 0.25;
+  const taxablePortion = grossPensionDrawn * 0.75;
+
+  // Total taxable retirement income = state pension + taxable pension drawdown
+  // No pension contribution or NI in retirement — just income tax
+  const totalTaxableIncome = statePensionIncome + taxablePortion;
+
+  // Tax on total taxable retirement income
+  const taxOnTotal = calculateIncomeTax(totalTaxableIncome);
+  // Tax attributable to state pension alone
+  const taxOnStatePension = calculateIncomeTax(statePensionIncome);
+
+  // Marginal tax on pension drawdown portion
+  const pensionTax = taxOnTotal.tax - taxOnStatePension.tax;
+
+  return taxFreePortion + taxablePortion - pensionTax;
 }

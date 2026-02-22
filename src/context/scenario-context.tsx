@@ -30,6 +30,8 @@ export interface SavedScenario {
   name: string;
   overrides: ScenarioOverrides;
   savedAt: string; // ISO date
+  /** FEAT-019: Human-readable description of what changed */
+  description?: string;
 }
 
 export interface ScenarioContextValue {
@@ -41,7 +43,7 @@ export interface ScenarioContextValue {
   disableScenario: () => void;
   applyOverrides: (household: HouseholdData) => HouseholdData;
   savedScenarios: SavedScenario[];
-  saveScenario: (name: string) => void;
+  saveScenario: (name: string, description?: string) => void;
   loadScenario: (name: string) => void;
   deleteScenario: (name: string) => void;
 }
@@ -96,10 +98,10 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
     setOverrides({});
   }, []);
 
-  const saveScenario = useCallback((name: string) => {
+  const saveScenario = useCallback((name: string, description?: string) => {
     setSavedScenarios((prev) => {
       const updated = prev.filter((s) => s.name !== name);
-      updated.push({ name, overrides, savedAt: new Date().toISOString() });
+      updated.push({ name, overrides, savedAt: new Date().toISOString(), description });
       persistSavedScenarios(updated);
       return updated;
     });

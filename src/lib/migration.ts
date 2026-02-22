@@ -163,7 +163,7 @@ function migrateDashboardConfigDefault(data: Record<string, unknown>): Record<st
   if (data.dashboardConfig && typeof data.dashboardConfig === "object") return data;
   return {
     ...data,
-    dashboardConfig: { heroMetrics: ["net_worth", "fire_progress", "retirement_countdown"] },
+    dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
   };
 }
 

@@ -87,6 +87,7 @@ export const BonusStructureSchema = z.object({
   vestingYears: z.number().int().min(0).max(10).default(0),
   vestingGapYears: z.number().int().min(0).max(5).default(0),
   estimatedAnnualReturn: z.number().min(-0.5).max(0.5).default(0.08),
+  bonusPaymentMonth: z.number().int().min(0).max(11).optional(),
 });
 
 export const PersonIncomeSchema = z.object({
@@ -146,6 +147,11 @@ export const CommittedOutgoingCategorySchema = z.enum([
   "rent",
   "childcare",
   "insurance",
+  "utilities",
+  "subscriptions",
+  "transport",
+  "health",
+  "loan_repayment",
   "other",
 ]);
 
@@ -176,6 +182,7 @@ export const HeroMetricTypeSchema = z.enum([
   "fire_progress",
   "net_worth_after_commitments",
   "projected_retirement_income",
+  "cash_runway",
 ]);
 
 export const DashboardConfigSchema = z.object({
@@ -236,7 +243,7 @@ export const HouseholdDataSchema = z.object({
   emergencyFund: EmergencyFundConfigSchema,
   committedOutgoings: z.array(CommittedOutgoingSchema).default([]),
   dashboardConfig: DashboardConfigSchema.default({
-    heroMetrics: ["net_worth", "fire_progress", "retirement_countdown"],
+    heroMetrics: ["net_worth", "cash_position", "retirement_countdown"],
   }),
   iht: IHTConfigSchema,
 });

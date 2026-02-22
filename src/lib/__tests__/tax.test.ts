@@ -85,6 +85,26 @@ describe("calculateIncomeTax", () => {
     expect(result.tax).toBe(6486);
   });
 
+  it("relief at source reduces adjusted net income for PA taper", () => {
+    // £110,000 salary, £8,000 net pension contribution (relief at source)
+    // Gross pension contribution: £8,000 / 0.8 = £10,000
+    // Adjusted net income for PA taper: £110,000 - £10,000 = £100,000
+    // PA taper threshold is £100,000 — so PA should NOT be tapered
+    const withRelief = calculateIncomeTax(110000, 8000, "relief_at_source");
+    const paBreakdown = withRelief.breakdown.find((b) => b.band === "Personal Allowance");
+    // Full personal allowance should be preserved (not tapered)
+    expect(paBreakdown?.taxableAmount).toBe(12_570);
+
+    // Without pension contribution, PA would be heavily tapered
+    const withoutPension = calculateIncomeTax(110000, 0, "salary_sacrifice");
+    const paWithout = withoutPension.breakdown.find((b) => b.band === "Personal Allowance");
+    // £110k - £100k = £10k excess, lose £5k of PA => PA = £12,570 - £5,000 = £7,570
+    expect(paWithout?.taxableAmount).toBe(7_570);
+
+    // Relief at source with contribution should pay less tax
+    expect(withRelief.tax).toBeLessThan(withoutPension.tax);
+  });
+
   it("extends basic rate band for relief at source pension", () => {
     // £55,000 salary, £4,000 net pension contribution
     // Gross pension contribution: £4,000 / 0.8 = £5,000
@@ -161,9 +181,9 @@ describe("calculateStudentLoan", () => {
   });
 
   it("calculates Plan 1 repayment correctly", () => {
-    // £50,000 salary, Plan 1 threshold: £22,015, rate: 9%
-    // Repayable: (£50,000 - £22,015) = £27,985 * 0.09 = £2,518.65
-    expect(calculateStudentLoan(50000, "plan1")).toBe(2518.65);
+    // £50,000 salary, Plan 1 threshold: £24,990, rate: 9%
+    // Repayable: (£50,000 - £24,990) = £25,010 * 0.09 = £2,250.90
+    expect(calculateStudentLoan(50000, "plan1")).toBe(2250.9);
   });
 
   it("calculates Plan 2 repayment correctly", () => {
@@ -173,9 +193,9 @@ describe("calculateStudentLoan", () => {
   });
 
   it("calculates Plan 4 repayment correctly", () => {
-    // £50,000, Plan 4 threshold: £27,660
-    // (£50,000 - £27,660) = £22,340 * 0.09 = £2,010.60
-    expect(calculateStudentLoan(50000, "plan4")).toBe(2010.6);
+    // £50,000, Plan 4 threshold: £31,395
+    // (£50,000 - £31,395) = £18,605 * 0.09 = £1,674.45
+    expect(calculateStudentLoan(50000, "plan4")).toBe(1674.45);
   });
 
   it("calculates Plan 5 repayment correctly", () => {

@@ -211,7 +211,7 @@ function SettingsPageInner() {
   // ----------------------------------------------------------
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader title="Settings" description="Manage all your financial data. Changes are saved automatically." />
 
       {/* Quick Setup Guide */}

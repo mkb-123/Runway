@@ -201,7 +201,7 @@ export default function TaxPlanningPage() {
           baseTotalUnrealisedGain,
         };
       }),
-    [persons, income, contributions, household.accounts, household.bonusStructures, isaAllowance, pensionAllowance, cgtAnnualExempt, baseIncomeLookup, baseHousehold.contributions, baseHousehold.accounts, baseHousehold.bonusStructures]
+    [persons, income, contributions, household.accounts, household.bonusStructures, isaAllowance, cgtAnnualExempt, baseIncomeLookup, baseHousehold.contributions, baseHousehold.accounts, baseHousehold.bonusStructures]
   );
 
   // Pension modelling scenarios
@@ -292,7 +292,7 @@ export default function TaxPlanningPage() {
   );
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader title="Tax Planning & Optimisation" description="Strategies to minimise tax drag and optimise your investment wrappers.">
         <PersonToggle />
       </PageHeader>

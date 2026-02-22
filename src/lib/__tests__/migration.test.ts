@@ -146,7 +146,7 @@ describe("migrateHouseholdData", () => {
 
       const migrated = migrateHouseholdData(data);
       const dc = migrated.dashboardConfig as Record<string, unknown>;
-      expect(dc.heroMetrics).toEqual(["net_worth", "fire_progress", "retirement_countdown"]);
+      expect(dc.heroMetrics).toEqual(["net_worth", "cash_position", "retirement_countdown"]);
     });
   });
 

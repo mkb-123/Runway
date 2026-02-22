@@ -125,25 +125,7 @@ export default function CashFlowPage() {
     return { currentYear, shortfallYears };
   }, [baseData]);
 
-  if (filteredHousehold.persons.length === 0) {
-    return (
-      <div className="space-y-8">
-        <PageHeader title="Lifetime Cash Flow" description="Year-by-year income vs expenditure" />
-        <EmptyState message="Add people and income in Settings to see your lifetime cash flow projection." />
-      </div>
-    );
-  }
-
-  if (data.length === 0) {
-    return (
-      <div className="space-y-8">
-        <PageHeader title="Lifetime Cash Flow" description="Year-by-year income vs expenditure" />
-        <EmptyState message="Ensure at least one person has a date of birth configured in Settings." />
-      </div>
-    );
-  }
-
-  // School fee timeline data
+  // School fee timeline data (must be above early returns to satisfy rules-of-hooks)
   const schoolFeeTimeline = useMemo(
     () => generateSchoolFeeTimeline(household.children),
     [household.children]
@@ -154,11 +136,29 @@ export default function CashFlowPage() {
   );
   const hasSchoolFees = household.children.length > 0 && household.children.some((c) => c.schoolFeeAnnual > 0);
 
+  if (filteredHousehold.persons.length === 0) {
+    return (
+      <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <PageHeader title="Lifetime Cash Flow" description="Year-by-year income vs expenditure" />
+        <EmptyState message="Add people and income in Settings to see your lifetime cash flow projection." />
+      </div>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <PageHeader title="Lifetime Cash Flow" description="Year-by-year income vs expenditure" />
+        <EmptyState message="Ensure at least one person has a date of birth configured in Settings." />
+      </div>
+    );
+  }
+
   const primaryPerson = filteredHousehold.persons.find((p) => p.relationship === "self") ?? filteredHousehold.persons[0];
   const currentAge = calculateAge(primaryPerson.dateOfBirth);
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader
         title="Lifetime Cash Flow"
         description={`${primaryPersonName}'s household \u2014 age ${currentAge} to 95 at ${(growthRate * 100).toFixed(0)}% growth`}

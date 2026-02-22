@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { getAccountTaxWrapper, isAccountAccessible, getHouseholdGrossIncome, annualiseContribution } from "@/types";
+import { isAccountAccessible, getHouseholdGrossIncome, annualiseContribution } from "@/types";
 import { calculateTotalAnnualContributions, calculateHouseholdStatePension } from "@/lib/aggregations";
 import {
   formatCurrency,
@@ -221,17 +221,26 @@ export default function RetirementPage() {
   const plannedRetirementAge = primaryPerson?.plannedRetirementAge ?? 60;
   const pensionAccessAge = primaryPerson?.pensionAccessAge ?? 57;
 
-  // Interactive retirement age override
-  const [retirementAgeOverride, setRetirementAgeOverride] = useState<
-    number | null
-  >(null);
-  const effectiveRetirementAge = retirementAgeOverride ?? plannedRetirementAge;
+  // Interactive retirement age override.
+  // Store the scenario mode alongside the override so we can automatically
+  // reset the slider when scenario mode changes (avoids stale local state
+  // conflicting with scenario panel retirement age overrides).
+  const [retirementAgeState, setRetirementAgeState] = useState<{
+    scenarioMode: boolean;
+    ageOverride: number | null;
+  }>({ scenarioMode: isScenarioMode, ageOverride: null });
 
-  // Reset local slider when scenario mode changes (prevents stale local state
-  // conflicting with scenario panel retirement age overrides)
-  useEffect(() => {
-    setRetirementAgeOverride(null);
-  }, [isScenarioMode]);
+  // Derive effective override — auto-resets when scenario mode changes
+  const retirementAgeOverride =
+    retirementAgeState.scenarioMode === isScenarioMode
+      ? retirementAgeState.ageOverride
+      : null;
+
+  const setRetirementAgeOverride = (age: number | null) => {
+    setRetirementAgeState({ scenarioMode: isScenarioMode, ageOverride: age });
+  };
+
+  const effectiveRetirementAge = retirementAgeOverride ?? plannedRetirementAge;
 
   // Growth rate toggle (index into scenarioRates)
   const [selectedRateIndex, setSelectedRateIndex] = useState<number>(
@@ -433,7 +442,7 @@ export default function RetirementPage() {
   }, [basePersons, baseAccounts, basePersonContribBreakdown, midRate, yearsToRetirement]);
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader
         title="Retirement Planning"
         description="Track your progress toward financial independence"

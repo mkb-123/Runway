@@ -23,6 +23,9 @@ import {
   Percent,
   CalendarClock,
   Target,
+  Save,
+  Trash2,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,7 +40,7 @@ import {
 } from "@/components/ui/sheet";
 import { useScenario, type ScenarioOverrides } from "@/context/scenario-context";
 import { useData } from "@/context/data-context";
-import { getPersonContributionTotals, getPersonGrossIncome, isAccountAccessible } from "@/types";
+import { getPersonContributionTotals, getPersonGrossIncome } from "@/types";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/format";
 import { calculateAge, projectFinalValue, calculateSWR, calculateProRataStatePension } from "@/lib/projections";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
@@ -45,7 +48,7 @@ import {
   scaleSavingsRateContributions,
   calculateScenarioImpact,
   buildAvoidTaperPreset,
-  type ImpactPreview,
+  generateScenarioDescription,
 } from "@/lib/scenario";
 
 // --- Smart Presets ---
@@ -123,6 +126,7 @@ function Section({
     <div className="rounded-lg border bg-card">
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
         className="flex w-full items-center justify-between p-3 text-left"
       >
         <span className="flex items-center gap-2 text-sm font-medium">
@@ -146,6 +150,9 @@ function Section({
 
 // --- Range Slider with Value ---
 
+// BUG-007: All form inputs must have htmlFor/id linkage for WCAG compliance
+let rangeIdCounter = 0;
+
 function RangeInput({
   label,
   value,
@@ -155,6 +162,7 @@ function RangeInput({
   current,
   format,
   onChange,
+  id: externalId,
 }: {
   label: string;
   value: number;
@@ -164,17 +172,20 @@ function RangeInput({
   current: number;
   format: (v: number) => string;
   onChange: (v: number) => void;
+  id?: string;
 }) {
+  const inputId = externalId ?? `range-input-${++rangeIdCounter}`;
   const changed = value !== current;
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label className="text-xs text-muted-foreground">{label}</Label>
+        <Label htmlFor={inputId} className="text-xs text-muted-foreground">{label}</Label>
         <span className={`text-sm font-medium tabular-nums ${changed ? "text-primary" : ""}`}>
           {format(value)}
         </span>
       </div>
       <input
+        id={inputId}
         type="range"
         min={min}
         max={max}
@@ -198,11 +209,17 @@ export function ScenarioPanel() {
   const { household } = useData();
   const {
     isScenarioMode,
+    overrides: activeOverrides,
     enableScenario,
     disableScenario,
+    savedScenarios,
+    saveScenario,
+    loadScenario,
+    deleteScenario,
   } = useScenario();
 
   const [open, setOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
 
   // Track pension overrides for live preview
   const [pensionOverrides, setPensionOverrides] = useState<Record<string, number>>({});
@@ -360,7 +377,7 @@ export function ScenarioPanel() {
     }
 
     enableScenario("Custom Scenario", newOverrides);
-  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, totalGrossIncome, contribsByPerson, retirementAgeOverrides, targetIncomeOverride, enableScenario]);
+  }, [household, pensionOverrides, incomeOverrides, contributionOverrides, marketShock, savingsRateOverride, totalGrossIncome, retirementAgeOverrides, targetIncomeOverride, enableScenario]);
 
   const applyPreset = useCallback(
     (preset: SmartPreset) => {
@@ -502,6 +519,48 @@ export function ScenarioPanel() {
               })}
             </div>
           </div>
+
+          {/* FEAT-019: Saved Scenarios */}
+          {savedScenarios.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Saved Scenarios
+              </h3>
+              <div className="space-y-2">
+                {savedScenarios.map((scenario) => (
+                  <div
+                    key={scenario.name}
+                    className="flex items-start gap-2 rounded-lg border p-3"
+                  >
+                    <BookOpen className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <button
+                        onClick={() => {
+                          loadScenario(scenario.name);
+                          setOpen(false);
+                        }}
+                        className="text-left"
+                      >
+                        <p className="text-sm font-medium">{scenario.name}</p>
+                        {scenario.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {scenario.description}
+                          </p>
+                        )}
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => deleteScenario(scenario.name)}
+                      className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
+                      aria-label={`Delete ${scenario.name}`}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="border-t" />
 
@@ -836,8 +895,39 @@ export function ScenarioPanel() {
             </div>
           </Section>
 
-          {/* Apply / Reset — sticky footer on mobile */}
-          <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 py-3">
+          {/* Apply / Save / Reset — sticky footer with safe-area padding for mobile browser chrome */}
+          <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {/* FEAT-019: Save current scenario */}
+            {isScenarioMode && (
+              <div className="mb-2 flex gap-2">
+                <Input
+                  placeholder="Save as..."
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  className="text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && saveName.trim()) {
+                      const desc = generateScenarioDescription(activeOverrides, household);
+                      saveScenario(saveName.trim(), desc);
+                      setSaveName("");
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!saveName.trim()}
+                  onClick={() => {
+                    const desc = generateScenarioDescription(activeOverrides, household);
+                    saveScenario(saveName.trim(), desc);
+                    setSaveName("");
+                  }}
+                >
+                  <Save className="mr-1 size-3.5" />
+                  Save
+                </Button>
+              </div>
+            )}
             <div className="flex gap-2">
               <Button
                 onClick={() => {

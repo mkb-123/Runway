@@ -345,6 +345,7 @@ describe("analyzePensionHeadroom — uses totalPensionContributions correctly", 
       allAccounts: [],
       effectivePensionAllowance: 60000,
       totalPensionContributions: totalPension,
+      totalAvailableAllowance: 60000,
     };
 
     const recs = analyzePensionHeadroom(ctx);
@@ -380,6 +381,7 @@ describe("analyzePensionHeadroom — uses totalPensionContributions correctly", 
       allAccounts: [],
       effectivePensionAllowance: 60000,
       totalPensionContributions: totalPension,
+      totalAvailableAllowance: 60000,
     };
 
     expect(analyzePensionHeadroom(ctx)).toHaveLength(0);
@@ -417,6 +419,7 @@ describe("analyzePensionHeadroom — uses totalPensionContributions correctly", 
       allAccounts: [],
       effectivePensionAllowance: 60000,
       totalPensionContributions: totalPension,
+      totalAvailableAllowance: 60000,
     };
 
     // Correctly returns nothing — only 18k headroom

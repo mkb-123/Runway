@@ -4,6 +4,8 @@ import {
   getNetWorthByPerson,
   getNetWorthByWrapper,
   getNetWorthByAccountType,
+  calculateTotalAnnualContributions,
+  calculatePersonalAnnualContributions,
 } from "../aggregations";
 import type { HouseholdData } from "@/types";
 
@@ -82,5 +84,38 @@ describe("getNetWorthByAccountType", () => {
     expect(result).toHaveLength(4);
     expect(result.find((r) => r.type === "sipp")?.value).toBe(200000);
     expect(result.find((r) => r.type === "stocks_and_shares_isa")?.value).toBe(100000);
+  });
+});
+
+describe("calculatePersonalAnnualContributions vs calculateTotalAnnualContributions", () => {
+  const income = [
+    {
+      personId: "p1",
+      grossSalary: 100000,
+      employerPensionContribution: 10000,
+      employeePensionContribution: 5000,
+      pensionContributionMethod: "salary_sacrifice" as const,
+    },
+  ];
+  const contributions = [
+    { id: "c1", personId: "p1", label: "ISA", target: "isa" as const, amount: 1000, frequency: "monthly" as const },
+  ];
+
+  it("total includes employer contributions", () => {
+    const total = calculateTotalAnnualContributions(contributions, income);
+    // ISA: 1000*12 + employee: 5000 + employer: 10000 = 27000
+    expect(total).toBe(27000);
+  });
+
+  it("personal excludes employer contributions", () => {
+    const personal = calculatePersonalAnnualContributions(contributions, income);
+    // ISA: 1000*12 + employee: 5000 = 17000
+    expect(personal).toBe(17000);
+  });
+
+  it("difference is exactly employer contributions", () => {
+    const total = calculateTotalAnnualContributions(contributions, income);
+    const personal = calculatePersonalAnnualContributions(contributions, income);
+    expect(total - personal).toBe(10000);
   });
 });

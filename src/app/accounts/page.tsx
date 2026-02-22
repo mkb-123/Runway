@@ -96,7 +96,7 @@ export default function AccountsPage() {
   }, [filteredAccounts, baseAccountValues]);
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader title="Accounts" description="Overview of all accounts grouped by person.">
         <PersonToggle />
       </PageHeader>

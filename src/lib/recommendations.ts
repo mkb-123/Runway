@@ -26,7 +26,7 @@ import type {
 import { getPersonContributionTotals, getHouseholdGrossIncome, annualiseContribution } from "@/types";
 import { calculateIncomeTax, calculateNI } from "@/lib/tax";
 import { getUnrealisedGains } from "@/lib/cgt";
-import { calculateTaperedAnnualAllowance } from "@/lib/projections";
+import { calculateTaperedAnnualAllowance, calculatePensionCarryForward } from "@/lib/projections";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 
 export type RecommendationPriority = "high" | "medium" | "low";
@@ -85,6 +85,8 @@ interface PersonContext {
   /** Total pension contributions from ALL sources: employee + employer + discretionary.
    *  This is the value that counts against the annual allowance. */
   totalPensionContributions: number;
+  /** FEAT-002: Total available allowance including carry-forward from prior 3 years */
+  totalAvailableAllowance: number;
 }
 
 // --- Individual analyzers ---
@@ -216,14 +218,19 @@ export function analyzeISAUsage(ctx: PersonContext): Recommendation[] {
   ];
 }
 
-/** 3. Pension allowance headroom */
+/** 3. Pension allowance headroom (FEAT-002: includes carry-forward) */
 // FEAT-001: Uses tapered annual allowance for high earners
 export function analyzePensionHeadroom(ctx: PersonContext): Recommendation[] {
-  const { person, adjustedGross, effectivePensionAllowance, totalPensionContributions } = ctx;
+  const { person, adjustedGross, effectivePensionAllowance, totalAvailableAllowance, totalPensionContributions } = ctx;
   const pensionUsed = totalPensionContributions;
-  const pensionRemaining = effectivePensionAllowance - pensionUsed;
-  const pensionPercent = effectivePensionAllowance > 0
-    ? Math.round((pensionUsed / effectivePensionAllowance) * 100)
+
+  // FEAT-002: Use totalAvailableAllowance (includes carry-forward) for headroom calculation
+  const pensionRemaining = totalAvailableAllowance - pensionUsed;
+  const carryForwardAmount = totalAvailableAllowance - effectivePensionAllowance;
+  const hasCarryForward = carryForwardAmount > 0;
+
+  const pensionPercent = totalAvailableAllowance > 0
+    ? Math.round((pensionUsed / totalAvailableAllowance) * 100)
     : 0;
 
   if (pensionRemaining <= 20000) return [];
@@ -232,18 +239,22 @@ export function analyzePensionHeadroom(ctx: PersonContext): Recommendation[] {
   const reliefRate = adjustedGross > UK_TAX_CONSTANTS.incomeTax.basicRateUpperLimit ? 0.4 : 0.2;
   const taxRelief = Math.round(pensionRemaining * reliefRate);
 
+  const carryForwardNote = hasCarryForward
+    ? ` Includes £${carryForwardAmount.toLocaleString()} carry-forward from prior years' unused allowance.`
+    : "";
+
   return [
     {
       id: `pension-headroom-${person.id}`,
       title: `${person.name}: £${pensionRemaining.toLocaleString()} pension headroom unused`,
-      description: `Only ${pensionPercent}% of ${person.name}'s £${effectivePensionAllowance.toLocaleString()} pension annual allowance is used (£${pensionUsed.toLocaleString()} contributed).${isTapered ? ` Note: allowance is tapered from £${UK_TAX_CONSTANTS.pensionAnnualAllowance.toLocaleString()} due to high income.` : ""} As a ${reliefRate === 0.4 ? "higher" : "basic"} rate taxpayer, additional contributions get ${(reliefRate * 100).toFixed(0)}% tax relief.`,
+      description: `Only ${pensionPercent}% of ${person.name}'s £${totalAvailableAllowance.toLocaleString()} available pension allowance is used (£${pensionUsed.toLocaleString()} contributed).${isTapered ? ` Note: current year allowance is tapered from £${UK_TAX_CONSTANTS.pensionAnnualAllowance.toLocaleString()} due to high income.` : ""}${carryForwardNote} As a ${reliefRate === 0.4 ? "higher" : "basic"} rate taxpayer, additional contributions get ${(reliefRate * 100).toFixed(0)}% tax relief.`,
       impact: `Tax relief of £${taxRelief.toLocaleString()} on the unused £${pensionRemaining.toLocaleString()} headroom.`,
       priority: pensionRemaining > 40000 ? "high" : "medium",
       category: "pension",
       personId: person.id,
       personName: person.name,
       actionUrl: "/tax-planning",
-      plainAction: `You could put up to £${pensionRemaining.toLocaleString()} more into your pension this year. The government adds back £${taxRelief.toLocaleString()} in tax relief — that's free money.`,
+      plainAction: `You could put up to £${pensionRemaining.toLocaleString()} more into your pension this year.${hasCarryForward ? ` This includes carry-forward from prior years.` : ""} The government adds back £${taxRelief.toLocaleString()} in tax relief — that's free money.`,
     },
   ];
 }
@@ -545,6 +556,13 @@ export function generateRecommendations(
       personIncome.employerPensionContribution +
       personContributions.pensionContribution;
 
+    // FEAT-002: Calculate carry-forward from prior years
+    const priorContribs = personIncome.priorYearPensionContributions ?? [];
+    const totalAvailableAllowance = calculatePensionCarryForward(
+      effectivePensionAllowance,
+      priorContribs
+    );
+
     const ctx: PersonContext = {
       person,
       income: personIncome,
@@ -554,22 +572,32 @@ export function generateRecommendations(
       allAccounts: accounts,
       effectivePensionAllowance,
       totalPensionContributions,
+      totalAvailableAllowance,
     };
 
     for (const analyze of perPersonAnalyzers) {
       recommendations.push(...analyze(ctx));
     }
 
-    // FEAT-014: Coordinate ISA usage — deduct ISA top-up from available allowance for Bed & ISA
+    // FEAT-014 + James feedback: Coordinate ISA usage — Bed & ISA takes priority over
+    // generic ISA top-up because it achieves both goals (shelter gains + use ISA allowance).
     const isaUsed = personContributions.isaContribution;
     const isaRemaining = UK_TAX_CONSTANTS.isaAnnualAllowance - isaUsed;
-    // If we already recommended ISA top-up, the Bed & ISA gets what's left (zero, to avoid exceeding allowance)
-    // If the ISA recommendation exists, it claims the remaining allowance — Bed & ISA gets nothing extra
-    const isaRecommendation = recommendations.find(
-      (r) => (r.id === `isa-topup-${person.id}` || r.id === `isa-unused-${person.id}`)
-    );
-    const isaRemainingForBedAndIsa = isaRecommendation ? 0 : isaRemaining;
-    recommendations.push(...analyzeBedAndISA(ctx, isaRemainingForBedAndIsa));
+
+    // Try Bed & ISA first (it uses the ISA allowance more effectively when gains exist)
+    const bedAndIsaRecs = analyzeBedAndISA(ctx, isaRemaining);
+    recommendations.push(...bedAndIsaRecs);
+
+    // If Bed & ISA claimed the ISA allowance, suppress generic ISA top-up to avoid exceeding allowance
+    if (bedAndIsaRecs.length > 0) {
+      // Remove any ISA top-up recommendations for this person (Bed & ISA covers ISA usage)
+      const isaTopUpIdx = recommendations.findIndex(
+        (r) => r.id === `isa-topup-${person.id}` || r.id === `isa-unused-${person.id}`
+      );
+      if (isaTopUpIdx !== -1) {
+        recommendations.splice(isaTopUpIdx, 1);
+      }
+    }
   }
 
   // Household-level analysis

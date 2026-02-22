@@ -60,7 +60,7 @@ export interface BonusStructure {
   personId: string;
   /** Total annual bonus (cash + deferred). Grows at bonusGrowthRate. */
   totalBonusAnnual: number;
-  /** Fixed cash portion paid immediately each year. Does NOT grow. */
+  /** Cash portion paid immediately each year. Base amount; grows at bonusGrowthRate in projections. */
   cashBonusAnnual: number;
   /** Number of years for equal vesting (e.g. 3 = 1/3 vests each year) */
   vestingYears: number;
@@ -68,6 +68,8 @@ export interface BonusStructure {
   vestingGapYears: number;
   /** Expected annual return on deferred amounts while vesting */
   estimatedAnnualReturn: number;
+  /** Month cash bonus is paid (0=Jan, 1=Feb, ..., 11=Dec). Defaults to 2 (March). */
+  bonusPaymentMonth?: number;
 }
 
 /** Derived: deferred portion = total - cash (never negative) */
@@ -85,6 +87,8 @@ export interface PersonIncome {
   salaryGrowthRate?: number;
   /** Expected annual bonus growth rate as a decimal (e.g. 0.05 for 5%). Defaults to 0. */
   bonusGrowthRate?: number;
+  /** FEAT-002: Prior 3 years' total pension contributions [year-1, year-2, year-3] for carry-forward */
+  priorYearPensionContributions?: number[];
 }
 
 // --- Contributions & Planning ---
@@ -199,6 +203,11 @@ export type CommittedOutgoingCategory =
   | "rent"
   | "childcare"
   | "insurance"
+  | "utilities"
+  | "subscriptions"
+  | "transport"
+  | "health"
+  | "loan_repayment"
   | "other";
 
 export type OutgoingFrequency = "monthly" | "termly" | "annually";
@@ -222,6 +231,11 @@ export const OUTGOING_CATEGORY_LABELS: Record<CommittedOutgoingCategory, string>
   rent: "Rent",
   childcare: "Childcare",
   insurance: "Insurance",
+  utilities: "Utilities",
+  subscriptions: "Subscriptions",
+  transport: "Transport",
+  health: "Health",
+  loan_repayment: "Loan Repayment",
   other: "Other",
 };
 
@@ -254,7 +268,11 @@ export type HeroMetricType =
   | "savings_rate"
   | "fire_progress"
   | "net_worth_after_commitments"
-  | "projected_retirement_income";
+  | "projected_retirement_income"
+  | "cash_runway"
+  | "school_fee_countdown"
+  | "pension_bridge_gap"
+  | "per_person_retirement";
 
 export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   net_worth: "Total Net Worth",
@@ -266,6 +284,10 @@ export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   fire_progress: "FIRE Progress",
   net_worth_after_commitments: "Net Worth After Commitments",
   projected_retirement_income: "Projected Retirement Income",
+  cash_runway: "Cash Runway",
+  school_fee_countdown: "School Fee Countdown",
+  pension_bridge_gap: "Pension Bridge Gap",
+  per_person_retirement: "Per-Person Retirement",
 };
 
 export interface DashboardConfig {

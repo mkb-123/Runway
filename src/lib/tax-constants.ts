@@ -31,9 +31,9 @@ export const UK_TAX_CONSTANTS = {
 
   // --- Student Loan Repayment ---
   studentLoan: {
-    plan1: { threshold: 22_015, rate: 0.09 },
+    plan1: { threshold: 24_990, rate: 0.09 },
     plan2: { threshold: 27_295, rate: 0.09 },
-    plan4: { threshold: 27_660, rate: 0.09 },
+    plan4: { threshold: 31_395, rate: 0.09 },
     plan5: { threshold: 25_000, rate: 0.09 },
     postgrad: { threshold: 21_000, rate: 0.06 },
   },

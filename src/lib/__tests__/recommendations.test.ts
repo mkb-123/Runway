@@ -275,6 +275,7 @@ describe("analyzePensionHeadroom", () => {
       employerPensionContribution: 3000,
     });
     const contributions = makeContributionTotals({ pensionContribution: 10000 });
+    const totalPension = computeTotalPension(income, contributions);
     const ctx = {
       person: makePerson(),
       income,
@@ -283,7 +284,8 @@ describe("analyzePensionHeadroom", () => {
       adjustedGross: 80000,
       allAccounts: [],
       effectivePensionAllowance: 60000,
-      totalPensionContributions: computeTotalPension(income, contributions),
+      totalPensionContributions: totalPension,
+      totalAvailableAllowance: 60000,
     };
 
     // totalPensionContributions = 3000 + 3000 + 10000 = 16000. Remaining = 44000 > 20000.
@@ -298,6 +300,7 @@ describe("analyzePensionHeadroom", () => {
       employerPensionContribution: 5000,
     });
     const contributions = makeContributionTotals({ pensionContribution: 30000 });
+    const totalPension = computeTotalPension(income, contributions);
     const ctx = {
       person: makePerson(),
       income,
@@ -306,7 +309,8 @@ describe("analyzePensionHeadroom", () => {
       adjustedGross: 60000,
       allAccounts: [],
       effectivePensionAllowance: 60000,
-      totalPensionContributions: computeTotalPension(income, contributions),
+      totalPensionContributions: totalPension,
+      totalAvailableAllowance: 60000,
     };
 
     // totalPensionContributions = 20000 + 5000 + 30000 = 55000. Remaining = 5000 <= 20000.
@@ -320,6 +324,7 @@ describe("analyzePensionHeadroom", () => {
       employerPensionContribution: 5000,
     });
     const contributions = makeContributionTotals({ pensionContribution: 0 });
+    const totalPension = computeTotalPension(income, contributions);
     const ctx = {
       person: makePerson(),
       income,
@@ -328,11 +333,38 @@ describe("analyzePensionHeadroom", () => {
       adjustedGross: 80000,
       allAccounts: [],
       effectivePensionAllowance: 60000,
-      totalPensionContributions: computeTotalPension(income, contributions),
+      totalPensionContributions: totalPension,
+      totalAvailableAllowance: 60000,
     };
 
     // totalPensionContributions = 40000 + 5000 + 0 = 45000. Remaining = 15000 <= 20000.
     expect(analyzePensionHeadroom(ctx)).toHaveLength(0);
+  });
+
+  it("FEAT-002: includes carry-forward in headroom", () => {
+    const income = makeIncome({
+      employeePensionContribution: 3000,
+      employerPensionContribution: 3000,
+    });
+    const contributions = makeContributionTotals({ pensionContribution: 10000 });
+    const totalPension = computeTotalPension(income, contributions);
+    const ctx = {
+      person: makePerson(),
+      income,
+      contributions,
+      accounts: [],
+      adjustedGross: 80000,
+      allAccounts: [],
+      effectivePensionAllowance: 60000,
+      totalPensionContributions: totalPension,
+      totalAvailableAllowance: 180000, // 60k current + 120k carry-forward from 3 unused years
+    };
+
+    // totalPensionContributions = 16000. Remaining = 180000 - 16000 = 164000.
+    const recs = analyzePensionHeadroom(ctx);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].description).toContain("carry-forward");
+    expect(recs[0].description).toContain("£180,000"); // total available
   });
 });
 

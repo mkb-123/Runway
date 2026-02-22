@@ -1,245 +1,106 @@
 # Open Issues — Agent Team Review
 
 > This file is maintained by the agent team. Review it at the start of every session.
-> Mark issues as `[CLOSED]` when resolved. Do not delete — keep for audit trail.
 
 ---
 
 ## Bugs
 
-### BUG-001: Scenario banner shows on all pages but only 2 pages use scenario data [HIGH]
+### BUG-021: CGT rate is all-or-nothing (single rate based on total income) [LOW]
 
 **Status:** OPEN
-**Reported by:** UX Designer, Devil's Advocate
-**Files:** `src/components/scenario-panel.tsx:149`, all page files
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/cgt.ts`
 
-The What-If scenario banner appears on all 11 pages (rendered in root Navigation), but only Dashboard (`/`) and Retirement (`/retirement`) use `useScenarioData()`. The other 9 pages use raw `useData()` and display unmodified values. A user in "Market Crash (-30%)" mode who navigates to `/projections` sees original un-crashed values despite the banner.
-
-**Fix:** Update all remaining pages to use `useScenarioData()`:
-- `src/app/accounts/page.tsx`
-- `src/app/holdings/page.tsx`
-- `src/app/projections/page.tsx`
-- `src/app/income/page.tsx`
-- `src/app/tax-planning/page.tsx`
-- `src/app/allocation/page.tsx`
-- `src/app/iht/page.tsx`
+The code applies a single CGT rate (basic or higher) based on total income, rather than splitting gains across the basic/higher rate bands. This is conservative — it overstates CGT for taxpayers near the basic rate boundary.
 
 ---
 
-### BUG-002: Retirement page NaN% and Infinity when income or withdrawal rate is zero [HIGH]
+### BUG-022: Projection model uses inconsistent compounding (monthly vs annual) [LOW]
 
 **Status:** OPEN
-**Reported by:** Devil's Advocate
-**Files:** `src/app/retirement/page.tsx:78`, `src/app/retirement/page.tsx:48-55`
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/projections.ts`
 
-- `savingsRate = totalAnnualContributions / totalGrossIncome * 100` — produces `NaN` when income is 0
-- `requiredPot = targetAnnualIncome / withdrawalRate` — produces `Infinity` when withdrawal rate is 0, cascading through the entire page
-
-**Fix:** Guard both: `totalGrossIncome > 0 ? ... : 0` and `withdrawalRate > 0 ? ... : 0`.
+`projectCompoundGrowth` uses monthly compounding while `projectCompoundGrowthWithGrowingContributions` uses annual compounding. Results from these two functions are not directly comparable for the same inputs.
 
 ---
 
-### BUG-003: Income timeline grows pots before drawdown, overstating retirement income [HIGH]
+### BUG-023: Pension bridge does not account for investment growth [LOW]
 
 **Status:** OPEN
-**Reported by:** Charting Expert, Financial Advisor
-**Files:** `src/components/charts/retirement-income-timeline.tsx:88-94`, `:108-113`
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/projections.ts`
 
-Growth is applied to pension pots and accessible wealth BEFORE withdrawals each year. Standard convention is draw-first-then-grow. This systematically overstates income and makes pots last years longer than realistic.
-
-Also: double-compounding at the pension access age transition (pot grown in pre-access else branch at age N-1, then again in the if branch at age N).
-
-**Fix:** Draw first, then grow: `const draw = Math.min(need, pot); pot -= draw; pot *= (1 + rate);`
+The bridge calculation uses flat `years * annualSpend` without investment growth during the bridge period. Conservative but could overstate required bridge funding.
 
 ---
 
-### BUG-004: State pension capped to remainingNeed hides real entitlement [HIGH]
+### BUG-024: Bed & ISA annualTaxSaved naming is misleading [LOW]
 
 **Status:** OPEN
-**Reported by:** Charting Expert
-**Files:** `src/components/charts/retirement-income-timeline.tsx:75-78`
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/cgt.ts`
 
-`Math.min(p.statePensionAnnual, remainingNeed)` caps state pension to what's needed. If person 1's state pension covers the target, person 2's shows as £0. In reality both receive their full entitlement. The chart should allow total income to exceed the target line (showing surplus).
-
-**Fix:** Remove the `Math.min` cap. Let total income exceed target. Shortfall only when total < target.
+The field name suggests an annual saving, but it actually represents the total CGT that would be payable on the full unrealised gain — a one-time crystallised avoidance, not an annual figure.
 
 ---
 
-### BUG-005: First-person priority bias in drawdown ordering [MEDIUM]
+### BUG-026: Required pot does not account for tax on pension drawdown [MEDIUM]
 
 **Status:** OPEN
-**Reported by:** Charting Expert, Devil's Advocate
-**Files:** `src/components/charts/retirement-income-timeline.tsx:70-120`
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/projections.ts`
 
-The shared `remainingNeed` pool means person 1's pension is always fully depleted before person 2's is touched. This is suboptimal for tax planning and longevity.
-
-**Fix:** Draw proportionally from each person's pot based on pot size ratio, or split need equally.
+`calculateRequiredPot(annualIncome, rate)` returns `annualIncome / rate` assuming gross = net. In reality, pension drawdown is taxed (25% PCLS tax-free, 75% at income tax rates). A £40k target income requires a larger gross drawdown (~£47k for basic rate taxpayers), meaning the required pot is understated by 15-20%.
 
 ---
 
-### BUG-006: Scenario panel Sheet width overflows on 375px mobile screens [HIGH]
+### BUG-027: RNRB not capped at property value [MEDIUM]
 
 **Status:** OPEN
-**Reported by:** UX Designer
-**Files:** `src/components/scenario-panel.tsx:199`
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/iht.ts`
 
-`w-96` (384px) overflows a 375px viewport by 9px. Inputs and close button may be unreachable.
-
-**Fix:** Replace `w-96` with `w-full sm:w-96` or remove it entirely to use Sheet's default responsive width.
+The Residence Nil-Rate Band is applied at the full £175k per person regardless of actual property value. Per IHTA 1984 s.8FE, RNRB is limited to the lower of £175k and the property value passing to direct descendants. For a £150k property, the RNRB should be £150k, not £175k.
 
 ---
 
-### BUG-007: No htmlFor/id linkage on scenario panel form inputs [HIGH]
+### BUG-028: IHT gift taper relief not modelled [MEDIUM]
 
 **Status:** OPEN
-**Reported by:** UX Designer
-**Files:** `src/components/scenario-panel.tsx` (all Label/Input pairs, ~12 instances)
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/iht.ts`
 
-Every `<Label>` and `<Input>` pair lacks `htmlFor`/`id` association. Screen readers announce inputs as "edit text" with no label. WCAG 2.1 Level A failure (SC 1.3.1, 4.1.2).
-
-**Fix:** Add unique `id` props to inputs and matching `htmlFor` to labels.
+Gifts within 7 years are applied in full against NRB. Per IHTA 1984 s.7(4), gifts 3-7 years old benefit from taper relief: 3-4yr = 80%, 4-5yr = 60%, 5-6yr = 40%, 6-7yr = 20% of the IHT rate. Current model overstates IHT for older gifts.
 
 ---
 
-### BUG-008: ISA recommendation has coverage gap (50%-99% remaining) [HIGH]
+### BUG-029: Bed & ISA recommendation always uses higher CGT rate [MEDIUM]
 
 **Status:** OPEN
-**Reported by:** Devil's Advocate, Financial Advisor
-**Files:** `src/lib/recommendations.ts:116-138`
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/recommendations.ts`
 
-The first branch triggers when ISA remaining is <= 50% of allowance. The second triggers when ISA remaining is exactly 100%. Anyone with 50%-99% remaining gets NO recommendation.
-
-**Fix:** Change condition to `isaRemaining > 0` (any unused allowance generates a recommendation).
+`estimatedCGT = taxableGain * higherRate (24%)` regardless of the person's actual tax band. Basic rate taxpayers should use 18%. This overstates CGT cost for basic rate taxpayers.
 
 ---
 
-### BUG-009: Bed & ISA only recommended when gains < £3,000 CGT exempt amount [HIGH]
+### BUG-030: Relief at source not accounted for in CGT rate determination [LOW]
 
 **Status:** OPEN
-**Reported by:** Financial Advisor
-**Files:** `src/lib/recommendations.ts:179`
+**Reported by:** Financial Advisor (Audit)
+**Files:** `src/lib/cgt.ts`
 
-The recommendation only fires when `totalGain <= cgt.annualExemptAmount`. Gains above £3k — which is where most real value lies — generate no recommendation. The most valuable Bed & ISA cases are missed.
-
-**Fix:** Add a second branch for gains > exempt amount that shows CGT cost vs long-term ISA benefit analysis.
-
----
-
-### BUG-010: Emergency fund check excludes Cash ISA and Premium Bonds [MEDIUM]
-
-**Status:** OPEN
-**Reported by:** Devil's Advocate, Financial Advisor
-**Files:** `src/lib/recommendations.ts:235-236`
-
-Filter only counts `cash_savings` accounts. Cash ISAs and Premium Bonds are both instant-access liquid assets commonly treated as emergency fund components. Users get false "emergency fund low" warnings.
-
-**Fix:** Include `cash_isa` and `premium_bonds` in the filter.
-
----
-
-### BUG-011: Drawdown chart uses requiredPot not currentPot as starting value [HIGH]
-
-**Status:** OPEN
-**Reported by:** Financial Advisor
-**Files:** `src/app/retirement/page.tsx:402`
-
-The drawdown chart starts from `requiredPot` (the target based on SWR), not from `currentPot` (actual net worth). If the household is only 60% to target, the chart shows a more optimistic scenario than reality.
-
-**Fix:** Use `currentPot` or the projected pot at retirement age.
-
----
-
-### BUG-012: Drawdown chart uses full state pension ignoring NI qualifying years [MEDIUM]
-
-**Status:** OPEN
-**Reported by:** Financial Advisor
-**Files:** `src/app/retirement/page.tsx:407`
-
-The drawdown chart passes `UK_TAX_CONSTANTS.statePension.fullNewStatePensionAnnual` regardless of qualifying years, while the income timeline chart correctly pro-rates. Two charts on the same page show different state pension figures.
-
-**Fix:** Calculate pro-rated state pension and pass to drawdown chart.
-
----
-
-### BUG-013: Scenario panel prevents modelling zero income (redundancy) [MEDIUM]
-
-**Status:** OPEN
-**Reported by:** Devil's Advocate
-**Files:** `src/components/scenario-panel.tsx:79`
-
-The filter `([, val]) => val > 0` excludes income overrides of 0. Users cannot model a redundancy scenario.
-
-**Fix:** Change to `val >= 0` or `val !== undefined`.
-
----
-
-### BUG-014: Recommendation badge row overflows on mobile (no flex-wrap) [MEDIUM]
-
-**Status:** OPEN
-**Reported by:** UX Designer
-**Files:** `src/app/page.tsx:414`
-
-`flex items-center gap-2` without `flex-wrap` causes badges to overflow horizontally on 375px screens with long recommendation titles.
-
-**Fix:** Add `flex-wrap` class.
-
----
-
-### BUG-015: Retirement income timeline chart has no accessible text alternative [HIGH]
-
-**Status:** OPEN
-**Reported by:** UX Designer
-**Files:** `src/components/charts/retirement-income-timeline.tsx:188`
-
-The chart renders only SVG. No `aria-label`, summary table, or screen-reader-accessible representation. WCAG 2.1 Level A failure (SC 1.1.1).
-
-**Fix:** Add `aria-label` to container div and consider a "View as table" toggle.
-
----
-
-### BUG-016: Monotone interpolation creates misleading smooth curves for annual data [MEDIUM]
-
-**Status:** OPEN
-**Reported by:** Charting Expert
-**Files:** `src/components/charts/retirement-income-timeline.tsx:232`
-
-`type="monotone"` creates smooth splines between integer age data points. State pension kicks in fully at one age, not gradually. Smoothing implies gradual transitions that don't exist.
-
-**Fix:** Use `type="stepAfter"` for accurate discrete annual representation.
-
----
-
-### BUG-017: Shortfall stacked with income visually reaches the target line — misleading [MEDIUM]
-
-**Status:** OPEN
-**Reported by:** Charting Expert, Devil's Advocate
-**Files:** `src/components/charts/retirement-income-timeline.tsx:123`, `:229-237`
-
-Shortfall is in the same `stackId="income"`. The total stack (income + shortfall) always reaches the target line. Users may misread this as "on track" when the red area IS the shortfall.
-
-**Fix:** Remove shortfall from the income stack. Show as a separate annotation or hatched overlay.
-
----
+`determineCgtRate` does not account for the basic rate band extension from relief at source pension contributions. Could incorrectly assign higher CGT rate to someone whose extended basic rate band covers their gains.
 
 ---
 
 ## Feature Requests
 
-### FEAT-001: Missing pension tapered annual allowance [CRITICAL]
-
-**Status:** OPEN
-**Reported by:** Financial Advisor
-**Files:** `src/lib/recommendations.ts:144-145`, `src/lib/tax-constants.ts`
-
-The pension annual allowance is used as a flat £60k for everyone. For individuals with adjusted income exceeding £260k, the allowance tapers to a minimum of £10k. A client earning £300k who follows the recommendation to contribute up to £60k would face an annual allowance tax charge. This is a material regulatory error.
-
-**Required constants:** threshold income (£200k), adjusted income (£260k), taper rate (1:2), minimum tapered allowance (£10k).
-
----
-
 ### FEAT-002: Add pension carry-forward rules [MEDIUM]
 
-**Status:** OPEN
+**Status:** CLOSED
 **Reported by:** Financial Advisor
 **Files:** `src/lib/recommendations.ts`, `src/lib/tax-constants.ts`
 
@@ -247,39 +108,9 @@ Unused pension annual allowance from previous 3 tax years can be carried forward
 
 ---
 
-### FEAT-003: Retirement age slider on income timeline [HIGH]
-
-**Status:** OPEN
-**Reported by:** HNW Customer (James), Devil's Advocate
-**Files:** `src/app/retirement/page.tsx:140`
-
-`earlyRetirementAge = currentAge + 10` is hardcoded. Users cannot adjust retirement age. A 55-year-old sees age 65 regardless of plans. Add a slider or dropdown to set retirement age, updating the chart in real-time.
-
----
-
-### FEAT-004: Growth rate toggle on income timeline [MEDIUM]
-
-**Status:** OPEN
-**Reported by:** HNW Customer (James)
-**Files:** `src/app/retirement/page.tsx:347`
-
-Currently uses middle scenario rate only. Allow toggling between all configured scenario rates (5%, 7%, 9%) to see how shortfall age changes.
-
----
-
-### FEAT-005: Recommendations link to relevant pages [MEDIUM]
-
-**Status:** OPEN
-**Reported by:** HNW Customer (Sarah)
-**Files:** `src/app/page.tsx:400-445`, `src/lib/recommendations.ts`
-
-Recommendations should include a link to the relevant page (e.g., salary sacrifice recommendation links to Tax Planning pension optimisation section). Add a `link` field to the `Recommendation` type.
-
----
-
 ### FEAT-006: Dismissable recommendations with "done" state [LOW]
 
-**Status:** OPEN
+**Status:** CLOSED
 **Reported by:** HNW Customer (Sarah)
 **Files:** `src/app/page.tsx`, `src/lib/recommendations.ts`
 
@@ -297,82 +128,86 @@ Save and compare multiple named scenarios side by side (e.g., "Current Plan" vs 
 
 ---
 
-### FEAT-008: Vertical reference lines for pension access and state pension ages [LOW]
+### FEAT-015: Surplus income not reinvested in lifetime cashflow [LOW]
 
-**Status:** OPEN
-**Reported by:** Charting Expert
-**Files:** `src/components/charts/retirement-income-timeline.tsx`
+**Status:** CLOSED
+**Reported by:** Devil's Advocate (Round 5)
+**Files:** `src/lib/lifetime-cashflow.ts`
 
-Add vertical reference lines at each person's pension access age and state pension age. These are the critical inflection points and should be visually marked.
-
----
-
-### FEAT-009: Colourblind-safe chart palette with pattern fills [MEDIUM]
-
-**Status:** OPEN
-**Reported by:** UX Designer, Charting Expert
-**Files:** `src/components/charts/retirement-income-timeline.tsx:131-139`
-
-Green/teal pair (HSL 142 vs 160) and amber/orange pair (HSL 38 vs 25) are indistinguishable for colour-blind users. Add pattern fills (hatching, dots) and increase hue separation. Also handle 3+ person households where the 7-colour palette wraps.
+When total income exceeds expenditure, the surplus is reported but not reinvested into accessible wealth. In reality, surplus cash would accumulate and grow. This means the model understates wealth in later years.
 
 ---
 
-### FEAT-010: Missing disclaimers on retirement projections [HIGH]
+### FEAT-016: Pension contributions don't grow with salary [LOW]
 
-**Status:** OPEN
-**Reported by:** Financial Advisor
-**Files:** `src/app/retirement/page.tsx:332-388`, `:290-330`, `:412-483`
+**Status:** CLOSED
+**Reported by:** Devil's Advocate (Round 5)
+**Files:** `src/lib/lifetime-cashflow.ts`
 
-Several sections lack "Capital at risk — projections are illustrative" warnings:
-- Combined Retirement Income Timeline chart
-- Retirement Countdown section
-- FIRE Metrics section (especially "Coast FIRE: Achieved")
-- All nominal projections should note no inflation adjustment
-
-FCA compliance risk (COBS 4.6).
+Employment pension contributions are fixed at today's amount even when salaryGrowthRate is set. If salary grows 3%/yr, pension contributions should also grow proportionally (especially for salary sacrifice where the contribution is usually a % of salary).
 
 ---
 
-### FEAT-011: Y-axis label missing on income timeline chart [LOW]
+### FEAT-017: Lifestyle spending not inflation-adjusted in lifetime cashflow [LOW]
 
-**Status:** OPEN
-**Reported by:** Charting Expert
-**Files:** `src/components/charts/retirement-income-timeline.tsx:199-203`
+**Status:** CLOSED
+**Reported by:** Devil's Advocate (Round 5)
+**Files:** `src/lib/lifetime-cashflow.ts`
 
-Y-axis has no label. Add `label={{ value: "Annual Income (£)", angle: -90, position: "insideLeft" }}`.
-
----
-
-### FEAT-012: Tooltip shows zero-value series as noise [LOW]
-
-**Status:** OPEN
-**Reported by:** Charting Expert
-**Files:** `src/components/charts/retirement-income-timeline.tsx:204-216`
-
-Tooltip displays all series even when value is £0 at that age (e.g., "James State Pension: £0" at age 55). Filter out zero values in the tooltip formatter.
+`monthlyLifestyleSpending * 12` is constant across all years. Committed outgoings support per-item `inflationRate`, but lifestyle spending has no inflation adjustment. Over 30+ years this significantly understates expenditure.
 
 ---
 
-### FEAT-013: Salary sacrifice recommendation ignores actual pension method [MEDIUM]
+### FEAT-018: Cash runway metric not person-view filtered [LOW]
 
-**Status:** OPEN
-**Reported by:** Devil's Advocate
-**Files:** `src/lib/recommendations.ts:49-107`
+**Status:** CLOSED
+**Reported by:** QA Engineer (Round 5)
+**Files:** `src/app/page.tsx`, `src/lib/cash-flow.ts`
 
-The recommendation always says "salary sacrifice" but does not check whether the person's `pensionContributionMethod` is actually `salary_sacrifice`. If using `relief_at_source`, the advice is inapplicable.
-
-**Fix:** Check method before recommending, and adjust title/description accordingly.
+The `calculateCashRunway` function uses all household accounts regardless of person-view selection. When viewing a single person's dashboard, cash runway should reflect only that person's liquid assets.
 
 ---
 
-### FEAT-014: Conflicting ISA recommendations can exceed ISA allowance [MEDIUM]
+### FEAT-019: Saved scenario descriptions and preview [MEDIUM]
+
+**Status:** CLOSED
+**Reported by:** HNW Customer (James), HNW Customer (Priya)
+**Files:** `src/context/scenario-context.tsx`, `src/components/scenario-panel.tsx`
+
+Saved scenarios show only the name (e.g. "Custom Scenario") with no description of what changed. Auto-generate a human-readable summary from `ScenarioOverrides` (e.g. "Tom salary: £80k → £30k, Market: -30%"). Show impact preview (net worth delta) without needing to fully load the scenario.
+
+---
+
+### FEAT-020: Life-stage dashboard metrics (school fees, pension bridge, next bonus) [MEDIUM]
+
+**Status:** CLOSED
+**Reported by:** HNW Customer (James), HNW Customer (Priya)
+**Files:** `src/app/page.tsx`, `src/types/index.ts`
+
+Expand `HeroMetricType` with life-stage-appropriate metrics:
+- **School fee countdown** — years until last child finishes (Priya)
+- **Next income event** — next bonus vesting date and amount (Priya)
+- **Pension bridge gap** — years of accessible savings needed before pension access (James)
+- **Per-person retirement countdown** — separate countdowns for each person (James)
+
+---
+
+### FEAT-021: Scenario-aware recommendations diff [MEDIUM]
+
+**Status:** CLOSED
+**Reported by:** HNW Customer (James), HNW Customer (Priya)
+**Files:** `src/app/page.tsx`, `src/lib/recommendations.ts`
+
+When a scenario is applied, the recommendations engine already re-runs against scenario data (line 384-387 of page.tsx). But there is no visual diff between base and scenario recommendations. Add "New in this scenario" / "Resolved by this scenario" badges to show which recommendations changed and why.
+
+---
+
+### FEAT-022: Multi-year time-phased scenarios [HIGH]
 
 **Status:** OPEN
-**Reported by:** Devil's Advocate
-**Files:** `src/lib/recommendations.ts:116-127`, `:169-191`
+**Reported by:** HNW Customer (James), HNW Customer (Priya)
+**Files:** `src/context/scenario-context.tsx`, `src/lib/scenario.ts`
 
-A person can receive both "top up ISA" and "Bed & ISA transfer" recommendations, both consuming the same ISA allowance. The combined advice could lead a user to exceed the £20k limit.
-
-**Fix:** Coordinate ISA-consuming recommendations so total does not exceed remaining allowance.
+Scenarios are static snapshots — overrides apply to current data instantly with no concept of time. James wants "retire at 57, keep saving until then, then draw down." Priya wants "Tom earns 30k for 2 years then recovers." Needs a scenario timeline allowing overrides at specific dates or age milestones.
 
 ---

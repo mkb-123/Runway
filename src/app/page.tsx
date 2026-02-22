@@ -8,7 +8,6 @@ import {
   TrendingDown,
   X,
   Lightbulb,
-  Printer,
   ArrowRight,
   Wallet2,
   Banknote,
@@ -18,12 +17,16 @@ import {
   Target,
   Shield,
   Sunrise,
+  FlaskConical,
+  GraduationCap,
+  CalendarDays,
+  Users,
+  ChevronDown,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/page-header";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -31,27 +34,31 @@ import {
 } from "@/lib/format";
 import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
+import { useScenario } from "@/context/scenario-context";
+import { ScenarioPanel } from "@/components/scenario-panel";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { projectScenarios } from "@/lib/projections";
-import {
-  calculateRetirementCountdown,
-  calculateAdjustedRequiredPot,
-  calculateSWR,
-  projectFinalValue,
-  calculateAge,
-  getMidScenarioRate,
-} from "@/lib/projections";
+import { calculateAdjustedRequiredPot } from "@/lib/projections";
 import {
   generateRecommendations,
   type RecommendationPriority,
   type Recommendation,
 } from "@/lib/recommendations";
-import { annualiseOutgoing, getHouseholdGrossIncome, OUTGOING_CATEGORY_LABELS, OUTGOING_FREQUENCY_LABELS } from "@/types";
+import { annualiseOutgoing, OUTGOING_CATEGORY_LABELS, OUTGOING_FREQUENCY_LABELS } from "@/types";
 import { TAX_WRAPPER_LABELS } from "@/types";
 import type { TaxWrapper, HeroMetricType } from "@/types";
 import { calculateTotalAnnualContributions, calculateHouseholdStatePension } from "@/lib/aggregations";
+import {
+  computeHeroData,
+  getNextCashEvents,
+  getStatusSentence,
+  detectLifeStage,
+  getRecommendationUrgency,
+  type HeroMetricData,
+  type RecommendationUrgency,
+} from "@/lib/dashboard";
 
 import { NetWorthTrajectoryChart } from "@/components/charts/net-worth-trajectory";
 import { ByPersonChart } from "@/components/charts/by-person-chart";
@@ -63,25 +70,8 @@ import { SchoolFeeTimelineChart } from "@/components/charts/school-fee-timeline-
 import { generateSchoolFeeTimeline, findLastSchoolFeeYear } from "@/lib/school-fees";
 
 // ============================================================
-// Hero Metric — one of 3 configurable slots above the fold
+// Hero Metric — resolve type to display properties
 // ============================================================
-
-interface HeroMetricData {
-  totalNetWorth: number;
-  cashPosition: number;
-  monthOnMonthChange: number;
-  monthOnMonthPercent: number;
-  yearOnYearChange: number;
-  yearOnYearPercent: number;
-  retirementCountdownYears: number;
-  retirementCountdownMonths: number;
-  savingsRate: number;
-  fireProgress: number;
-  netWorthAfterCommitments: number;
-  totalAnnualCommitments: number;
-  projectedRetirementIncome: number;
-  projectedRetirementIncomeStatePension: number;
-}
 
 interface ResolvedMetric {
   label: string;
@@ -101,7 +91,7 @@ function resolveMetric(
   switch (type) {
     case "net_worth":
       return {
-        label: "Net Worth",
+        label: data.isPersonView ? "Net Worth (Personal)" : "Net Worth",
         value: formatCurrencyCompact(data.totalNetWorth),
         rawValue: data.totalNetWorth,
         format: formatCurrencyCompact,
@@ -120,34 +110,63 @@ function resolveMetric(
     case "retirement_countdown": {
       const y = data.retirementCountdownYears;
       const m = data.retirementCountdownMonths;
+      const onTrack = y === 0 && m === 0;
       return {
         label: "Retirement",
-        value: y === 0 && m === 0 ? "On track" : `${y}y ${m}m`,
+        value: onTrack ? "On track" : `${y}y ${m}m`,
         rawValue: y * 12 + m,
         format: (n: number) => {
           if (n === 0) return "On track";
           return `${Math.floor(n / 12)}y ${n % 12}m`;
         },
-        subtext: y === 0 && m === 0 ? "Target pot reached" : "to target",
-        color: "",
+        subtext: onTrack ? "Target pot reached" : "to target",
+        color: onTrack ? "text-emerald-600 dark:text-emerald-400" : "",
         icon: Clock,
       };
     }
     case "period_change": {
+      // QA-3: Show "N/A" when insufficient snapshots instead of "+0.0"
+      if (!data.hasEnoughSnapshotsForMoM) {
+        return {
+          label: "Period Change",
+          value: "N/A",
+          rawValue: 0,
+          format: () => "N/A",
+          subtext: "Needs 2+ months of history",
+          color: "text-muted-foreground",
+          icon: TrendingUp,
+        };
+      }
       const v = data.monthOnMonthChange;
       const color = v > 0 ? "text-emerald-600 dark:text-emerald-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
+      // REC-H: Period change attribution — show contribution context
+      const contribNote = data.monthlyContributionRate > 0
+        ? ` (incl. ~${formatCurrencyCompact(data.monthlyContributionRate)}/mo contributions)`
+        : "";
       return {
         label: "Period Change",
         value: `${v >= 0 ? "+" : ""}${formatCurrencyCompact(v)}`,
         rawValue: v,
         format: (n: number) => `${n >= 0 ? "+" : ""}${formatCurrencyCompact(n)}`,
-        subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.monthOnMonthPercent)} MoM`,
+        subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.monthOnMonthPercent)} MoM${contribNote}`,
         color,
         trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
         icon: TrendingUp,
       };
     }
     case "year_on_year_change": {
+      // QA-3: Show "N/A" when insufficient snapshots
+      if (!data.hasEnoughSnapshotsForYoY) {
+        return {
+          label: "Year-on-Year",
+          value: "N/A",
+          rawValue: 0,
+          format: () => "N/A",
+          subtext: "Needs ~12 months of history",
+          color: "text-muted-foreground",
+          icon: BarChart3,
+        };
+      }
       const v = data.yearOnYearChange;
       const color = v > 0 ? "text-emerald-600 dark:text-emerald-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
       return {
@@ -163,12 +182,16 @@ function resolveMetric(
     }
     case "savings_rate":
       return {
-        label: "Savings Rate",
+        label: data.isPersonView ? "Savings Rate (Personal)" : "Savings Rate",
         value: `${data.savingsRate.toFixed(1)}%`,
         rawValue: data.savingsRate,
         format: (n: number) => `${n.toFixed(1)}%`,
-        subtext: "of gross income",
-        color: "",
+        subtext: `${data.personalSavingsRate.toFixed(1)}% personal`,
+        color: data.savingsRate >= 20
+          ? "text-emerald-600 dark:text-emerald-400"
+          : data.savingsRate < 10
+            ? "text-amber-600 dark:text-amber-400"
+            : "",
         icon: PiggyBank,
       };
     case "fire_progress":
@@ -178,35 +201,135 @@ function resolveMetric(
         rawValue: data.fireProgress,
         format: (n: number) => `${n.toFixed(1)}%`,
         subtext: "of target pot",
-        color: data.fireProgress >= 100 ? "text-emerald-600 dark:text-emerald-400" : "",
+        color: data.fireProgress >= 100
+          ? "text-emerald-600 dark:text-emerald-400"
+          : data.fireProgress < 25
+            ? "text-amber-600 dark:text-amber-400"
+            : "",
         icon: Target,
       };
     case "net_worth_after_commitments":
+      // REC-K: Show as "years of coverage" instead of misleading subtraction
       return {
-        label: "After Commitments",
-        value: formatCurrencyCompact(data.netWorthAfterCommitments),
-        rawValue: data.netWorthAfterCommitments,
-        format: formatCurrencyCompact,
-        subtext: `${formatCurrencyCompact(data.totalAnnualCommitments)}/yr committed`,
-        color: "",
+        label: "Commitment Coverage",
+        value: data.commitmentCoverageYears >= 999
+          ? "N/A"
+          : `${data.commitmentCoverageYears.toFixed(1)}yr`,
+        rawValue: data.commitmentCoverageYears,
+        format: (n: number) => n >= 999 ? "N/A" : `${n.toFixed(1)}yr`,
+        subtext: data.totalAnnualCommitments > 0
+          ? `${formatCurrencyCompact(data.totalNetWorth)} covers ${formatCurrencyCompact(data.totalAnnualCommitments)}/yr`
+          : "No committed outgoings",
+        color: data.commitmentCoverageYears >= 15
+          ? "text-emerald-600 dark:text-emerald-400"
+          : data.commitmentCoverageYears < 5
+            ? "text-amber-600 dark:text-amber-400"
+            : "",
         icon: Shield,
       };
-    case "projected_retirement_income":
+    case "projected_retirement_income": {
+      const target = data.targetAnnualIncome;
+      const projected = data.projectedRetirementIncome;
+      const incomeColor = target > 0 && projected >= target
+        ? "text-emerald-600 dark:text-emerald-400"
+        : target > 0 && projected < target * 0.5
+          ? "text-red-600 dark:text-red-400"
+          : target > 0 && projected < target * 0.75
+            ? "text-amber-600 dark:text-amber-400"
+            : "";
+      // QA-6: Disclose growth rate assumption
+      const growthPct = (data.projectedGrowthRate * 100).toFixed(0);
+      const statePensionNote = data.projectedRetirementIncomeStatePension > 0
+        ? `incl. ${formatCurrencyCompact(data.projectedRetirementIncomeStatePension)} state pension`
+        : `at ${growthPct}% growth`;
       return {
         label: "Retirement Income",
-        value: `${formatCurrencyCompact(data.projectedRetirementIncome)}/yr`,
-        rawValue: data.projectedRetirementIncome,
+        value: `${formatCurrencyCompact(projected)}/yr`,
+        rawValue: projected,
         format: (n: number) => `${formatCurrencyCompact(n)}/yr`,
-        subtext: data.projectedRetirementIncomeStatePension > 0
-          ? `incl. ${formatCurrencyCompact(data.projectedRetirementIncomeStatePension)} state pension`
-          : "from projected pot at retirement",
-        color: "",
+        subtext: statePensionNote,
+        color: incomeColor,
         icon: Sunrise,
       };
+    }
+    case "cash_runway": {
+      const months = data.cashRunway;
+      // QA-4: Show "No outgoings" instead of green "∞" when nothing configured
+      if (!data.hasOutgoings) {
+        return {
+          label: "Cash Runway",
+          value: "N/A",
+          rawValue: 0,
+          format: () => "N/A",
+          subtext: "No outgoings configured",
+          color: "text-muted-foreground",
+          icon: Shield,
+        };
+      }
+      const color = months < 6 ? "text-red-600 dark:text-red-400" : months < 12 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
+      return {
+        label: "Cash Runway",
+        value: `${months.toFixed(1)}mo`,
+        rawValue: months,
+        format: (n: number) => `${n.toFixed(1)}mo`,
+        subtext: "of total outgoings covered",
+        color,
+        icon: Shield,
+      };
+    }
+    case "school_fee_countdown": {
+      const yrs = data.schoolFeeYearsRemaining;
+      return {
+        label: "School Fees End",
+        value: yrs <= 0 ? "Done" : `${yrs}yr`,
+        rawValue: yrs,
+        format: (n: number) => n <= 0 ? "Done" : `${n}yr`,
+        subtext: yrs <= 0 ? "No children in school" : "until last child finishes",
+        color: yrs <= 0 ? "text-emerald-600 dark:text-emerald-400" : "",
+        icon: GraduationCap,
+      };
+    }
+    case "pension_bridge_gap": {
+      const yrs = data.pensionBridgeYears;
+      return {
+        label: "Pension Bridge",
+        value: yrs <= 0 ? "None" : `${yrs}yr`,
+        rawValue: yrs,
+        format: (n: number) => n <= 0 ? "None" : `${n}yr`,
+        subtext: yrs <= 0 ? "Pension accessible at retirement" : "gap before pension access",
+        color: yrs > 5 ? "text-amber-600 dark:text-amber-400" : yrs > 0 ? "" : "text-emerald-600 dark:text-emerald-400",
+        icon: Clock,
+      };
+    }
+    case "per_person_retirement": {
+      const parts = data.perPersonRetirement;
+      if (parts.length === 0) {
+        return {
+          label: "Retirement",
+          value: "N/A",
+          rawValue: 0,
+          format: () => "N/A",
+          color: "",
+          icon: Clock,
+        };
+      }
+      const primary = parts[0];
+      // QA-7: Truncate subtext for 3+ persons to prevent overflow
+      const subtextParts = parts.length > 2
+        ? parts.slice(0, 2).map((p) => `${p.name}: ${p.years}y ${p.months}m`).join(" · ") + ` +${parts.length - 2} more`
+        : parts.map((p) => `${p.name}: ${p.years}y ${p.months}m`).join(" · ");
+      return {
+        label: "Retirement",
+        value: `${primary.years}y ${primary.months}m`,
+        rawValue: primary.years * 12 + primary.months,
+        format: (n: number) => `${Math.floor(n / 12)}y ${n % 12}m`,
+        subtext: subtextParts,
+        color: "",
+        icon: Clock,
+      };
+    }
   }
 }
-
-// CollapsibleSection is now the shared CollapsibleSection component
 
 // ============================================================
 // Recommendation Card
@@ -236,44 +359,101 @@ const priorityConfig: Record<
   },
 };
 
-function RecommendationCard({ rec }: { rec: Recommendation }) {
+const urgencyConfig: Record<RecommendationUrgency, { label: string; color: string } | null> = {
+  act_now: { label: "Act now", color: "bg-red-600 text-white" },
+  act_this_month: { label: "This month", color: "bg-amber-500 text-white" },
+  standing: null,
+};
+
+function RecommendationCard({ rec, scenarioBadge, urgency, onDismiss }: {
+  rec: Recommendation;
+  scenarioBadge?: "new" | "resolved";
+  urgency?: RecommendationUrgency;
+  onDismiss?: (id: string) => void;
+}) {
   const config = priorityConfig[rec.priority];
+  const urgencyBadge = urgency ? urgencyConfig[urgency] : null;
+  const content = (
+    <div className="flex items-start gap-3">
+      <Lightbulb className={`mt-0.5 size-4 shrink-0 ${config.color}`} />
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold">{rec.title}</h3>
+          <Badge variant="outline" className={`text-[10px] ${config.color}`}>
+            {config.label}
+          </Badge>
+          {urgencyBadge && (
+            <Badge className={`text-[10px] ${urgencyBadge.color}`}>
+              {urgencyBadge.label}
+            </Badge>
+          )}
+          {rec.personName && (
+            <Badge variant="secondary" className="text-[10px]">
+              {rec.personName}
+            </Badge>
+          )}
+          {scenarioBadge === "new" && (
+            <Badge className="bg-amber-500 text-[10px] text-white">
+              New in scenario
+            </Badge>
+          )}
+          {scenarioBadge === "resolved" && (
+            <Badge className="bg-emerald-500 text-[10px] text-white">
+              Resolved by scenario
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">{rec.description}</p>
+        {rec.plainAction && (
+          <p className="text-xs text-foreground/80 italic">{rec.plainAction}</p>
+        )}
+        <p className="text-xs font-medium">{rec.impact}</p>
+        <div className="flex items-center gap-3">
+          {rec.actionUrl && (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+              Take action <ArrowRight className="size-3" />
+            </span>
+          )}
+          {onDismiss && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDismiss(rec.id); }}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-3" /> Done
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (rec.actionUrl) {
+    return (
+      <Link href={rec.actionUrl} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Card className={`border ${config.border} ${config.bg} transition-shadow hover:shadow-md active:shadow-sm`}>
+          <CardContent className="py-4">{content}</CardContent>
+        </Card>
+      </Link>
+    );
+  }
+
   return (
     <Card className={`border ${config.border} ${config.bg}`}>
-      <CardContent className="py-3">
-        <div className="flex items-start gap-3">
-          <Lightbulb className={`mt-0.5 size-4 shrink-0 ${config.color}`} />
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-semibold">{rec.title}</h3>
-              <Badge variant="outline" className={`text-[10px] ${config.color}`}>
-                {config.label}
-              </Badge>
-              {rec.personName && (
-                <Badge variant="secondary" className="text-[10px]">
-                  {rec.personName}
-                </Badge>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">{rec.description}</p>
-            {rec.plainAction && (
-              <p className="text-xs text-foreground/80 italic">{rec.plainAction}</p>
-            )}
-            <p className="text-xs font-medium">{rec.impact}</p>
-            {rec.actionUrl && (
-              <Link
-                href={rec.actionUrl}
-                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-              >
-                Take action <ArrowRight className="size-3" />
-              </Link>
-            )}
-          </div>
-        </div>
-      </CardContent>
+      <CardContent className="py-4">{content}</CardContent>
     </Card>
   );
 }
+
+// ============================================================
+// Status sentence color mapping (REC-A)
+// ============================================================
+
+const statusColorClasses = {
+  green: "text-emerald-600 dark:text-emerald-400",
+  amber: "text-amber-600 dark:text-amber-400",
+  red: "text-red-600 dark:text-red-400",
+  neutral: "text-muted-foreground",
+} as const;
 
 // ============================================================
 // Main Dashboard
@@ -281,282 +461,138 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
 
 export default function Home() {
   const { snapshots: snapshotsData } = useData();
+  const { isScenarioMode, savedScenarios } = useScenario();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
   const baseHousehold = scenarioData.baseHousehold;
-  const totalNetWorth = scenarioData.getTotalNetWorth();
-  const byPerson = scenarioData.getNetWorthByPerson();
-  const byWrapper = scenarioData.getNetWorthByWrapper();
   const { selectedView } = usePersonView();
   const { snapshots } = snapshotsData;
 
-  // --- Person filtering ---
+  // =============================================
+  // REC-L: Two calls replace 30+ useMemo blocks
+  // =============================================
+  const heroData = useMemo(
+    () => computeHeroData(household, snapshots, selectedView),
+    [household, snapshots, selectedView]
+  );
+  const baseHeroData = useMemo(
+    () => computeHeroData(baseHousehold, snapshots, selectedView),
+    [baseHousehold, snapshots, selectedView]
+  );
+
+  // REC-A: Contextual status sentence
+  const statusSentence = useMemo(
+    () => getStatusSentence(heroData, household),
+    [heroData, household]
+  );
+
+  // REC-B: Life-stage detection for conditional FIRE bar
+  const lifeStage = useMemo(
+    () => detectLifeStage(household),
+    [household]
+  );
+
+  // REC-E: Next cash events
+  const cashEvents = useMemo(
+    () => getNextCashEvents(household),
+    [household]
+  );
+
+  // =============================================
+  // Dismissed recommendations (FEAT-006)
+  // =============================================
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = localStorage.getItem("nw-dismissed-recs");
+      return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const dismissRecommendation = useCallback((id: string) => {
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      localStorage.setItem("nw-dismissed-recs", JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+  const undismissAll = useCallback(() => {
+    setDismissedIds(new Set());
+    localStorage.removeItem("nw-dismissed-recs");
+  }, []);
+
+  // =============================================
+  // Chart and display data
+  // =============================================
+  const totalNetWorth = scenarioData.getTotalNetWorth();
+  const byPerson = scenarioData.getNetWorthByPerson();
+  const byWrapper = scenarioData.getNetWorthByWrapper();
+
   const filteredAccounts = useMemo(() => {
     if (selectedView === "household") return household.accounts;
     return household.accounts.filter((a) => a.personId === selectedView);
   }, [household.accounts, selectedView]);
 
-  const filteredNetWorth = useMemo(
-    () => filteredAccounts.reduce((sum, a) => sum + a.currentValue, 0),
-    [filteredAccounts]
-  );
-
-  // --- Base (un-overridden) values for what-if comparison ---
-  const baseFilteredAccounts = useMemo(() => {
-    if (selectedView === "household") return baseHousehold.accounts;
-    return baseHousehold.accounts.filter((a) => a.personId === selectedView);
-  }, [baseHousehold.accounts, selectedView]);
-
-  const baseTotalNetWorth = useMemo(
-    () => baseHousehold.accounts.reduce((sum, a) => sum + a.currentValue, 0),
-    [baseHousehold.accounts]
-  );
-
-  const baseFilteredNetWorth = useMemo(
-    () => baseFilteredAccounts.reduce((sum, a) => sum + a.currentValue, 0),
-    [baseFilteredAccounts]
-  );
-
-  // --- Cash position ---
-  const cashPosition = useMemo(
-    () =>
-      filteredAccounts
-        .filter((a) => a.type === "cash_savings" || a.type === "cash_isa" || a.type === "premium_bonds")
-        .reduce((sum, a) => sum + a.currentValue, 0),
-    [filteredAccounts]
-  );
-
-  const baseCashPosition = useMemo(
-    () =>
-      baseFilteredAccounts
-        .filter((a) => a.type === "cash_savings" || a.type === "cash_isa" || a.type === "premium_bonds")
-        .reduce((sum, a) => sum + a.currentValue, 0),
-    [baseFilteredAccounts]
-  );
-
-  // --- Committed outgoings + lifestyle spending ---
-  const totalAnnualCommitments = useMemo(
-    () => {
-      const committed = household.committedOutgoings.reduce((sum, o) => sum + annualiseOutgoing(o.amount, o.frequency), 0);
-      const lifestyle = household.emergencyFund.monthlyLifestyleSpending * 12;
-      return committed + lifestyle;
-    },
-    [household.committedOutgoings, household.emergencyFund.monthlyLifestyleSpending]
-  );
-
-  // --- Recommendations ---
+  // =============================================
+  // Recommendations + urgency tiers (REC-F)
+  // =============================================
   const recommendations = useMemo(
     () => generateRecommendations(household),
     [household]
   );
 
+  const baseRecommendations = useMemo(
+    () => isScenarioMode ? generateRecommendations(baseHousehold) : [],
+    [baseHousehold, isScenarioMode]
+  );
+
+  const { newInScenario, resolvedByScenario } = useMemo(() => {
+    if (!isScenarioMode) return { newInScenario: new Set<string>(), resolvedByScenario: new Set<string>() };
+    const baseIds = new Set(baseRecommendations.map((r) => r.title));
+    const scenarioIds = new Set(recommendations.map((r) => r.title));
+    return {
+      newInScenario: new Set([...scenarioIds].filter((id) => !baseIds.has(id))),
+      resolvedByScenario: new Set([...baseIds].filter((id) => !scenarioIds.has(id))),
+    };
+  }, [recommendations, baseRecommendations, isScenarioMode]);
+
+  // REC-F: Assign urgency tiers and sort: act_now > act_this_month > standing
   const filteredRecommendations = useMemo(() => {
-    if (selectedView === "household") return recommendations;
-    return recommendations.filter(
-      (r) =>
-        !r.personName ||
-        r.personName === household.persons.find((p) => p.id === selectedView)?.name
-    );
-  }, [recommendations, selectedView, household.persons]);
+    let recs = recommendations;
+    if (dismissedIds.size > 0) {
+      recs = recs.filter((r) => !dismissedIds.has(r.id));
+    }
+    if (selectedView !== "household") {
+      recs = recs.filter(
+        (r) =>
+          !r.personName ||
+          r.personName === household.persons.find((p) => p.id === selectedView)?.name
+      );
+    }
+    // Assign urgency and sort by urgency tier, then priority
+    const urgencyOrder: Record<RecommendationUrgency, number> = { act_now: 0, act_this_month: 1, standing: 2 };
+    const priorityOrder: Record<RecommendationPriority, number> = { high: 0, medium: 1, low: 2 };
+    return recs
+      .map((r) => ({ rec: r, urgency: getRecommendationUrgency(r.id) }))
+      .sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || priorityOrder[a.rec.priority] - priorityOrder[b.rec.priority])
+      .map((r) => r);
+  }, [recommendations, selectedView, household.persons, dismissedIds]);
 
-  // showAllRecs removed — recommendations now in CollapsibleSection
+  // REC-D: Cap mobile recommendations — show 2 by default, expand for more
+  const [showAllRecs, setShowAllRecs] = useState(false);
+  const visibleRecs = showAllRecs ? filteredRecommendations : filteredRecommendations.slice(0, 4);
+  const hiddenRecCount = filteredRecommendations.length - visibleRecs.length;
 
-  // --- Snapshot changes ---
-  const { monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent, latestSnapshot } =
-    useMemo(() => {
-      const latest = snapshots[snapshots.length - 1];
-      const previous = snapshots.length >= 2 ? snapshots[snapshots.length - 2] : null;
-      const moMChange = latest && previous ? latest.totalNetWorth - previous.totalNetWorth : 0;
-      const moMPercent = previous && previous.totalNetWorth > 0 ? moMChange / previous.totalNetWorth : 0;
-
-      const latestDate = new Date(latest?.date ?? new Date());
-      const oneYearAgo = new Date(latestDate);
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-      const yearAgoSnapshot = snapshots.reduce<(typeof snapshots)[number] | null>((closest, snap) => {
-        const snapDate = new Date(snap.date);
-        if (!closest) return snap;
-        return Math.abs(snapDate.getTime() - oneYearAgo.getTime()) <
-          Math.abs(new Date(closest.date).getTime() - oneYearAgo.getTime())
-          ? snap
-          : closest;
-      }, null);
-
-      const yoYChange = latest && yearAgoSnapshot ? latest.totalNetWorth - yearAgoSnapshot.totalNetWorth : 0;
-      const yoYPercent =
-        yearAgoSnapshot && yearAgoSnapshot.totalNetWorth > 0
-          ? yoYChange / yearAgoSnapshot.totalNetWorth
-          : 0;
-
-      return {
-        monthOnMonthChange: moMChange,
-        monthOnMonthPercent: moMPercent,
-        yearOnYearChange: yoYChange,
-        yearOnYearPercent: yoYPercent,
-        latestSnapshot: latest,
-      };
-    }, [snapshots]);
-
-  // --- Household state pension total ---
+  // =============================================
+  // Projections (for trajectory chart)
+  // =============================================
   const totalStatePensionAnnual = useMemo(
     () => calculateHouseholdStatePension(household.persons),
     [household.persons]
   );
 
-  // --- Retirement countdown ---
-  const { retirementCountdownYears, retirementCountdownMonths } = useMemo(() => {
-    const { retirement } = household;
-    const totalAnnual = calculateTotalAnnualContributions(household.contributions, household.income);
-    const requiredPot = calculateAdjustedRequiredPot(
-      retirement.targetAnnualIncome, retirement.withdrawalRate,
-      retirement.includeStatePension, totalStatePensionAnnual
-    );
-    const midRate = retirement.scenarioRates[Math.floor(retirement.scenarioRates.length / 2)] ?? 0.07;
-    const countdown = calculateRetirementCountdown(totalNetWorth, totalAnnual, requiredPot, midRate);
-    return { retirementCountdownYears: countdown.years, retirementCountdownMonths: countdown.months };
-  }, [household, totalNetWorth, totalStatePensionAnnual]);
-
-  // --- Savings rate + FIRE progress ---
-  const savingsRate = useMemo(() => {
-    const totalContrib = calculateTotalAnnualContributions(household.contributions, household.income);
-    const inc = getHouseholdGrossIncome(household.income, household.bonusStructures);
-    return inc > 0 ? (totalContrib / inc) * 100 : 0;
-  }, [household]);
-
-  const fireProgress = useMemo(() => {
-    const req = calculateAdjustedRequiredPot(
-      household.retirement.targetAnnualIncome, household.retirement.withdrawalRate,
-      household.retirement.includeStatePension, totalStatePensionAnnual
-    );
-    return req > 0 ? (totalNetWorth / req) * 100 : 0;
-  }, [household.retirement, totalNetWorth, totalStatePensionAnnual]);
-
-  // --- Base metrics for what-if comparison ---
-  const baseSavingsRate = useMemo(() => {
-    const totalContrib = calculateTotalAnnualContributions(baseHousehold.contributions, baseHousehold.income);
-    const inc = getHouseholdGrossIncome(baseHousehold.income, baseHousehold.bonusStructures);
-    return inc > 0 ? (totalContrib / inc) * 100 : 0;
-  }, [baseHousehold]);
-
-  const baseStatePensionAnnual = useMemo(
-    () => calculateHouseholdStatePension(baseHousehold.persons),
-    [baseHousehold.persons]
-  );
-
-  const baseFireProgress = useMemo(() => {
-    const req = calculateAdjustedRequiredPot(
-      baseHousehold.retirement.targetAnnualIncome, baseHousehold.retirement.withdrawalRate,
-      baseHousehold.retirement.includeStatePension, baseStatePensionAnnual
-    );
-    return req > 0 ? (baseTotalNetWorth / req) * 100 : 0;
-  }, [baseHousehold.retirement, baseTotalNetWorth, baseStatePensionAnnual]);
-
-  const { baseRetCountdownYears, baseRetCountdownMonths } = useMemo(() => {
-    const { retirement } = baseHousehold;
-    const totalAnnual = calculateTotalAnnualContributions(baseHousehold.contributions, baseHousehold.income);
-    const requiredPot = calculateAdjustedRequiredPot(
-      retirement.targetAnnualIncome, retirement.withdrawalRate,
-      retirement.includeStatePension, baseStatePensionAnnual
-    );
-    const midRate = retirement.scenarioRates[Math.floor(retirement.scenarioRates.length / 2)] ?? 0.07;
-    const cd = calculateRetirementCountdown(baseTotalNetWorth, totalAnnual, requiredPot, midRate);
-    return { baseRetCountdownYears: cd.years, baseRetCountdownMonths: cd.months };
-  }, [baseHousehold, baseTotalNetWorth, baseStatePensionAnnual]);
-
-  const baseCommitments = useMemo(() => {
-    const committed = baseHousehold.committedOutgoings.reduce((sum, o) => sum + annualiseOutgoing(o.amount, o.frequency), 0);
-    const lifestyle = baseHousehold.emergencyFund.monthlyLifestyleSpending * 12;
-    return committed + lifestyle;
-  }, [baseHousehold.committedOutgoings, baseHousehold.emergencyFund.monthlyLifestyleSpending]);
-
-  // --- Projected retirement income ---
-  const { projectedRetirementIncome, projectedRetirementIncomeStatePension } = useMemo(() => {
-    const { retirement } = household;
-    const totalContrib = calculateTotalAnnualContributions(household.contributions, household.income);
-    const midRate = getMidScenarioRate(retirement.scenarioRates);
-    const primaryPerson = household.persons.find((p) => p.relationship === "self");
-    const currentAge = primaryPerson ? calculateAge(primaryPerson.dateOfBirth) : 35;
-    const yearsToRetirement = Math.max(0, (primaryPerson?.plannedRetirementAge ?? 60) - currentAge);
-    const projectedPot = projectFinalValue(totalNetWorth, totalContrib, midRate, yearsToRetirement);
-    const sustainableIncome = calculateSWR(projectedPot, retirement.withdrawalRate);
-    const statePensionPortion = retirement.includeStatePension ? totalStatePensionAnnual : 0;
-    return {
-      projectedRetirementIncome: sustainableIncome + statePensionPortion,
-      projectedRetirementIncomeStatePension: statePensionPortion,
-    };
-  }, [household, totalNetWorth, totalStatePensionAnnual]);
-
-  const { baseProjectedRetirementIncome, baseProjectedRetirementIncomeStatePension } = useMemo(() => {
-    const { retirement } = baseHousehold;
-    const totalContrib = calculateTotalAnnualContributions(baseHousehold.contributions, baseHousehold.income);
-    const midRate = getMidScenarioRate(retirement.scenarioRates);
-    const primaryPerson = baseHousehold.persons.find((p) => p.relationship === "self");
-    const currentAge = primaryPerson ? calculateAge(primaryPerson.dateOfBirth) : 35;
-    const yearsToRetirement = Math.max(0, (primaryPerson?.plannedRetirementAge ?? 60) - currentAge);
-    const projectedPot = projectFinalValue(baseTotalNetWorth, totalContrib, midRate, yearsToRetirement);
-    const sustainableIncome = calculateSWR(projectedPot, retirement.withdrawalRate);
-    const statePensionPortion = retirement.includeStatePension ? baseStatePensionAnnual : 0;
-    return {
-      baseProjectedRetirementIncome: sustainableIncome + statePensionPortion,
-      baseProjectedRetirementIncomeStatePension: statePensionPortion,
-    };
-  }, [baseHousehold, baseTotalNetWorth, baseStatePensionAnnual]);
-
-  // --- Hero data ---
-  const heroData: HeroMetricData = useMemo(
-    () => ({
-      totalNetWorth: selectedView === "household" ? totalNetWorth : filteredNetWorth,
-      cashPosition,
-      monthOnMonthChange,
-      monthOnMonthPercent,
-      yearOnYearChange,
-      yearOnYearPercent,
-      retirementCountdownYears,
-      retirementCountdownMonths,
-      savingsRate,
-      fireProgress,
-      netWorthAfterCommitments: totalNetWorth - totalAnnualCommitments,
-      totalAnnualCommitments,
-      projectedRetirementIncome,
-      projectedRetirementIncomeStatePension,
-    }),
-    [
-      totalNetWorth, filteredNetWorth, selectedView, cashPosition,
-      monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent,
-      retirementCountdownYears, retirementCountdownMonths,
-      savingsRate, fireProgress, totalAnnualCommitments,
-      projectedRetirementIncome, projectedRetirementIncomeStatePension,
-    ]
-  );
-
-  // Base hero data for what-if comparison (only computed when in scenario mode)
-  const baseHeroData: HeroMetricData = useMemo(
-    () => ({
-      totalNetWorth: selectedView === "household" ? baseTotalNetWorth : baseFilteredNetWorth,
-      cashPosition: baseCashPosition,
-      monthOnMonthChange,
-      monthOnMonthPercent,
-      yearOnYearChange,
-      yearOnYearPercent,
-      retirementCountdownYears: baseRetCountdownYears,
-      retirementCountdownMonths: baseRetCountdownMonths,
-      savingsRate: baseSavingsRate,
-      fireProgress: baseFireProgress,
-      netWorthAfterCommitments: baseTotalNetWorth - baseCommitments,
-      totalAnnualCommitments: baseCommitments,
-      projectedRetirementIncome: baseProjectedRetirementIncome,
-      projectedRetirementIncomeStatePension: baseProjectedRetirementIncomeStatePension,
-    }),
-    [
-      baseTotalNetWorth, baseFilteredNetWorth, selectedView, baseCashPosition,
-      monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent,
-      baseRetCountdownYears, baseRetCountdownMonths,
-      baseSavingsRate, baseFireProgress, baseCommitments,
-      baseProjectedRetirementIncome, baseProjectedRetirementIncomeStatePension,
-    ]
-  );
-
-  // --- Projections ---
   const { scenarios, scenarioRates, projectionYears, milestones } = useMemo(() => {
     const monthlyContrib = calculateTotalAnnualContributions(household.contributions, household.income) / 12;
     const rates = household.retirement.scenarioRates;
@@ -574,7 +610,9 @@ export default function Home() {
     return { scenarios: projScenarios, scenarioRates: rates, projectionYears: years, milestones: ms };
   }, [household, totalNetWorth, totalStatePensionAnnual]);
 
-  // --- Chart data ---
+  // =============================================
+  // Chart data
+  // =============================================
   const personChartData = useMemo(() => byPerson.map((p) => ({ name: p.name, value: p.value })), [byPerson]);
 
   const wrapperData = useMemo(() => {
@@ -594,7 +632,9 @@ export default function Home() {
 
   const wrapperSummary = wrapperData.map((w) => `${Math.round(w.percent * 100)}% ${w.label}`).join(", ");
 
-  // --- Banner ---
+  // =============================================
+  // Banner
+  // =============================================
   const [bannerDismissed, setBannerDismissed] = useState(() => {
     if (typeof window === "undefined") return true;
     try {
@@ -613,7 +653,9 @@ export default function Home() {
     }
   }, []);
 
-  // --- School fee timeline (for education section) ---
+  // =============================================
+  // Education section data
+  // =============================================
   const schoolFeeTimeline = useMemo(
     () => generateSchoolFeeTimeline(household.children),
     [household.children]
@@ -623,10 +665,16 @@ export default function Home() {
     [household.children]
   );
 
+  const latestSnapshot = snapshots[snapshots.length - 1];
   const heroMetrics = household.dashboardConfig.heroMetrics;
+  // REC-B + QA-2: Check if fire_progress is already selected as a configurable metric
+  const fireSelectedAsMetric = heroMetrics.includes("fire_progress");
+
+  // REC-D: Collapse What-If CTA after first scenario is saved
+  const hasUsedScenarios = savedScenarios.length > 0;
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       {/* Print header */}
       <div className="print-report-header hidden print:block">
         <h1>Runway — Financial Report</h1>
@@ -643,7 +691,7 @@ export default function Home() {
         <div className="relative rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
           <button
             onClick={dismissBanner}
-            className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
+            className="absolute right-3 top-3 rounded-md p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
             aria-label="Dismiss getting started banner"
           >
             <X className="size-4" />
@@ -665,28 +713,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Header */}
-      <PageHeader
-        title="Dashboard"
-        description={
-          latestSnapshot
-            ? new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" }).format(
-                new Date(latestSnapshot.date)
-              )
-            : "Your financial overview"
-        }
-      >
-        <PersonToggle />
-        <Button
-          variant="outline"
-          size="sm"
-          className="shrink-0 gap-1.5 print:hidden"
-          onClick={() => window.print()}
-        >
-          <Printer className="size-3.5" />
-          <span className="hidden sm:inline">Print</span>
-        </Button>
-      </PageHeader>
+      {/* REC-D: Removed "Dashboard" PageHeader title (redundant with nav)
+          PersonToggle is embedded in hero card instead */}
 
       {/* HERO — bold primary metric + supporting metrics */}
       {(() => {
@@ -695,15 +723,25 @@ export default function Home() {
         const PrimaryIcon = primary.icon;
         const secondaryMetrics = heroMetrics.slice(1).map((m) => resolveMetric(m, heroData));
         const baseSecondaryMetrics = heroMetrics.slice(1).map((m) => resolveMetric(m, baseHeroData));
+
+        // REC-B: Determine what to show in the sub-hero strip
+        // Pre-retirement → FIRE progress bar
+        // School fees → School Fee Funding Status
+        // Accumulator → FIRE progress bar
+        // QA-2: Suppress hardcoded FIRE bar when fire_progress is already a selected metric
+        const showFireBar = !fireSelectedAsMetric && heroData.fireProgress > 0;
+        const showSchoolFeeStrip = lifeStage === "school_fees" && !showFireBar;
+
         return (
-          <div className="space-y-4">
-            {/* Primary metric — the headline number */}
+          <div className="space-y-3">
+            {/* Primary metric card */}
             <Card className="relative overflow-hidden border-primary/15 bg-gradient-to-br from-primary/10 via-primary/5 to-card">
-              <div className="pointer-events-none absolute -right-8 -top-8 size-40 rounded-full bg-primary/[0.04]" />
-              <div className="pointer-events-none absolute right-12 -bottom-6 size-24 rounded-full bg-primary/[0.03]" />
-              <CardContent className="relative pt-6 pb-5">
+              <div className="pointer-events-none absolute -right-8 -top-8 size-40 rounded-full bg-primary/[0.04] hidden sm:block" />
+              <div className="pointer-events-none absolute right-12 -bottom-6 size-24 rounded-full bg-primary/[0.03] hidden sm:block" />
+              <CardContent className="relative pt-4 pb-3 sm:pt-6 sm:pb-5">
+                {/* REC-D: Person toggle embedded top-right of hero card */}
                 <div className="flex items-start justify-between">
-                  <div>
+                  <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
                         <PrimaryIcon className="size-4 text-primary" />
@@ -711,22 +749,33 @@ export default function Home() {
                       <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         {primary.label}
                       </span>
+                      {/* Latest snapshot date */}
+                      {latestSnapshot && (
+                        <span className="hidden text-xs text-muted-foreground/60 sm:inline">
+                          {new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric" }).format(new Date(latestSnapshot.date))}
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-baseline gap-3">
-                      <span className={`text-4xl sm:text-5xl font-bold tracking-tight tabular-nums ${primary.color}`}>
+                    <div className="flex items-baseline gap-3 min-w-0">
+                      <span className={`${isScenarioMode ? "text-2xl sm:text-4xl" : "text-4xl sm:text-5xl"} font-bold tracking-tight leading-none tabular-nums ${primary.color}`}>
                         <ScenarioDelta base={basePrimary.rawValue} scenario={primary.rawValue} format={primary.format} />
                       </span>
                       {primary.trend === "up" && <TrendingUp className="size-6 text-emerald-500" />}
                       {primary.trend === "down" && <TrendingDown className="size-6 text-red-500" />}
                     </div>
-                    {primary.subtext && (
-                      <span className="mt-1 block text-sm text-muted-foreground">{primary.subtext}</span>
-                    )}
+                    {/* REC-A: Status sentence replaces plain subtext */}
+                    <span className={`mt-1 block text-sm ${statusColorClasses[statusSentence.color]}`}>
+                      {statusSentence.text}
+                    </span>
+                  </div>
+                  {/* REC-D: PersonToggle embedded in hero top-right */}
+                  <div className="shrink-0 print:hidden">
+                    <PersonToggle />
                   </div>
                 </div>
 
-                {/* FIRE progress bar — integrated into hero */}
-                {heroData.fireProgress > 0 && (
+                {/* REC-B: Conditional sub-hero strip */}
+                {showFireBar && (
                   <div className="mt-5 pt-4 border-t border-primary/10">
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-1.5">
@@ -758,6 +807,41 @@ export default function Home() {
                     </div>
                   </div>
                 )}
+
+                {/* REC-B: School fee funding strip for school-fee households */}
+                {showSchoolFeeStrip && heroData.schoolFeeYearsRemaining > 0 && (
+                  <div className="mt-5 pt-4 border-t border-primary/10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <GraduationCap className="size-3.5 text-muted-foreground" />
+                        <span className="text-xs font-medium text-muted-foreground">School Fee Commitment</span>
+                      </div>
+                      <span className="text-xs font-bold tabular-nums">
+                        {heroData.schoolFeeYearsRemaining}yr remaining
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* REC-G: Couples snapshot for multi-person households */}
+                {household.persons.length >= 2 && selectedView === "household" && (
+                  <div className="mt-4 pt-3 border-t border-primary/10">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Users className="size-3.5 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground">At a Glance</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {heroData.perPersonRetirement.map((p) => (
+                        <div key={p.name} className="rounded-md bg-muted/40 px-3 py-2">
+                          <span className="text-xs font-medium">{p.name}</span>
+                          <span className="ml-2 text-xs tabular-nums text-muted-foreground">
+                            {p.years === 0 && p.months === 0 ? "Retired" : `${p.years}y ${p.months}m to retirement`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -769,7 +853,7 @@ export default function Home() {
                   const baseMetric = baseSecondaryMetrics[i];
                   return (
                     <Card key={i} className="border-muted-foreground/10 transition-shadow duration-200 hover:shadow-md">
-                      <CardContent className="pt-4 pb-3">
+                      <CardContent className="pt-3 pb-2 sm:pt-4 sm:pb-3">
                         <div className="flex items-center gap-2 mb-1.5">
                           <div className="flex size-6 items-center justify-center rounded-md bg-muted">
                             <MetricIcon className="size-3.5 text-muted-foreground" />
@@ -786,7 +870,7 @@ export default function Home() {
                           {metric.trend === "down" && <TrendingDown className="size-4 text-red-500" />}
                         </div>
                         {metric.subtext && (
-                          <span className="mt-0.5 block text-[11px] text-muted-foreground">{metric.subtext}</span>
+                          <span className="mt-0.5 block text-[11px] text-muted-foreground truncate">{metric.subtext}</span>
                         )}
                       </CardContent>
                     </Card>
@@ -798,18 +882,100 @@ export default function Home() {
         );
       })()}
 
-      {/* RECOMMENDATIONS — collapsible */}
-      {filteredRecommendations.length > 0 && (
+      {/* REC-E: Next Cash Events strip */}
+      {cashEvents.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-muted-foreground/10 bg-muted/30 px-4 py-3">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <CalendarDays className="size-4 text-muted-foreground" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Next Events</span>
+          </div>
+          {cashEvents.slice(0, 3).map((event, i) => (
+            <div key={i} className="flex items-center gap-2 text-sm">
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(event.date)}
+              </span>
+              <span className="text-xs">{event.label}</span>
+              <span className={`text-xs font-semibold tabular-nums ${event.type === "inflow" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                {event.type === "inflow" ? "+" : ""}{formatCurrencyCompact(Math.abs(event.amount))}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* REC-D: What-If CTA — collapsed to small button after first use */}
+      {!isScenarioMode && (
+        hasUsedScenarios ? (
+          <div className="flex items-center gap-2">
+            <ScenarioPanel />
+            <span className="text-xs text-muted-foreground">Open scenario panel</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <FlaskConical className="size-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">What would happen if...?</p>
+              <p className="text-xs text-muted-foreground hidden sm:block">
+                Model salary changes, pension sacrifice, market crashes, or early retirement
+              </p>
+              <p className="text-xs text-muted-foreground sm:hidden">
+                Model scenarios and see the impact
+              </p>
+            </div>
+            <ScenarioPanel />
+          </div>
+        )
+      )}
+
+      {/* RECOMMENDATIONS — with urgency tiers (REC-F), capped on mobile (REC-D) */}
+      {(filteredRecommendations.length > 0 || resolvedByScenario.size > 0) && (
         <CollapsibleSection
           title="Recommendations"
-          summary={`${filteredRecommendations.length} suggestion${filteredRecommendations.length !== 1 ? "s" : ""}`}
+          summary={`${filteredRecommendations.length} suggestion${filteredRecommendations.length !== 1 ? "s" : ""}${isScenarioMode && resolvedByScenario.size > 0 ? ` · ${resolvedByScenario.size} resolved` : ""}`}
           defaultOpen
           storageKey="recommendations"
         >
           <div className="grid gap-3">
-            {filteredRecommendations.map((rec) => (
-              <RecommendationCard key={rec.id} rec={rec} />
+            {visibleRecs.map(({ rec, urgency }) => (
+              <RecommendationCard
+                key={rec.id}
+                rec={rec}
+                urgency={urgency}
+                scenarioBadge={newInScenario.has(rec.title) ? "new" : undefined}
+                onDismiss={dismissRecommendation}
+              />
             ))}
+            {/* REC-D: Show more button when recommendations are capped */}
+            {hiddenRecCount > 0 && (
+              <button
+                onClick={() => setShowAllRecs(true)}
+                className="flex items-center justify-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                Show {hiddenRecCount} more <ChevronDown className="size-3" />
+              </button>
+            )}
+            {/* FEAT-021: Show resolved recommendations with badge */}
+            {isScenarioMode && baseRecommendations
+              .filter((r) => resolvedByScenario.has(r.title))
+              .map((rec) => (
+                <RecommendationCard
+                  key={`resolved-${rec.id}`}
+                  rec={rec}
+                  scenarioBadge="resolved"
+                />
+              ))
+            }
+            {/* FEAT-006: Show undo link when recommendations are dismissed */}
+            {dismissedIds.size > 0 && (
+              <button
+                onClick={undismissAll}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Show {dismissedIds.size} dismissed recommendation{dismissedIds.size !== 1 ? "s" : ""}
+              </button>
+            )}
           </div>
         </CollapsibleSection>
       )}
@@ -847,20 +1013,8 @@ export default function Home() {
         </CollapsibleSection>
       )}
 
-      {/* PRIMARY CHARTS — 2-col on desktop, with accent top border */}
+      {/* PRIMARY CHARTS */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="border-t border-t-primary/20">
-          <CardHeader>
-            <div className="flex items-baseline justify-between">
-              <CardTitle>Net Worth by Wrapper</CardTitle>
-              <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <WrapperSplitChart data={byWrapper} />
-          </CardContent>
-        </Card>
-
         <Card className="border-t border-t-primary/20">
           <CardHeader>
             <div className="flex items-baseline justify-between">
@@ -877,9 +1031,21 @@ export default function Home() {
             </p>
           </CardContent>
         </Card>
+
+        <Card className="border-t border-t-primary/20">
+          <CardHeader>
+            <div className="flex items-baseline justify-between">
+              <CardTitle>Net Worth by Wrapper</CardTitle>
+              <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <WrapperSplitChart data={byWrapper} />
+          </CardContent>
+        </Card>
       </div>
 
-      {/* SECONDARY SECTIONS — collapsible */}
+      {/* SECONDARY SECTIONS */}
       <CollapsibleSection title="Liquid vs Illiquid" summary="Accessible wealth vs locked pensions" storageKey="liquidity">
         <Card>
           <CardContent className="pt-6">
@@ -902,39 +1068,59 @@ export default function Home() {
         </CollapsibleSection>
       )}
 
-      {household.committedOutgoings.length > 0 && (
-        <CollapsibleSection
-          title="Committed Outgoings"
-          summary={`${formatCurrencyCompact(totalAnnualCommitments)}/yr across ${household.committedOutgoings.length} items`}
-          storageKey="commitments"
-        >
-          <Card>
-            <CardContent className="pt-4 pb-2">
-              <div className="space-y-1">
-                {[...household.committedOutgoings]
-                  .sort((a, b) => annualiseOutgoing(b.amount, b.frequency) - annualiseOutgoing(a.amount, a.frequency))
-                  .map((o) => {
-                    const annual = annualiseOutgoing(o.amount, o.frequency);
-                    return (
-                      <div key={o.id} className="flex items-center gap-3 py-1.5 border-b last:border-0">
-                        <Badge variant="outline" className="text-[10px] shrink-0 w-20 justify-center">
-                          {OUTGOING_CATEGORY_LABELS[o.category]}
-                        </Badge>
-                        <span className="text-sm flex-1 truncate">{o.label || OUTGOING_CATEGORY_LABELS[o.category]}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {OUTGOING_FREQUENCY_LABELS[o.frequency]}
-                        </span>
-                        <span className="text-sm font-medium tabular-nums shrink-0 w-20 text-right">
-                          {formatCurrencyCompact(annual)}/yr
-                        </span>
-                      </div>
-                    );
-                  })}
+      {household.committedOutgoings.length > 0 && (() => {
+        const categoryTotals = household.committedOutgoings.reduce<Record<string, number>>((acc, o) => {
+          const annual = annualiseOutgoing(o.amount, o.frequency);
+          acc[o.category] = (acc[o.category] ?? 0) + annual;
+          return acc;
+        }, {});
+        const sortedCategories = Object.entries(categoryTotals).sort(([, a], [, b]) => b - a);
+
+        return (
+          <CollapsibleSection
+            title="Committed Outgoings"
+            summary={`${formatCurrencyCompact(heroData.totalAnnualCommitments)}/yr across ${household.committedOutgoings.length} items`}
+            storageKey="commitments"
+          >
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {sortedCategories.map(([category, total]) => (
+                  <div key={category} className="flex items-center gap-1.5 rounded-md bg-muted/50 px-2.5 py-1.5">
+                    <span className="text-xs text-muted-foreground">{OUTGOING_CATEGORY_LABELS[category as keyof typeof OUTGOING_CATEGORY_LABELS]}</span>
+                    <span className="text-xs font-semibold tabular-nums">{formatCurrencyCompact(total)}/yr</span>
+                  </div>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        </CollapsibleSection>
-      )}
+
+              <Card>
+                <CardContent className="pt-4 pb-2">
+                  <div className="space-y-1">
+                    {[...household.committedOutgoings]
+                      .sort((a, b) => annualiseOutgoing(b.amount, b.frequency) - annualiseOutgoing(a.amount, a.frequency))
+                      .map((o) => {
+                        const annual = annualiseOutgoing(o.amount, o.frequency);
+                        return (
+                          <div key={o.id} className="flex items-center gap-3 py-1.5 border-b last:border-0">
+                            <Badge variant="outline" className="text-[10px] shrink-0 w-20 justify-center">
+                              {OUTGOING_CATEGORY_LABELS[o.category]}
+                            </Badge>
+                            <span className="text-sm flex-1 truncate">{o.label || OUTGOING_CATEGORY_LABELS[o.category]}</span>
+                            <span className="hidden text-xs text-muted-foreground shrink-0 sm:inline">
+                              {OUTGOING_FREQUENCY_LABELS[o.frequency]}
+                            </span>
+                            <span className="text-sm font-medium tabular-nums shrink-0 w-20 text-right">
+                              {formatCurrencyCompact(annual)}/yr
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </CollapsibleSection>
+        );
+      })()}
     </div>
   );
 }

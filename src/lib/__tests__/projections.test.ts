@@ -13,6 +13,7 @@ import {
   calculateAdjustedRequiredPot,
   calculateProRataStatePension,
   calculateAge,
+  calculatePensionCarryForward,
   calculateTaxEfficiencyScore,
   projectDeferredBonusValue,
   calculateTaperedAnnualAllowance,
@@ -690,5 +691,54 @@ describe("projected retirement income (integration)", () => {
     expect(projectedPot).toBe(500_000);
     const sustainableIncome = calculateSWR(projectedPot, 0.04);
     expect(sustainableIncome).toBe(20_000);
+  });
+});
+
+describe("FEAT-002: calculatePensionCarryForward", () => {
+  it("returns current year allowance when no prior data", () => {
+    expect(calculatePensionCarryForward(60_000, [])).toBe(60_000);
+  });
+
+  it("returns current year allowance when prior years fully used", () => {
+    expect(calculatePensionCarryForward(60_000, [60_000, 60_000, 60_000])).toBe(60_000);
+  });
+
+  it("carries forward unused allowance from 1 prior year", () => {
+    // Prior year: contributed £20k of £60k allowance → £40k carry-forward
+    expect(calculatePensionCarryForward(60_000, [20_000])).toBe(100_000);
+  });
+
+  it("carries forward from 3 prior years", () => {
+    // Year-1: £10k of £60k → £50k unused
+    // Year-2: £30k of £60k → £30k unused
+    // Year-3: £0 of £60k → £60k unused
+    // Total carry-forward: £140k + current £60k = £200k
+    expect(calculatePensionCarryForward(60_000, [10_000, 30_000, 0])).toBe(200_000);
+  });
+
+  it("ignores more than 3 prior years", () => {
+    // Only the first 3 years should be counted
+    expect(calculatePensionCarryForward(60_000, [0, 0, 0, 0])).toBe(240_000);
+    // Same as with just 3 years
+    expect(calculatePensionCarryForward(60_000, [0, 0, 0])).toBe(240_000);
+  });
+
+  it("handles tapered allowance in current year", () => {
+    // Current year tapered to £30k, prior years all unused at £60k each
+    expect(calculatePensionCarryForward(30_000, [0, 0, 0])).toBe(210_000);
+  });
+
+  it("handles custom prior year allowances", () => {
+    // Prior years also had tapered allowances
+    expect(calculatePensionCarryForward(
+      60_000,
+      [10_000, 20_000, 30_000],
+      [40_000, 50_000, 60_000] // tapered prior allowances
+    )).toBe(60_000 + 30_000 + 30_000 + 30_000); // 150k
+  });
+
+  it("contributions above allowance produce zero carry-forward for that year", () => {
+    // Over-contributed in year-1: doesn't create negative carry-forward
+    expect(calculatePensionCarryForward(60_000, [80_000, 0])).toBe(120_000);
   });
 });

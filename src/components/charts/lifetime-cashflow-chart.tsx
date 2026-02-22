@@ -15,7 +15,6 @@
 // - Colorblind-safe palette with semantic meaning
 
 import {
-  AreaChart,
   Area,
   XAxis,
   YAxis,

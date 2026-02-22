@@ -444,6 +444,40 @@ export function calculateTaperedAnnualAllowance(
   return Math.max(tapered, pensionMinimumTaperedAllowance);
 }
 
+/**
+ * FEAT-002: Calculate pension carry-forward allowance.
+ *
+ * Per HMRC rules, unused pension annual allowance from the previous 3 tax years
+ * can be carried forward, provided the person was a member of a registered pension scheme
+ * in those years.
+ *
+ * @param currentYearAllowance - The annual allowance for the current year (may be tapered)
+ * @param priorYearContributions - Array of total pension contributions for the prior 3 years
+ *   [year-1, year-2, year-3] (most recent first). Each value is the total contribution
+ *   (employee + employer) made in that year.
+ * @param priorYearAllowances - Optional: allowances for prior years if they differed (e.g. due to taper).
+ *   Defaults to the standard £60k if not provided.
+ * @returns The total available allowance for the current year including carry-forward
+ */
+export function calculatePensionCarryForward(
+  currentYearAllowance: number,
+  priorYearContributions: number[],
+  priorYearAllowances?: number[]
+): number {
+  const standardAllowance = UK_TAX_CONSTANTS.pensionAnnualAllowance;
+  let carryForward = 0;
+
+  // Only look at up to 3 prior years
+  for (let i = 0; i < Math.min(3, priorYearContributions.length); i++) {
+    const yearAllowance = priorYearAllowances?.[i] ?? standardAllowance;
+    const contributed = priorYearContributions[i] ?? 0;
+    const unused = Math.max(0, yearAllowance - contributed);
+    carryForward += unused;
+  }
+
+  return currentYearAllowance + carryForward;
+}
+
 // --- State Pension ---
 
 /**
