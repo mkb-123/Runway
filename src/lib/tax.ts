@@ -386,3 +386,82 @@ export function calculateTakeHomePayWithStudentLoan(
     monthlyTakeHome: roundPence((base.takeHome - studentLoan) / 12),
   };
 }
+
+// ============================================================
+// Self-Employment National Insurance (Class 2 + Class 4)
+// ============================================================
+
+export interface SelfEmploymentNIResult {
+  class2: number;
+  class4: number;
+  total: number;
+  breakdown: {
+    band: string;
+    rate: number;
+    profits: number;
+    ni: number;
+  }[];
+}
+
+/**
+ * Calculate self-employment NI (Class 2 + Class 4) on annual profits.
+ *
+ * Class 2: flat-rate weekly contribution if profits > small profits threshold.
+ * Class 4: 6% on profits between LPL and UPL, 2% above UPL (2024/25 rates).
+ *
+ * Pension contributions are NOT deducted from NI-able profits for the self-employed
+ * (unlike salary sacrifice for employed).
+ */
+export function calculateSelfEmploymentNI(annualProfits: number): SelfEmploymentNIResult {
+  const c = UK_TAX_CONSTANTS.selfEmploymentNI;
+  const breakdown: SelfEmploymentNIResult["breakdown"] = [];
+
+  // Class 2 — flat rate if above small profits threshold
+  let class2 = 0;
+  if (annualProfits >= c.class2SmallProfitsThreshold) {
+    class2 = roundPence(c.class2WeeklyRate * 52);
+    breakdown.push({
+      band: "Class 2 (flat rate)",
+      rate: 0,
+      profits: annualProfits,
+      ni: class2,
+    });
+  }
+
+  // Class 4 — main rate band
+  let class4 = 0;
+  const mainBand = Math.max(
+    0,
+    Math.min(annualProfits, c.class4UpperProfitsLimit) - c.class4LowerProfitsLimit
+  );
+  if (mainBand > 0) {
+    const mainNI = roundPence(mainBand * c.class4MainRate);
+    class4 += mainNI;
+    breakdown.push({
+      band: `Class 4 (${(c.class4MainRate * 100).toFixed(0)}%)`,
+      rate: c.class4MainRate,
+      profits: mainBand,
+      ni: mainNI,
+    });
+  }
+
+  // Class 4 — additional rate band
+  const addBand = Math.max(0, annualProfits - c.class4UpperProfitsLimit);
+  if (addBand > 0) {
+    const addNI = roundPence(addBand * c.class4AdditionalRate);
+    class4 += addNI;
+    breakdown.push({
+      band: `Class 4 (${(c.class4AdditionalRate * 100).toFixed(0)}%)`,
+      rate: c.class4AdditionalRate,
+      profits: addBand,
+      ni: addNI,
+    });
+  }
+
+  return {
+    class2,
+    class4,
+    total: roundPence(class2 + class4),
+    breakdown,
+  };
+}

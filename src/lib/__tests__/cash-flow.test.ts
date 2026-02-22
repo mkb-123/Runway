@@ -61,6 +61,7 @@ function buildMinimalHousehold(overrides?: {
       targetMonths: 6,
       monthlyLifestyleSpending: 1500,
     },
+    properties: [],
     iht: {
       estimatedPropertyValue: 0,
       passingToDirectDescendants: false,

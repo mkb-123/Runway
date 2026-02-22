@@ -613,6 +613,7 @@ export default function RetirementPage() {
         title="Drawdown Projection"
         summary="How your pot depletes during retirement"
         storageKey="retirement-drawdown"
+        lazy
       >
         <Card>
           <CardHeader>
@@ -662,6 +663,7 @@ export default function RetirementPage() {
         title="FIRE Metrics"
         summary="Savings rate, Coast FIRE, and required monthly savings"
         storageKey="retirement-fire"
+        lazy
       >
         <FireMetricsCard
           savingsRate={savingsRate}

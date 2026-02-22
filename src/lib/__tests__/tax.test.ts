@@ -5,6 +5,7 @@ import {
   calculateStudentLoan,
   calculateTakeHomePay,
   calculateTakeHomePayWithStudentLoan,
+  calculateSelfEmploymentNI,
 } from "../tax";
 import type { PersonIncome } from "@/types";
 import { roundPence } from "@/lib/format";
@@ -362,5 +363,49 @@ describe("calculateTakeHomePayWithStudentLoan", () => {
 
     const result = calculateTakeHomePayWithStudentLoan(income, "none");
     expect(result.studentLoan).toBe(0);
+  });
+});
+
+// ============================================================
+// Self-Employment NI (Class 2 + Class 4)
+// ============================================================
+
+describe("calculateSelfEmploymentNI", () => {
+  it("returns zero for profits below small profits threshold", () => {
+    const result = calculateSelfEmploymentNI(5_000);
+    expect(result.class2).toBe(0);
+    expect(result.class4).toBe(0);
+    expect(result.total).toBe(0);
+  });
+
+  it("charges Class 2 flat rate above small profits threshold", () => {
+    const result = calculateSelfEmploymentNI(10_000);
+    expect(result.class2).toBeCloseTo(3.45 * 52, 0);
+    // Below Class 4 lower profits limit — no Class 4
+    expect(result.class4).toBe(0);
+  });
+
+  it("charges Class 4 main rate on profits between LPL and UPL", () => {
+    // £30,000 profit: Class 4 on (£30k - £12,570) = £17,430 at 6%
+    const result = calculateSelfEmploymentNI(30_000);
+    expect(result.class4).toBeCloseTo(17_430 * 0.06, 0);
+    expect(result.class2).toBeGreaterThan(0);
+    expect(result.total).toBe(result.class2 + result.class4);
+  });
+
+  it("charges Class 4 additional rate above UPL", () => {
+    // £80,000 profit
+    const result = calculateSelfEmploymentNI(80_000);
+    const mainBand = 50_270 - 12_570; // £37,700 at 6%
+    const addBand = 80_000 - 50_270; // £29,730 at 2%
+    expect(result.class4).toBeCloseTo(mainBand * 0.06 + addBand * 0.02, 0);
+  });
+
+  it("has lower NI than employee Class 1 for same income", () => {
+    const salary = 60_000;
+    const employeeNI = calculateNI(salary);
+    const selfEmpNI = calculateSelfEmploymentNI(salary);
+    // Self-employment NI should be lower (6% vs 8% main rate)
+    expect(selfEmpNI.total).toBeLessThan(employeeNI.ni);
   });
 });

@@ -36,11 +36,15 @@ import { calculateTakeHomePay } from "@/lib/tax";
 import { calculateTaperedAnnualAllowance } from "@/lib/projections";
 import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
+import { EffectiveTaxRateChart } from "@/components/charts/effective-tax-rate-chart";
+import { TaxBandChart, type TaxBandDataItem } from "@/components/charts/tax-band-chart";
 import { ScenarioDelta } from "@/components/scenario-delta";
+import { StaleTaxBanner } from "@/components/stale-tax-banner";
 import type { PersonIncome } from "@/types";
 import { getPersonContributionTotals, getAccountTaxWrapper } from "@/types";
 import type { TaxWrapper } from "@/types";
 import { SettingsBar } from "@/components/settings-bar";
+import { calculateIncomeTax } from "@/lib/tax";
 
 export default function TaxPlanningPage() {
   useData(); // keep context provider mounted
@@ -178,6 +182,31 @@ export default function TaxPlanningPage() {
           0
         );
 
+        // Tax band data for chart
+        const taxBandData: TaxBandDataItem | null = personIncome
+          ? (() => {
+              const taxResult = calculateIncomeTax(
+                personIncome.grossSalary,
+                personIncome.employeePensionContribution,
+                personIncome.pensionContributionMethod
+              );
+              const item: TaxBandDataItem = {
+                name: person.name,
+                personalAllowance: 0,
+                basicRate: 0,
+                higherRate: 0,
+                additionalRate: 0,
+              };
+              for (const band of taxResult.breakdown) {
+                if (band.band === "Personal Allowance") item.personalAllowance = band.taxableAmount;
+                else if (band.band === "Basic Rate") item.basicRate = band.taxableAmount;
+                else if (band.band === "Higher Rate") item.higherRate = band.taxableAmount;
+                else if (band.band === "Additional Rate") item.additionalRate = band.taxableAmount;
+              }
+              return item;
+            })()
+          : null;
+
         return {
           person,
           personIncome,
@@ -195,6 +224,7 @@ export default function TaxPlanningPage() {
           bedAndISA,
           breakEvenYears,
           isHigherRate,
+          taxBandData,
           // Base values for ScenarioDelta
           baseGiaValue,
           baseIsaUsed,
@@ -300,6 +330,8 @@ export default function TaxPlanningPage() {
       <PageHeader title="Tax Planning & Optimisation" description="Strategies to minimise tax drag and optimise your investment wrappers.">
         <PersonToggle />
       </PageHeader>
+
+      <StaleTaxBanner />
 
       {persons.length === 0 && (
         <EmptyState message="No household data yet. Add people and accounts to see tax planning strategies." settingsTab="household" />
@@ -655,6 +687,41 @@ export default function TaxPlanningPage() {
                 );
               })}
             </div>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
+
+      {/* Tax Band Breakdown */}
+      <CollapsibleSection title="Tax Band Breakdown" summary="Income by tax band per person" storageKey="tax-bands">
+        <Card>
+          <CardHeader>
+            <CardTitle>Income by Tax Band</CardTitle>
+            <CardDescription>
+              How each person&apos;s income is distributed across tax bands after pension contributions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TaxBandChart
+              data={personData
+                .filter((pd) => pd.taxBandData !== null)
+                .map((pd) => pd.taxBandData!)}
+              height={Math.max(200, personData.length * 80)}
+            />
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
+
+      {/* Effective Tax Rate Curve */}
+      <CollapsibleSection title="Effective Tax Rate" summary="Marginal & effective rates by income" storageKey="tax-rate-curve">
+        <Card>
+          <CardHeader>
+            <CardTitle>Effective Tax Rate Curve</CardTitle>
+            <CardDescription>
+              Marginal and effective income tax + NI rates across income ranges. Note the 60% trap between £100k–£125k.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EffectiveTaxRateChart />
           </CardContent>
         </Card>
       </CollapsibleSection>

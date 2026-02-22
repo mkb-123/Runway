@@ -30,6 +30,7 @@ function makeHousehold(overrides?: Partial<HouseholdData>): HouseholdData {
     ],
     retirement: { targetAnnualIncome: 40000, withdrawalRate: 0.04, includeStatePension: true, scenarioRates: [0.05, 0.07] },
     emergencyFund: { monthlyEssentialExpenses: 2000, targetMonths: 6, monthlyLifestyleSpending: 1500 },
+    properties: [],
     iht: { estimatedPropertyValue: 400000, passingToDirectDescendants: true, gifts: [] },
     children: [],
     committedOutgoings: [],
@@ -236,6 +237,53 @@ describe("applyScenarioOverrides", () => {
     const originalIncome = h.income[0].grossSalary;
     applyScenarioOverrides(h, { income: [{ personId: "p1", grossSalary: 999999 }] });
     expect(h.income[0].grossSalary).toBe(originalIncome);
+  });
+
+  describe("property overrides", () => {
+    it("overrides property value for downsizing scenario", () => {
+      const h = makeHousehold({
+        properties: [
+          { id: "prop-1", label: "Home", estimatedValue: 500000, ownerPersonIds: ["p1"], mortgageBalance: 200000 },
+        ],
+      });
+      const result = applyScenarioOverrides(h, {
+        propertyOverrides: [
+          { propertyId: "prop-1", estimatedValue: 300000, mortgageBalance: 0 },
+        ],
+      });
+      expect(result.properties[0].estimatedValue).toBe(300000);
+      expect(result.properties[0].mortgageBalance).toBe(0);
+    });
+
+    it("only overrides specified fields", () => {
+      const h = makeHousehold({
+        properties: [
+          { id: "prop-1", label: "Home", estimatedValue: 500000, ownerPersonIds: ["p1"], mortgageBalance: 200000 },
+        ],
+      });
+      const result = applyScenarioOverrides(h, {
+        propertyOverrides: [
+          { propertyId: "prop-1", appreciationRate: 0.05 },
+        ],
+      });
+      expect(result.properties[0].estimatedValue).toBe(500000);
+      expect(result.properties[0].mortgageBalance).toBe(200000);
+      expect(result.properties[0].appreciationRate).toBe(0.05);
+    });
+
+    it("ignores overrides for non-existent properties", () => {
+      const h = makeHousehold({
+        properties: [
+          { id: "prop-1", label: "Home", estimatedValue: 500000, ownerPersonIds: ["p1"], mortgageBalance: 0 },
+        ],
+      });
+      const result = applyScenarioOverrides(h, {
+        propertyOverrides: [
+          { propertyId: "non-existent", estimatedValue: 100000 },
+        ],
+      });
+      expect(result.properties[0].estimatedValue).toBe(500000);
+    });
   });
 
   describe("combined overrides (integration)", () => {

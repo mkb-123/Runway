@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import type { Gift, HouseholdData } from "@/types";
 import { clone, setField, renderField } from "./field-helpers";
+import { formatCurrency } from "@/lib/format";
 
 interface IhtTabProps {
   household: HouseholdData;
@@ -49,12 +50,35 @@ export function IhtTab({ household, updateHousehold }: IhtTabProps) {
     updateHousehold(updated);
   }
 
+  const totalPropertyValue = household.properties.reduce((s, p) => s + p.estimatedValue, 0);
+  const totalMortgage = household.properties.reduce((s, p) => s + p.mortgageBalance, 0);
+  const totalEquity = Math.max(0, totalPropertyValue - totalMortgage);
+
   return (
     <div className="space-y-4 mt-4">
       <p className="text-sm text-muted-foreground">
-        Property value and gift records for inheritance tax estimates under the 7-year rule.
+        Estate planning and gift records for inheritance tax estimates under the 7-year rule.
+        Properties are managed on the Property tab.
       </p>
 
+      {/* Property summary (read-only link to Property tab) */}
+      {household.properties.length > 0 && (
+        <Card>
+          <CardContent className="py-3">
+            <p className="text-sm">
+              <span className="font-medium">Property in estate:</span>{" "}
+              {formatCurrency(totalEquity)} equity ({formatCurrency(totalPropertyValue)} value
+              {totalMortgage > 0 && ` − ${formatCurrency(totalMortgage)} mortgage`})
+              {" · "}
+              <a href="/settings?tab=property" className="text-primary underline underline-offset-2 text-sm">
+                Edit on Property tab
+              </a>
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* IHT Config */}
       <Card>
         <CardHeader>
           <CardTitle>Estate</CardTitle>
@@ -65,19 +89,6 @@ export function IhtTab({ household, updateHousehold }: IhtTabProps) {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {renderField(
-              "Estimated Property Value",
-              <Input
-                type="number"
-                step="0.01"
-                value={household.iht.estimatedPropertyValue}
-                onChange={(e) =>
-                  updateIHT("estimatedPropertyValue", Number(e.target.value))
-                }
-                placeholder="0.00"
-              />,
-              "Main residence value for IHT calculations"
-            )}
             {renderField(
               "Passing to Direct Descendants",
               <div className="flex items-center gap-2 h-9">
@@ -100,6 +111,7 @@ export function IhtTab({ household, updateHousehold }: IhtTabProps) {
         </CardContent>
       </Card>
 
+      {/* Gifts */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">

@@ -329,9 +329,10 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
   const targets = [500, 1000, 2000, 3000];
   retRows.push({ Item: "", "Value": "" }, { Item: "--- Required Monthly Savings ---", "Value": "" });
   for (const target of targets) {
-    const required = calculateRequiredSavings(grandTotal, requiredPot, retAge - currentAge, midRate);
+    const targetPot = target * 1000;
+    const required = calculateRequiredSavings(targetPot, grandTotal, retAge - currentAge, midRate);
     retRows.push({
-      Item: `To reach ${formatCurrency(target * 1000)} target`,
+      Item: `To reach ${formatCurrency(targetPot)} target`,
       "Value": formatCurrency(required / 12) + "/month",
     });
   }
@@ -357,7 +358,10 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
   const pbValue = household.accounts
     .filter((a) => getAccountTaxWrapper(a.type) === "premium_bonds")
     .reduce((s, a) => s + a.currentValue, 0);
-  const inEstate = ihtConfig.estimatedPropertyValue + isaValue + giaValue + cashValue + pbValue;
+  const propertyValue = household.properties.reduce((s, p) => s + p.estimatedValue, 0);
+  const mortgageBalance = household.properties.reduce((s, p) => s + p.mortgageBalance, 0);
+  const propertyEquity = Math.max(0, propertyValue - mortgageBalance);
+  const inEstate = propertyEquity + isaValue + giaValue + cashValue + pbValue;
 
   const giftsWithin7 = ihtConfig.gifts
     .filter((g) => yearsSince(g.date) < 7)
@@ -372,7 +376,8 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
 
   const ihtRows: Record<string, string | number>[] = [
     { Item: "Total Net Worth", "Value (£)": curr(grandTotal) },
-    { Item: "Property Value", "Value (£)": curr(ihtConfig.estimatedPropertyValue) },
+    { Item: "Property Value", "Value (£)": curr(propertyValue) },
+    ...(mortgageBalance > 0 ? [{ Item: "Mortgage Balance", "Value (£)": curr(-mortgageBalance) }] : []),
     { Item: "Pension (Outside Estate)", "Value (£)": curr(pensionValue) },
     { Item: "ISA (In Estate)", "Value (£)": curr(isaValue) },
     { Item: "GIA (In Estate)", "Value (£)": curr(giaValue) },

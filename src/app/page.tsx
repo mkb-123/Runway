@@ -55,22 +55,41 @@ import {
   getStatusSentence,
   detectLifeStage,
   getRecommendationUrgency,
+  resolveMetricData,
   type HeroMetricData,
   type RecommendationUrgency,
+  type MetricIconKey,
 } from "@/lib/dashboard";
 
 import { NetWorthTrajectoryChart } from "@/components/charts/net-worth-trajectory";
-import { ByPersonChart } from "@/components/charts/by-person-chart";
+import { NetWorthHistoryChart } from "@/components/charts/net-worth-history";
 import { WrapperSplitChart } from "@/components/charts/wrapper-split-chart";
 import { LiquiditySplitChart } from "@/components/charts/liquidity-split-chart";
+import { AllocationBar } from "@/components/charts/allocation-bar";
 import { ScenarioDelta } from "@/components/scenario-delta";
 import { SchoolFeeSummary } from "@/components/school-fee-summary";
 import { SchoolFeeTimelineChart } from "@/components/charts/school-fee-timeline-chart";
 import { generateSchoolFeeTimeline, findLastSchoolFeeYear } from "@/lib/school-fees";
+import { StaleTaxBanner } from "@/components/stale-tax-banner";
+import { PropertyEquityChart } from "@/components/charts/property-equity-chart";
+import { MortgageAmortizationChart } from "@/components/charts/mortgage-amortization-chart";
+import { projectPropertyEquity, calculateMortgagePayoffYears, generateAmortizationSchedule } from "@/lib/property";
 
 // ============================================================
 // Hero Metric — resolve type to display properties
 // ============================================================
+
+const ICON_MAP: Record<MetricIconKey, LucideIcon> = {
+  banknote: Banknote,
+  clock: Clock,
+  "trending-up": TrendingUp,
+  "bar-chart": BarChart3,
+  "piggy-bank": PiggyBank,
+  target: Target,
+  shield: Shield,
+  sunrise: Sunrise,
+  "graduation-cap": GraduationCap,
+};
 
 interface ResolvedMetric {
   label: string;
@@ -87,266 +106,11 @@ function resolveMetric(
   type: HeroMetricType,
   data: HeroMetricData
 ): ResolvedMetric {
-  switch (type) {
-    case "cash_position":
-      return {
-        label: "Cash Position",
-        value: formatCurrencyCompact(data.cashPosition),
-        rawValue: data.cashPosition,
-        format: formatCurrencyCompact,
-        color: "",
-        icon: Banknote,
-      };
-    case "retirement_countdown": {
-      const y = data.retirementCountdownYears;
-      const m = data.retirementCountdownMonths;
-      const onTrack = y === 0 && m === 0;
-      return {
-        label: "Retirement",
-        value: onTrack ? "On track" : `${y}y ${m}m`,
-        rawValue: y * 12 + m,
-        format: (n: number) => {
-          if (n === 0) return "On track";
-          return `${Math.floor(n / 12)}y ${n % 12}m`;
-        },
-        subtext: onTrack ? "Target pot reached" : "to target",
-        color: onTrack ? "text-emerald-600 dark:text-emerald-400" : "",
-        icon: Clock,
-      };
-    }
-    case "period_change": {
-      // QA-3: Show "N/A" when insufficient snapshots instead of "+0.0"
-      if (!data.hasEnoughSnapshotsForMoM) {
-        return {
-          label: "Period Change",
-          value: "N/A",
-          rawValue: 0,
-          format: () => "N/A",
-          subtext: "Needs 2+ months of history",
-          color: "text-muted-foreground",
-          icon: TrendingUp,
-        };
-      }
-      const v = data.monthOnMonthChange;
-      const color = v > 0 ? "text-emerald-600 dark:text-emerald-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
-      // REC-H: Period change attribution — show contribution context
-      const contribNote = data.monthlyContributionRate > 0
-        ? ` (incl. ~${formatCurrencyCompact(data.monthlyContributionRate)}/mo contributions)`
-        : "";
-      return {
-        label: "Period Change",
-        value: `${v >= 0 ? "+" : ""}${formatCurrencyCompact(v)}`,
-        rawValue: v,
-        format: (n: number) => `${n >= 0 ? "+" : ""}${formatCurrencyCompact(n)}`,
-        subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.monthOnMonthPercent)} MoM${contribNote}`,
-        color,
-        trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
-        icon: TrendingUp,
-      };
-    }
-    case "year_on_year_change": {
-      // QA-3: Show "N/A" when insufficient snapshots
-      if (!data.hasEnoughSnapshotsForYoY) {
-        return {
-          label: "Year-on-Year",
-          value: "N/A",
-          rawValue: 0,
-          format: () => "N/A",
-          subtext: "Needs ~12 months of history",
-          color: "text-muted-foreground",
-          icon: BarChart3,
-        };
-      }
-      const v = data.yearOnYearChange;
-      const color = v > 0 ? "text-emerald-600 dark:text-emerald-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
-      return {
-        label: "Year-on-Year",
-        value: `${v >= 0 ? "+" : ""}${formatCurrencyCompact(v)}`,
-        rawValue: v,
-        format: (n: number) => `${n >= 0 ? "+" : ""}${formatCurrencyCompact(n)}`,
-        subtext: `${v >= 0 ? "+" : ""}${formatPercent(data.yearOnYearPercent)} YoY`,
-        color,
-        trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
-        icon: BarChart3,
-      };
-    }
-    case "savings_rate":
-      return {
-        label: data.isPersonView ? "Savings Rate (Personal)" : "Savings Rate",
-        value: `${data.savingsRate.toFixed(1)}%`,
-        rawValue: data.savingsRate,
-        format: (n: number) => `${n.toFixed(1)}%`,
-        subtext: `${data.personalSavingsRate.toFixed(1)}% personal`,
-        color: data.savingsRate >= 20
-          ? "text-emerald-600 dark:text-emerald-400"
-          : data.savingsRate < 10
-            ? "text-amber-600 dark:text-amber-400"
-            : "",
-        icon: PiggyBank,
-      };
-    case "fire_progress":
-      return {
-        label: "FIRE Progress",
-        value: `${data.fireProgress.toFixed(1)}%`,
-        rawValue: data.fireProgress,
-        format: (n: number) => `${n.toFixed(1)}%`,
-        subtext: "of target pot",
-        color: data.fireProgress >= 100
-          ? "text-emerald-600 dark:text-emerald-400"
-          : data.fireProgress < 25
-            ? "text-amber-600 dark:text-amber-400"
-            : "",
-        icon: Target,
-      };
-    case "net_worth_after_commitments":
-      // REC-K: "years of net worth vs annual outgoings"
-      return {
-        label: "Commitments Covered",
-        value: data.commitmentCoverageYears >= 999
-          ? "N/A"
-          : `${data.commitmentCoverageYears.toFixed(1)}yr`,
-        rawValue: data.commitmentCoverageYears,
-        format: (n: number) => n >= 999 ? "N/A" : `${n.toFixed(1)}yr`,
-        subtext: data.totalAnnualCommitments > 0
-          ? `yrs net worth covers ${formatCurrencyCompact(data.totalAnnualCommitments)}/yr outgoings`
-          : "No committed outgoings",
-        color: data.commitmentCoverageYears >= 15
-          ? "text-emerald-600 dark:text-emerald-400"
-          : data.commitmentCoverageYears < 5
-            ? "text-amber-600 dark:text-amber-400"
-            : "",
-        icon: Shield,
-      };
-    case "projected_retirement_income": {
-      const target = data.targetAnnualIncome;
-      const projected = data.projectedRetirementIncome;
-      const incomeColor = target > 0 && projected >= target
-        ? "text-emerald-600 dark:text-emerald-400"
-        : target > 0 && projected < target * 0.5
-          ? "text-red-600 dark:text-red-400"
-          : target > 0 && projected < target * 0.75
-            ? "text-amber-600 dark:text-amber-400"
-            : "";
-      // QA-6: Disclose growth rate assumption
-      const growthPct = (data.projectedGrowthRate * 100).toFixed(0);
-      const statePensionNote = data.projectedRetirementIncomeStatePension > 0
-        ? `incl. ${formatCurrencyCompact(data.projectedRetirementIncomeStatePension)} state pension`
-        : `at ${growthPct}% growth`;
-      return {
-        label: "Retirement Income",
-        value: `${formatCurrencyCompact(projected)}/yr`,
-        rawValue: projected,
-        format: (n: number) => `${formatCurrencyCompact(n)}/yr`,
-        subtext: statePensionNote,
-        color: incomeColor,
-        icon: Sunrise,
-      };
-    }
-    case "cash_runway": {
-      const months = data.cashRunway;
-      // QA-4: Show "No outgoings" instead of green "∞" when nothing configured
-      if (!data.hasOutgoings) {
-        return {
-          label: "Cash Cushion",
-          value: "N/A",
-          rawValue: 0,
-          format: () => "N/A",
-          subtext: "No outgoings configured",
-          color: "text-muted-foreground",
-          icon: Shield,
-        };
-      }
-      const color = months < 3 ? "text-red-600 dark:text-red-400" : months < 6 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
-      return {
-        label: "Cash Cushion",
-        value: `${months.toFixed(1)}mo`,
-        rawValue: months,
-        format: (n: number) => `${n.toFixed(1)}mo`,
-        subtext: "months of outgoings if income stopped",
-        color,
-        icon: Shield,
-      };
-    }
-    case "school_fee_countdown": {
-      const yrs = data.schoolFeeYearsRemaining;
-      return {
-        label: "School Fees End",
-        value: yrs <= 0 ? "Done" : `${yrs}yr`,
-        rawValue: yrs,
-        format: (n: number) => n <= 0 ? "Done" : `${n}yr`,
-        subtext: yrs <= 0 ? "No children in school" : "until last child finishes",
-        color: yrs <= 0 ? "text-emerald-600 dark:text-emerald-400" : "",
-        icon: GraduationCap,
-      };
-    }
-    case "pension_bridge_gap": {
-      const yrs = data.pensionBridgeYears;
-      return {
-        label: "Pension Bridge",
-        value: yrs <= 0 ? "None" : `${yrs}yr`,
-        rawValue: yrs,
-        format: (n: number) => n <= 0 ? "None" : `${n}yr`,
-        subtext: yrs <= 0 ? "Pension accessible at retirement" : "gap before pension access",
-        color: yrs > 5 ? "text-amber-600 dark:text-amber-400" : yrs > 0 ? "" : "text-emerald-600 dark:text-emerald-400",
-        icon: Clock,
-      };
-    }
-    case "per_person_retirement": {
-      const parts = data.perPersonRetirement;
-      if (parts.length === 0) {
-        return {
-          label: "Retirement",
-          value: "N/A",
-          rawValue: 0,
-          format: () => "N/A",
-          color: "",
-          icon: Clock,
-        };
-      }
-      const primary = parts[0];
-      // QA-7: Truncate subtext for 3+ persons to prevent overflow
-      const subtextParts = parts.length > 2
-        ? parts.slice(0, 2).map((p) => `${p.name}: ${p.years}y ${p.months}m`).join(" · ") + ` +${parts.length - 2} more`
-        : parts.map((p) => `${p.name}: ${p.years}y ${p.months}m`).join(" · ");
-      return {
-        label: "Retirement",
-        value: `${primary.years}y ${primary.months}m`,
-        rawValue: primary.years * 12 + primary.months,
-        format: (n: number) => `${Math.floor(n / 12)}y ${n % 12}m`,
-        subtext: subtextParts,
-        color: "",
-        icon: Clock,
-      };
-    }
-    case "iht_liability": {
-      const liability = data.ihtLiability;
-      return {
-        label: "IHT Liability",
-        value: liability <= 0 ? "£0" : formatCurrencyCompact(liability),
-        rawValue: liability,
-        format: (n: number) => n <= 0 ? "£0" : formatCurrencyCompact(n),
-        subtext: liability <= 0 ? "Below IHT threshold" : "estimated on current estate",
-        color: liability > 500_000
-          ? "text-red-600 dark:text-red-400"
-          : liability > 100_000
-            ? "text-amber-600 dark:text-amber-400"
-            : liability <= 0
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "",
-        icon: Shield,
-      };
-    }
-    // Safety fallback — "net_worth" removed in migration 10; handles stale localStorage
-    default:
-      return {
-        label: "Retirement Income",
-        value: `${formatCurrencyCompact(data.projectedRetirementIncome)}/yr`,
-        rawValue: data.projectedRetirementIncome,
-        format: (n: number) => `${formatCurrencyCompact(n)}/yr`,
-        color: "",
-        icon: Sunrise,
-      };
-  }
+  const resolved = resolveMetricData(type, data);
+  return {
+    ...resolved,
+    icon: ICON_MAP[resolved.iconKey] ?? Sunrise,
+  };
 }
 
 // ============================================================
@@ -696,6 +460,41 @@ export default function Home() {
     [household.children]
   );
 
+  // =============================================
+  // Property equity projections (for chart)
+  // =============================================
+  const propertyProjections = useMemo(() => {
+    if (household.properties.length === 0) return { projections: [], mortgagePayoffYear: null };
+
+    const projections = household.properties.map((prop) => ({
+      label: prop.label,
+      data: projectPropertyEquity(prop, 30),
+    }));
+
+    // Find earliest mortgage payoff across all properties with mortgages
+    let mortgagePayoffYear: number | null = null;
+    for (const prop of household.properties) {
+      if (prop.mortgageBalance > 0) {
+        const payoff = calculateMortgagePayoffYears(prop);
+        if (payoff !== null && payoff > 0) {
+          if (mortgagePayoffYear === null || payoff < mortgagePayoffYear) {
+            mortgagePayoffYear = payoff;
+          }
+        }
+      }
+    }
+
+    return { projections, mortgagePayoffYear };
+  }, [household.properties]);
+
+  // Amortization schedules for properties with active mortgages
+  const amortizationSchedules = useMemo(() => {
+    return household.properties
+      .filter((p) => p.mortgageBalance > 0 && p.mortgageRate && p.mortgageTerm && p.mortgageStartDate)
+      .map((p) => ({ label: p.label, schedule: generateAmortizationSchedule(p) }))
+      .filter((s) => s.schedule.length > 0);
+  }, [household.properties]);
+
   const latestSnapshot = snapshots[snapshots.length - 1];
   const heroMetrics = household.dashboardConfig.heroMetrics;
   // REC-B + QA-2: Check if fire_progress is already selected as a configurable metric
@@ -706,6 +505,9 @@ export default function Home() {
 
   return (
     <div className="space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      {/* Stale tax year warning — trust-critical */}
+      <StaleTaxBanner />
+
       {/* Print header */}
       <div className="print-report-header hidden print:block">
         <h1>Runway — Financial Report</h1>
@@ -976,6 +778,9 @@ export default function Home() {
                 />
               ))
             }
+            <p className="text-[11px] text-muted-foreground">
+              These suggestions are for informational purposes only and do not constitute financial advice. Speak to a qualified financial advisor before making investment or pension decisions.
+            </p>
             {/* FEAT-006: Show undo link when recommendations are dismissed */}
             {dismissedIds.size > 0 && (
               <button
@@ -1073,6 +878,24 @@ export default function Home() {
             </CardContent>
           </Card>
 
+          {snapshots.length > 1 && (
+            <Card className="border-t border-t-primary/20">
+              <CardHeader>
+                <CardTitle>Net Worth History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <NetWorthHistoryChart
+                  snapshots={snapshots}
+                  propertyAddedDate={
+                    household.properties.reduce((s, p) => s + p.estimatedValue, 0) > 0
+                      ? new Date().toISOString().slice(0, 7)
+                      : undefined
+                  }
+                />
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-t border-t-primary/20">
             <CardHeader>
               <div className="flex items-baseline justify-between">
@@ -1081,7 +904,19 @@ export default function Home() {
               </div>
             </CardHeader>
             <CardContent>
-              <WrapperSplitChart data={byWrapper} />
+              <AllocationBar
+                segments={wrapperData.map((w) => ({
+                  label: w.label,
+                  value: w.value,
+                  color: {
+                    pension: "var(--chart-1)",
+                    isa: "var(--chart-2)",
+                    gia: "var(--chart-3)",
+                    cash: "var(--chart-4)",
+                    premium_bonds: "var(--chart-5)",
+                  }[w.wrapper] ?? "var(--chart-1)",
+                }))}
+              />
             </CardContent>
           </Card>
         </div>
@@ -1096,7 +931,13 @@ export default function Home() {
         >
           <Card>
             <CardContent className="pt-6">
-              <ByPersonChart data={personChartData} />
+              <AllocationBar
+                segments={personChartData.map((p, i) => ({
+                  label: p.name,
+                  value: p.value,
+                  color: [`var(--chart-1)`, `var(--chart-2)`, `var(--chart-3)`, `var(--chart-4)`, `var(--chart-5)`][i % 5],
+                }))}
+              />
             </CardContent>
           </Card>
         </CollapsibleSection>
@@ -1109,6 +950,51 @@ export default function Home() {
           </CardContent>
         </Card>
       </CollapsibleSection>
+
+      {/* Property Equity Trajectory */}
+      {propertyProjections.projections.length > 0 && (
+        <CollapsibleSection
+          title="Property Equity"
+          summary={`${household.properties.length} propert${household.properties.length !== 1 ? "ies" : "y"} · ${formatCurrencyCompact(heroData.totalPropertyEquity)} equity`}
+          defaultOpen
+          storageKey="property-equity"
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-baseline justify-between">
+                <CardTitle>Property Equity Trajectory</CardTitle>
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  30-year projection with appreciation + mortgage paydown
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <PropertyEquityChart
+                projections={propertyProjections.projections}
+                mortgagePayoffYear={propertyProjections.mortgagePayoffYear}
+              />
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Property values are estimates. Past appreciation does not guarantee future growth.
+              </p>
+            </CardContent>
+          </Card>
+          {amortizationSchedules.map((s) => (
+            <Card key={s.label}>
+              <CardHeader>
+                <div className="flex items-baseline justify-between">
+                  <CardTitle className="text-base">{s.label} — Mortgage Breakdown</CardTitle>
+                  <span className="hidden text-xs text-muted-foreground sm:inline">
+                    Interest vs principal over remaining term
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <MortgageAmortizationChart schedule={s.schedule} label={s.label} />
+              </CardContent>
+            </Card>
+          ))}
+        </CollapsibleSection>
+      )}
 
       {household.committedOutgoings.length > 0 && (() => {
         const categoryTotals = household.committedOutgoings.reduce<Record<string, number>>((acc, o) => {
@@ -1123,6 +1009,7 @@ export default function Home() {
             title="Committed Outgoings"
             summary={`${formatCurrencyCompact(heroData.totalAnnualCommitments)}/yr across ${household.committedOutgoings.length} items`}
             storageKey="commitments"
+            lazy
           >
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">

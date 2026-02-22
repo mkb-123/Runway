@@ -67,7 +67,7 @@ export function ThemeToggle() {
       onClick={cycle}
       aria-label={label}
       title={label}
-      className="size-8"
+      className="min-h-[44px] min-w-[44px]"
     >
       <Icon className="size-4" />
     </Button>

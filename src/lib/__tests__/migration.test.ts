@@ -279,4 +279,73 @@ describe("migrateHouseholdData", () => {
       expect(new Set(metrics).size).toBe(5);
     });
   });
+
+  describe("migration 11: property first-class", () => {
+    it("creates properties[] from iht.estimatedPropertyValue when > 0", () => {
+      const data = {
+        persons: [{ id: "p1", name: "Alice" }, { id: "p2", name: "Bob" }],
+        accounts: [],
+        income: [],
+        bonusStructures: [],
+        contributions: [],
+        retirement: { targetAnnualIncome: 60000, withdrawalRate: 0.04, includeStatePension: true, scenarioRates: [0.07] },
+        emergencyFund: { monthlyEssentialExpenses: 3000, targetMonths: 6, monthlyLifestyleSpending: 2000 },
+        iht: { estimatedPropertyValue: 450000, passingToDirectDescendants: true, gifts: [] },
+        committedOutgoings: [],
+        dashboardConfig: { heroMetrics: ["projected_retirement_income", "cash_position", "retirement_countdown", "period_change", "cash_runway"] },
+      };
+
+      const migrated = migrateHouseholdData(data);
+      const properties = migrated.properties as Array<Record<string, unknown>>;
+      expect(properties).toHaveLength(1);
+      expect(properties[0].label).toBe("Primary Residence");
+      expect(properties[0].estimatedValue).toBe(450000);
+      expect(properties[0].mortgageBalance).toBe(0);
+      expect(properties[0].ownerPersonIds).toEqual(["p1", "p2"]);
+      // Old field zeroed out
+      const iht = migrated.iht as Record<string, unknown>;
+      expect(iht.estimatedPropertyValue).toBe(0);
+    });
+
+    it("creates empty properties[] when estimatedPropertyValue is 0", () => {
+      const data = {
+        persons: [{ id: "p1", name: "Alice" }],
+        accounts: [],
+        income: [],
+        bonusStructures: [],
+        contributions: [],
+        retirement: { targetAnnualIncome: 60000, withdrawalRate: 0.04, includeStatePension: true, scenarioRates: [0.07] },
+        emergencyFund: { monthlyEssentialExpenses: 3000, targetMonths: 6, monthlyLifestyleSpending: 2000 },
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
+        committedOutgoings: [],
+        dashboardConfig: { heroMetrics: ["projected_retirement_income", "cash_position", "retirement_countdown", "period_change", "cash_runway"] },
+      };
+
+      const migrated = migrateHouseholdData(data);
+      const properties = migrated.properties as Array<Record<string, unknown>>;
+      expect(properties).toHaveLength(0);
+    });
+
+    it("is idempotent — no-op when properties[] already exists", () => {
+      const data = {
+        persons: [{ id: "p1", name: "Alice" }],
+        accounts: [],
+        income: [],
+        bonusStructures: [],
+        contributions: [],
+        retirement: { targetAnnualIncome: 60000, withdrawalRate: 0.04, includeStatePension: true, scenarioRates: [0.07] },
+        emergencyFund: { monthlyEssentialExpenses: 3000, targetMonths: 6, monthlyLifestyleSpending: 2000 },
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 500000, ownerPersonIds: ["p1"], mortgageBalance: 200000 }],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: true, gifts: [] },
+        committedOutgoings: [],
+        dashboardConfig: { heroMetrics: ["projected_retirement_income", "cash_position", "retirement_countdown", "period_change", "cash_runway"] },
+      };
+
+      const migrated = migrateHouseholdData(data);
+      const properties = migrated.properties as Array<Record<string, unknown>>;
+      expect(properties).toHaveLength(1);
+      expect(properties[0].estimatedValue).toBe(500000);
+      expect(properties[0].mortgageBalance).toBe(200000);
+    });
+  });
 });

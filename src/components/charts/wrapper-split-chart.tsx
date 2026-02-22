@@ -14,11 +14,11 @@ interface WrapperSplitChartProps {
 }
 
 const WRAPPER_COLORS: Record<TaxWrapper, string> = {
-  pension: "#6366f1",
-  isa: "#22c55e",
-  gia: "#f59e0b",
-  cash: "#3b82f6",
-  premium_bonds: "#8b5cf6",
+  pension: "var(--chart-1)",
+  isa: "var(--chart-2)",
+  gia: "var(--chart-3)",
+  cash: "var(--chart-4)",
+  premium_bonds: "var(--chart-5)",
 };
 
 interface CustomTooltipProps {
@@ -53,22 +53,20 @@ export function WrapperSplitChart({ data }: WrapperSplitChartProps) {
     }));
 
   return (
-    <div role="img" aria-label="Asset allocation by tax wrapper type">
-    <ResponsiveContainer width="100%" height={320}>
+    <div className="h-[280px] sm:h-[320px]" role="img" aria-label="Asset allocation by tax wrapper type">
+    <ResponsiveContainer width="100%" height="100%">
       <PieChart>
         <Pie
           data={chartData}
           cx="50%"
           cy="50%"
-          innerRadius={60}
-          outerRadius={110}
+          innerRadius={50}
+          outerRadius={90}
           paddingAngle={2}
           dataKey="value"
           nameKey="name"
-          label={({ name, percent }: { name?: string; percent?: number }) =>
-            `${name ?? ""} ${formatPercent(percent ?? 0)}`
-          }
-          labelLine={true}
+          label={false}
+          labelLine={false}
         >
           {chartData.map((entry) => (
             <Cell

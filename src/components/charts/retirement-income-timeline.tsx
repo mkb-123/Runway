@@ -3,23 +3,7 @@
 // ============================================================
 // Combined Retirement Income Timeline Chart
 // ============================================================
-// Stacked area chart showing all household income sources by year:
-// - Per-person DC pension drawdown
-// - Per-person state pension
-// - ISA/GIA drawdown to fill the gap
-// Displays from earliest retirement age to age 95.
-//
-// Fixes applied:
-// - BUG-003: Draw-then-grow ordering (correct convention)
-// - BUG-004: State pension paid in full (not capped to remainingNeed)
-// - BUG-005: Proportional drawdown across persons (not first-person priority)
-// - BUG-016: stepAfter interpolation for discrete annual data
-// - BUG-017: Shortfall shown as separate annotation (not stacked with income)
-// - BUG-015: Accessible aria-label on chart container
-// - FEAT-008: Vertical reference lines for pension access and state pension ages
-// - FEAT-009: Colorblind-safe palette with increased hue separation
-// - FEAT-011: Y-axis label
-// - FEAT-012: Filter zero-value tooltip entries
+// Rendering layer only — financial logic lives in src/lib/retirement.ts.
 
 import {
   AreaChart,
@@ -32,18 +16,9 @@ import {
   ReferenceLine,
 } from "recharts";
 import { formatCurrencyAxis, formatCurrencyTooltip } from "@/lib/format";
+import { buildIncomeTimeline, type PersonRetirementInput } from "@/lib/retirement";
 
-export interface PersonRetirementInput {
-  name: string;
-  pensionAccessAge: number;
-  stateRetirementAge: number;
-  /** Total DC pension pot at retirement */
-  pensionPot: number;
-  /** Accessible (non-pension) wealth */
-  accessibleWealth: number;
-  /** Annual state pension entitlement */
-  statePensionAnnual: number;
-}
+export type { PersonRetirementInput };
 
 interface RetirementIncomeTimelineProps {
   persons: PersonRetirementInput[];
@@ -51,119 +26,6 @@ interface RetirementIncomeTimelineProps {
   retirementAge: number;
   endAge?: number;
   growthRate: number;
-}
-
-interface DataPoint {
-  age: number;
-  [key: string]: number;
-}
-
-function buildIncomeTimeline(
-  persons: PersonRetirementInput[],
-  targetAnnualIncome: number,
-  retirementAge: number,
-  endAge: number,
-  growthRate: number
-): DataPoint[] {
-  const data: DataPoint[] = [];
-
-  // Track mutable pots
-  const pots = persons.map((p) => ({
-    name: p.name,
-    pensionPot: p.pensionPot,
-    accessibleWealth: p.accessibleWealth,
-    pensionAccessAge: p.pensionAccessAge,
-    stateRetirementAge: p.stateRetirementAge,
-    statePensionAnnual: p.statePensionAnnual,
-  }));
-
-  for (let age = retirementAge; age <= endAge; age++) {
-    const point: DataPoint = { age };
-
-    // BUG-004: State pensions paid in full (not capped to target).
-    // Total income may exceed target — that's a surplus, which is correct.
-    let totalIncome = 0;
-
-    // 1. State pensions first (guaranteed income, paid in full)
-    for (const p of pots) {
-      const key = `${p.name} State Pension`;
-      if (age >= p.stateRetirementAge) {
-        point[key] = Math.round(p.statePensionAnnual);
-        totalIncome += p.statePensionAnnual;
-      } else {
-        point[key] = 0;
-      }
-    }
-
-    // 2. DC Pension drawdown (once accessible)
-    // BUG-005: Proportional drawdown across persons
-    const remainingNeedAfterStatePension = Math.max(0, targetAnnualIncome - totalIncome);
-
-    // Calculate total available pension pot for proportional split
-    const availablePensionPots = pots
-      .filter((p) => age >= p.pensionAccessAge && p.pensionPot > 0)
-      .map((p) => ({ p, available: p.pensionPot }));
-    const totalAvailablePension = availablePensionPots.reduce((s, x) => s + x.available, 0);
-
-    for (const p of pots) {
-      const key = `${p.name} Pension`;
-      if (age >= p.pensionAccessAge && p.pensionPot > 0) {
-        // BUG-005: Split need proportionally by pot size
-        const share = totalAvailablePension > 0
-          ? (p.pensionPot / totalAvailablePension) * remainingNeedAfterStatePension
-          : 0;
-        // BUG-003: Draw first, then grow
-        const draw = Math.min(share, p.pensionPot);
-        p.pensionPot -= draw;
-        p.pensionPot *= 1 + growthRate;
-        point[key] = Math.round(draw);
-        totalIncome += draw;
-      } else {
-        // Grow even if not drawing
-        if (p.pensionPot > 0) {
-          p.pensionPot *= 1 + growthRate;
-        }
-        point[key] = 0;
-      }
-    }
-
-    // 3. ISA/Accessible drawdown (bridge before pension, or supplement after)
-    const remainingNeedAfterPension = Math.max(0, targetAnnualIncome - totalIncome);
-
-    // BUG-005: Proportional drawdown for ISA/savings too
-    const availableISAPots = pots
-      .filter((p) => p.accessibleWealth > 0)
-      .map((p) => ({ p, available: p.accessibleWealth }));
-    const totalAvailableISA = availableISAPots.reduce((s, x) => s + x.available, 0);
-
-    for (const p of pots) {
-      const key = `${p.name} ISA/Savings`;
-      if (p.accessibleWealth > 0 && remainingNeedAfterPension > 0) {
-        // Split need proportionally
-        const share = totalAvailableISA > 0
-          ? (p.accessibleWealth / totalAvailableISA) * remainingNeedAfterPension
-          : 0;
-        // BUG-003: Draw first, then grow
-        const draw = Math.min(share, p.accessibleWealth);
-        p.accessibleWealth -= draw;
-        p.accessibleWealth *= 1 + growthRate;
-        point[key] = Math.round(draw);
-        totalIncome += draw;
-      } else {
-        if (p.accessibleWealth > 0) {
-          p.accessibleWealth *= 1 + growthRate;
-        }
-        point[key] = 0;
-      }
-    }
-
-    // BUG-017: Shortfall tracked separately (not in income stack)
-    point["Shortfall"] = Math.round(Math.max(0, targetAnnualIncome - totalIncome));
-
-    data.push(point);
-  }
-
-  return data;
 }
 
 // FEAT-009: Colorblind-safe palette with wider hue separation and distinct patterns
@@ -245,7 +107,7 @@ export function RetirementIncomeTimeline({
 
   return (
     <div
-      className="h-[450px] w-full"
+      className="h-[300px] sm:h-[450px] w-full"
       role="img"
       aria-label={accessibleSummary}
     >

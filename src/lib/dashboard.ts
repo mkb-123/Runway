@@ -8,8 +8,8 @@
 // Also includes: next cash events (REC-E), status sentence (REC-A),
 // period change attribution (REC-H).
 
-import type { HouseholdData, NetWorthSnapshot } from "@/types";
-import { annualiseOutgoing, getHouseholdGrossIncome, getPersonGrossIncome } from "@/types";
+import type { HouseholdData, NetWorthSnapshot, HeroMetricType } from "@/types";
+import { annualiseOutgoing, getHouseholdGrossIncome, getPersonGrossIncome, getTotalPropertyEquity, getPropertyEquity } from "@/types";
 import {
   calculateRetirementCountdown,
   calculateAdjustedRequiredPot,
@@ -71,6 +71,14 @@ export interface HeroMetricData {
   isPersonView: boolean;
   /** IHT liability (£) based on current estate value, persons, gifts, and RNRB eligibility */
   ihtLiability: number;
+  /** Investable net worth (accounts only, excluding property) */
+  investableNetWorth: number;
+  /** Total property equity */
+  totalPropertyEquity: number;
+  /** Pension pot total (workplace + SIPP — locked until pension access age) */
+  pensionTotal: number;
+  /** Accessible assets (investable minus pensions) — ISA, GIA, cash, premium bonds */
+  accessibleNetWorth: number;
 }
 
 /** REC-E: Upcoming cash event */
@@ -115,6 +123,12 @@ export function computeHeroData(
   const cashPosition = accounts
     .filter((a) => a.type === "cash_savings" || a.type === "cash_isa" || a.type === "premium_bonds")
     .reduce((sum, a) => sum + a.currentValue, 0);
+
+  // --- Pension vs accessible split ---
+  const pensionTotal = accounts
+    .filter((a) => a.type === "workplace_pension" || a.type === "sipp")
+    .reduce((sum, a) => sum + a.currentValue, 0);
+  const accessibleNetWorth = totalNetWorth - pensionTotal;
 
   // --- Snapshot changes (person-filtered) ---
   const snapshotChanges = computeSnapshotChanges(snapshots, personId);
@@ -218,11 +232,14 @@ export function computeHeroData(
   });
 
   // --- IHT liability (household-level, always computed against full estate) ---
-  // In-estate assets: all non-pension accounts + estimated property value
+  // In-estate assets: all non-pension accounts + property equity (value - mortgage)
   const estateAccountsValue = household.accounts
     .filter((a) => a.type !== "workplace_pension" && a.type !== "sipp")
     .reduce((s, a) => s + a.currentValue, 0);
-  const estateValue = estateAccountsValue + household.iht.estimatedPropertyValue;
+  const propertyEquity = household.properties.reduce(
+    (s, p) => s + Math.max(0, p.estimatedValue - p.mortgageBalance), 0
+  );
+  const estateValue = estateAccountsValue + propertyEquity;
   const numberOfPersons = household.persons.length;
   const giftsWithin7Years = household.iht.gifts
     .filter((g) => yearsSince(g.date) < 7)
@@ -258,6 +275,14 @@ export function computeHeroData(
     monthlyContributionRate: totalContrib / 12,
     isPersonView,
     ihtLiability: ihtResult.ihtLiability,
+    investableNetWorth: totalNetWorth,
+    totalPropertyEquity: personId
+      ? household.properties
+          .filter((p) => p.ownerPersonIds.includes(personId))
+          .reduce((sum, p) => sum + getPropertyEquity(p) / Math.max(1, p.ownerPersonIds.length), 0)
+      : getTotalPropertyEquity(household.properties),
+    pensionTotal,
+    accessibleNetWorth,
   };
 }
 
@@ -570,4 +595,350 @@ export function getRecommendationUrgency(
 
   // Emergency fund / retirement behind — standing but important
   return "standing";
+}
+
+// ============================================================
+// Metric Resolution (extracted from page.tsx)
+// ============================================================
+
+/** Icon key — maps to lucide-react imports in the consuming component */
+export type MetricIconKey =
+  | "banknote"
+  | "clock"
+  | "trending-up"
+  | "bar-chart"
+  | "piggy-bank"
+  | "target"
+  | "shield"
+  | "sunrise"
+  | "graduation-cap";
+
+/** Resolved metric data — pure values, no React dependencies */
+export interface ResolvedMetricData {
+  label: string;
+  value: string;
+  rawValue: number;
+  format: (n: number) => string;
+  subtext?: string;
+  color: string;
+  trend?: "up" | "down";
+  iconKey: MetricIconKey;
+}
+
+/**
+ * Resolve a hero metric type to its display values.
+ * Pure function — no React dependencies (icon is a key, not a component).
+ */
+export function resolveMetricData(
+  type: HeroMetricType,
+  data: HeroMetricData
+): ResolvedMetricData {
+  switch (type) {
+    case "cash_position":
+      return {
+        label: "Cash Position",
+        value: formatCompact(data.cashPosition),
+        rawValue: data.cashPosition,
+        format: formatCompact,
+        color: "",
+        iconKey: "banknote",
+      };
+    case "retirement_countdown": {
+      const y = data.retirementCountdownYears;
+      const m = data.retirementCountdownMonths;
+      const onTrack = y === 0 && m === 0;
+      return {
+        label: "Retirement",
+        value: onTrack ? "On track" : `${y}y ${m}m`,
+        rawValue: y * 12 + m,
+        format: (n: number) => {
+          if (n === 0) return "On track";
+          return `${Math.floor(n / 12)}y ${n % 12}m`;
+        },
+        subtext: onTrack ? "Target pot reached" : "to target",
+        color: onTrack ? "text-emerald-600 dark:text-emerald-400" : "",
+        iconKey: "clock",
+      };
+    }
+    case "period_change": {
+      if (!data.hasEnoughSnapshotsForMoM) {
+        return {
+          label: "Period Change",
+          value: "N/A",
+          rawValue: 0,
+          format: () => "N/A",
+          subtext: "Needs 2+ months of history",
+          color: "text-muted-foreground",
+          iconKey: "trending-up",
+        };
+      }
+      const v = data.monthOnMonthChange;
+      const color =
+        v > 0 ? "text-emerald-600 dark:text-emerald-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
+      const contribNote =
+        data.monthlyContributionRate > 0
+          ? ` (incl. ~${formatCompact(data.monthlyContributionRate)}/mo contributions)`
+          : "";
+      return {
+        label: "Period Change",
+        value: `${v >= 0 ? "+" : ""}${formatCompact(v)}`,
+        rawValue: v,
+        format: (n: number) => `${n >= 0 ? "+" : ""}${formatCompact(n)}`,
+        subtext: `${v >= 0 ? "+" : ""}${formatPct(data.monthOnMonthPercent)} MoM${contribNote}`,
+        color,
+        trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
+        iconKey: "trending-up",
+      };
+    }
+    case "year_on_year_change": {
+      if (!data.hasEnoughSnapshotsForYoY) {
+        return {
+          label: "Year-on-Year",
+          value: "N/A",
+          rawValue: 0,
+          format: () => "N/A",
+          subtext: "Needs ~12 months of history",
+          color: "text-muted-foreground",
+          iconKey: "bar-chart",
+        };
+      }
+      const v = data.yearOnYearChange;
+      const color =
+        v > 0 ? "text-emerald-600 dark:text-emerald-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
+      return {
+        label: "Year-on-Year",
+        value: `${v >= 0 ? "+" : ""}${formatCompact(v)}`,
+        rawValue: v,
+        format: (n: number) => `${n >= 0 ? "+" : ""}${formatCompact(n)}`,
+        subtext: `${v >= 0 ? "+" : ""}${formatPct(data.yearOnYearPercent)} YoY`,
+        color,
+        trend: v > 0 ? "up" : v < 0 ? "down" : undefined,
+        iconKey: "bar-chart",
+      };
+    }
+    case "savings_rate":
+      return {
+        label: data.isPersonView ? "Savings Rate (Personal)" : "Savings Rate",
+        value: `${data.savingsRate.toFixed(1)}%`,
+        rawValue: data.savingsRate,
+        format: (n: number) => `${n.toFixed(1)}%`,
+        subtext: `${data.personalSavingsRate.toFixed(1)}% personal`,
+        color:
+          data.savingsRate >= 20
+            ? "text-emerald-600 dark:text-emerald-400"
+            : data.savingsRate < 10
+              ? "text-amber-600 dark:text-amber-400"
+              : "",
+        iconKey: "piggy-bank",
+      };
+    case "fire_progress":
+      return {
+        label: "FIRE Progress",
+        value: `${data.fireProgress.toFixed(1)}%`,
+        rawValue: data.fireProgress,
+        format: (n: number) => `${n.toFixed(1)}%`,
+        subtext: "of target pot",
+        color:
+          data.fireProgress >= 100
+            ? "text-emerald-600 dark:text-emerald-400"
+            : data.fireProgress < 25
+              ? "text-amber-600 dark:text-amber-400"
+              : "",
+        iconKey: "target",
+      };
+    case "net_worth_after_commitments":
+      return {
+        label: "Commitments Covered",
+        value:
+          data.commitmentCoverageYears >= 999
+            ? "N/A"
+            : `${data.commitmentCoverageYears.toFixed(1)}yr`,
+        rawValue: data.commitmentCoverageYears,
+        format: (n: number) => (n >= 999 ? "N/A" : `${n.toFixed(1)}yr`),
+        subtext:
+          data.totalAnnualCommitments > 0
+            ? `yrs net worth covers ${formatCompact(data.totalAnnualCommitments)}/yr outgoings`
+            : "No committed outgoings",
+        color:
+          data.commitmentCoverageYears >= 15
+            ? "text-emerald-600 dark:text-emerald-400"
+            : data.commitmentCoverageYears < 5
+              ? "text-amber-600 dark:text-amber-400"
+              : "",
+        iconKey: "shield",
+      };
+    case "projected_retirement_income": {
+      const target = data.targetAnnualIncome;
+      const projected = data.projectedRetirementIncome;
+      const incomeColor =
+        target > 0 && projected >= target
+          ? "text-emerald-600 dark:text-emerald-400"
+          : target > 0 && projected < target * 0.5
+            ? "text-red-600 dark:text-red-400"
+            : target > 0 && projected < target * 0.75
+              ? "text-amber-600 dark:text-amber-400"
+              : "";
+      const growthPct = (data.projectedGrowthRate * 100).toFixed(0);
+      const statePensionNote =
+        data.projectedRetirementIncomeStatePension > 0
+          ? `incl. ${formatCompact(data.projectedRetirementIncomeStatePension)} state pension`
+          : `at ${growthPct}% growth`;
+      return {
+        label: "Retirement Income",
+        value: `${formatCompact(projected)}/yr`,
+        rawValue: projected,
+        format: (n: number) => `${formatCompact(n)}/yr`,
+        subtext: statePensionNote,
+        color: incomeColor,
+        iconKey: "sunrise",
+      };
+    }
+    case "cash_runway": {
+      const months = data.cashRunway;
+      if (!data.hasOutgoings) {
+        return {
+          label: "Cash Cushion",
+          value: "N/A",
+          rawValue: 0,
+          format: () => "N/A",
+          subtext: "No outgoings configured",
+          color: "text-muted-foreground",
+          iconKey: "shield",
+        };
+      }
+      const color =
+        months < 3
+          ? "text-red-600 dark:text-red-400"
+          : months < 6
+            ? "text-amber-600 dark:text-amber-400"
+            : "text-emerald-600 dark:text-emerald-400";
+      return {
+        label: "Cash Cushion",
+        value: `${months.toFixed(1)}mo`,
+        rawValue: months,
+        format: (n: number) => `${n.toFixed(1)}mo`,
+        subtext: "months of outgoings if income stopped",
+        color,
+        iconKey: "shield",
+      };
+    }
+    case "school_fee_countdown": {
+      const yrs = data.schoolFeeYearsRemaining;
+      return {
+        label: "School Fees End",
+        value: yrs <= 0 ? "Done" : `${yrs}yr`,
+        rawValue: yrs,
+        format: (n: number) => (n <= 0 ? "Done" : `${n}yr`),
+        subtext: yrs <= 0 ? "No children in school" : "until last child finishes",
+        color: yrs <= 0 ? "text-emerald-600 dark:text-emerald-400" : "",
+        iconKey: "graduation-cap",
+      };
+    }
+    case "pension_bridge_gap": {
+      const yrs = data.pensionBridgeYears;
+      return {
+        label: "Pension Bridge",
+        value: yrs <= 0 ? "None" : `${yrs}yr`,
+        rawValue: yrs,
+        format: (n: number) => (n <= 0 ? "None" : `${n}yr`),
+        subtext: yrs <= 0 ? "Pension accessible at retirement" : "gap before pension access",
+        color:
+          yrs > 5
+            ? "text-amber-600 dark:text-amber-400"
+            : yrs > 0
+              ? ""
+              : "text-emerald-600 dark:text-emerald-400",
+        iconKey: "clock",
+      };
+    }
+    case "per_person_retirement": {
+      const parts = data.perPersonRetirement;
+      if (parts.length === 0) {
+        return {
+          label: "Retirement",
+          value: "N/A",
+          rawValue: 0,
+          format: () => "N/A",
+          color: "",
+          iconKey: "clock",
+        };
+      }
+      const primary = parts[0];
+      const subtextParts =
+        parts.length > 2
+          ? parts
+              .slice(0, 2)
+              .map((p) => `${p.name}: ${p.years}y ${p.months}m`)
+              .join(" · ") + ` +${parts.length - 2} more`
+          : parts.map((p) => `${p.name}: ${p.years}y ${p.months}m`).join(" · ");
+      return {
+        label: "Retirement",
+        value: `${primary.years}y ${primary.months}m`,
+        rawValue: primary.years * 12 + primary.months,
+        format: (n: number) => `${Math.floor(n / 12)}y ${n % 12}m`,
+        subtext: subtextParts,
+        color: "",
+        iconKey: "clock",
+      };
+    }
+    case "iht_liability": {
+      const liability = data.ihtLiability;
+      return {
+        label: "IHT Liability",
+        value: liability <= 0 ? "£0" : formatCompact(liability),
+        rawValue: liability,
+        format: (n: number) => (n <= 0 ? "£0" : formatCompact(n)),
+        subtext: liability <= 0 ? "Below IHT threshold" : "estimated on current estate",
+        color:
+          liability > 500_000
+            ? "text-red-600 dark:text-red-400"
+            : liability > 100_000
+              ? "text-amber-600 dark:text-amber-400"
+              : liability <= 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "",
+        iconKey: "shield",
+      };
+    }
+    case "investable_net_worth": {
+      const investable = data.investableNetWorth;
+      const propertyEquity = data.totalPropertyEquity;
+      const pension = data.pensionTotal;
+      const accessible = data.accessibleNetWorth;
+      // Build informative subtext: show accessible vs locked pension split
+      const parts: string[] = [];
+      if (pension > 0) parts.push(`${formatCompact(accessible)} accessible, ${formatCompact(pension)} pension`);
+      if (propertyEquity > 0) parts.push(`excl. ${formatCompact(propertyEquity)} property`);
+      return {
+        label: "Investable Assets",
+        value: formatCompact(investable),
+        rawValue: investable,
+        format: formatCompact,
+        subtext: parts.length > 0 ? parts.join(" · ") : "liquid financial assets",
+        color: "",
+        iconKey: "banknote",
+      };
+    }
+    default:
+      return {
+        label: "Retirement Income",
+        value: `${formatCompact(data.projectedRetirementIncome)}/yr`,
+        rawValue: data.projectedRetirementIncome,
+        format: (n: number) => `${formatCompact(n)}/yr`,
+        color: "",
+        iconKey: "sunrise",
+      };
+  }
+}
+
+// Internal format helpers (avoid importing from format.ts to keep dependency tight)
+function formatCompact(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `£${(n / 1_000_000).toFixed(1)}m`;
+  if (abs >= 1_000) return `£${(n / 1_000).toFixed(1)}k`;
+  return `£${n.toFixed(0)}`;
+}
+
+function formatPct(n: number): string {
+  return `${(n * 100).toFixed(1)}%`;
 }

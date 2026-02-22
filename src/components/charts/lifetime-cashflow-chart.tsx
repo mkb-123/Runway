@@ -63,7 +63,7 @@ export function LifetimeCashFlowChart({ data, events, primaryPersonName }: Lifet
   }`;
 
   return (
-    <div className="h-[500px] w-full" role="img" aria-label={accessibleSummary}>
+    <div className="h-[350px] sm:h-[500px] w-full" role="img" aria-label={accessibleSummary}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
           <XAxis

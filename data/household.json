@@ -219,8 +219,21 @@
     "targetMonths": 6,
     "monthlyLifestyleSpending": 2800
   },
+  "properties": [
+    {
+      "id": "property-1",
+      "label": "Primary Residence",
+      "estimatedValue": 450000,
+      "ownerPersonIds": ["person-1", "person-2"],
+      "mortgageBalance": 280000,
+      "appreciationRate": 0.03,
+      "mortgageRate": 0.042,
+      "mortgageTerm": 25,
+      "mortgageStartDate": "2020-01-15"
+    }
+  ],
   "iht": {
-    "estimatedPropertyValue": 450000,
+    "estimatedPropertyValue": 0,
     "passingToDirectDescendants": true,
     "gifts": [
       {

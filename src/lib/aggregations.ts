@@ -7,27 +7,41 @@
 import { roundPence } from "@/lib/format";
 import { calculateProRataStatePension } from "@/lib/projections";
 import type { HouseholdData, TaxWrapper, AccountType, Contribution, PersonIncome, Person } from "@/types";
-import { getAccountTaxWrapper, annualiseContribution } from "@/types";
+import { getAccountTaxWrapper, annualiseContribution, getTotalPropertyEquity, getPropertyEquity } from "@/types";
 
-/** Total net worth across all accounts */
+/** Total net worth across all accounts + property equity */
 export function getTotalNetWorth(household: HouseholdData): number {
+  const accountsValue = household.accounts.reduce((sum, acc) => sum + acc.currentValue, 0);
+  const propertyEquity = getTotalPropertyEquity(household.properties);
+  return roundPence(accountsValue + propertyEquity);
+}
+
+/** Net worth from financial accounts only (excludes property) */
+export function getInvestableNetWorth(household: HouseholdData): number {
   return roundPence(
     household.accounts.reduce((sum, acc) => sum + acc.currentValue, 0)
   );
 }
 
-/** Net worth broken down by person */
+/** Net worth broken down by person (includes property equity for owners) */
 export function getNetWorthByPerson(
   household: HouseholdData
 ): { personId: string; name: string; value: number }[] {
   return household.persons.map((person) => {
-    const value = household.accounts
+    const accountValue = household.accounts
       .filter((a) => a.personId === person.id)
       .reduce((sum, acc) => sum + acc.currentValue, 0);
+    // Property equity split equally among owners
+    const propertyValue = household.properties
+      .filter((p) => p.ownerPersonIds.includes(person.id))
+      .reduce((sum, p) => {
+        const ownerCount = Math.max(1, p.ownerPersonIds.length);
+        return sum + getPropertyEquity(p) / ownerCount;
+      }, 0);
     return {
       personId: person.id,
       name: person.name,
-      value: roundPence(value),
+      value: roundPence(accountValue + propertyValue),
     };
   });
 }

@@ -272,7 +272,8 @@ export type HeroMetricType =
   | "school_fee_countdown"
   | "pension_bridge_gap"
   | "per_person_retirement"
-  | "iht_liability";
+  | "iht_liability"
+  | "investable_net_worth";
 
 export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   cash_position: "Cash Position",
@@ -288,11 +289,78 @@ export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   pension_bridge_gap: "Pension Bridge Gap",
   per_person_retirement: "Per-Person Retirement",
   iht_liability: "IHT Liability",
+  investable_net_worth: "Investable Net Worth",
 };
 
 export interface DashboardConfig {
   /** At least 1 metric required; index 0 is primary, remainder are secondary (max 5 total). */
   heroMetrics: HeroMetricType[];
+}
+
+// --- Property & Mortgage ---
+
+export interface Property {
+  id: string;
+  label: string; // e.g. "Primary Residence", "Holiday Home"
+  estimatedValue: number; // current market value
+  ownerPersonIds: string[]; // person IDs (joint ownership supported)
+  mortgageBalance: number; // outstanding mortgage (0 if none)
+  /** Annual property appreciation rate as decimal (e.g. 0.03 for 3%). Default 0. */
+  appreciationRate?: number;
+  /** Annual mortgage interest rate as decimal (e.g. 0.042 for 4.2%). Required for amortization. */
+  mortgageRate?: number;
+  /** Total mortgage term in years (e.g. 25). Required for amortization. */
+  mortgageTerm?: number;
+  /** Mortgage start date (ISO string). Used with term to calculate remaining years. */
+  mortgageStartDate?: string;
+}
+
+/** Net property equity: estimated value minus outstanding mortgage */
+export function getPropertyEquity(property: Property): number {
+  return Math.max(0, property.estimatedValue - property.mortgageBalance);
+}
+
+/** Total property equity across all properties */
+export function getTotalPropertyEquity(properties: Property[]): number {
+  return properties.reduce((sum, p) => sum + getPropertyEquity(p), 0);
+}
+
+/** Total property value (before mortgage) */
+export function getTotalPropertyValue(properties: Property[]): number {
+  return properties.reduce((sum, p) => sum + p.estimatedValue, 0);
+}
+
+/** Total outstanding mortgage across all properties */
+export function getTotalMortgageBalance(properties: Property[]): number {
+  return properties.reduce((sum, p) => sum + p.mortgageBalance, 0);
+}
+
+/**
+ * Calculate the remaining months on a mortgage given its start date and term.
+ * Returns 0 if mortgage is past term end.
+ */
+export function getMortgageRemainingMonths(property: Property, now: Date = new Date()): number {
+  if (!property.mortgageStartDate || !property.mortgageTerm) return 0;
+  const start = new Date(property.mortgageStartDate);
+  const totalMonths = property.mortgageTerm * 12;
+  const elapsedMonths = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  return Math.max(0, totalMonths - elapsedMonths);
+}
+
+/**
+ * Calculate annual mortgage payment (principal + interest) using standard annuity formula.
+ * Returns 0 if no mortgage details are provided.
+ */
+export function getAnnualMortgagePayment(property: Property, now: Date = new Date()): number {
+  const { mortgageBalance, mortgageRate } = property;
+  if (!mortgageBalance || !mortgageRate) return 0;
+  const remainingMonths = getMortgageRemainingMonths(property, now);
+  if (remainingMonths <= 0) return 0;
+  const monthlyRate = mortgageRate / 12;
+  // Standard annuity formula: M = P * r * (1+r)^n / ((1+r)^n - 1)
+  const factor = Math.pow(1 + monthlyRate, remainingMonths);
+  const monthlyPayment = mortgageBalance * (monthlyRate * factor) / (factor - 1);
+  return monthlyPayment * 12;
 }
 
 // --- IHT ---
@@ -306,7 +374,7 @@ export interface Gift {
 }
 
 export interface IHTConfig {
-  estimatedPropertyValue: number;
+  estimatedPropertyValue: number; // deprecated: use properties[] instead
   passingToDirectDescendants: boolean;
   gifts: Gift[];
 }
@@ -347,6 +415,7 @@ export interface HouseholdData {
   contributions: Contribution[];
   retirement: RetirementConfig;
   emergencyFund: EmergencyFundConfig;
+  properties: Property[];
   iht: IHTConfig;
   committedOutgoings: CommittedOutgoing[];
   dashboardConfig: DashboardConfig;

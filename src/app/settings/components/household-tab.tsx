@@ -539,6 +539,39 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                         "Expected annual bonus growth (e.g. 5 for 5%/yr). Used in cash flow projections."
                       )}
                     </div>
+
+                    {/* Pension carry-forward: prior 3 years' contributions */}
+                    <div className="mt-4 rounded-lg border p-3 space-y-2">
+                      <p className="text-sm font-medium">Pension Carry-Forward</p>
+                      <p className="text-xs text-muted-foreground">
+                        Enter total pension contributions (employee + employer) for the previous 3 tax years.
+                        Unused allowance can be carried forward to increase this year&apos;s limit.
+                      </p>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[0, 1, 2].map((yearIdx) => (
+                          <div key={yearIdx}>
+                            {renderField(
+                              `Year -${yearIdx + 1}`,
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={income.priorYearPensionContributions?.[yearIdx] ?? 0}
+                                onChange={(e) => {
+                                  const updated = clone(household);
+                                  const inc = updated.income[incomeIdx];
+                                  if (!inc.priorYearPensionContributions) {
+                                    inc.priorYearPensionContributions = [0, 0, 0];
+                                  }
+                                  inc.priorYearPensionContributions[yearIdx] = Number(e.target.value);
+                                  updateHousehold(updated);
+                                }}
+                                placeholder="0.00"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </CollapsibleContent>
                 </Collapsible>
               )}

@@ -5,6 +5,7 @@ import {
   getStatusSentence,
   detectLifeStage,
   getRecommendationUrgency,
+  resolveMetricData,
 } from "../dashboard";
 import type { HouseholdData, NetWorthSnapshot } from "@/types";
 
@@ -87,8 +88,9 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
       targetMonths: 6,
       monthlyLifestyleSpending: 2000,
     },
+    properties: [{ id: "prop-1", label: "Family Home", estimatedValue: 600000, ownerPersonIds: ["p1", "p2"], mortgageBalance: 0 }],
     iht: {
-      estimatedPropertyValue: 600000,
+      estimatedPropertyValue: 0,
       passingToDirectDescendants: true,
       gifts: [],
     },
@@ -297,7 +299,8 @@ describe("computeHeroData", () => {
           { id: "a3", personId: "p1", type: "stocks_and_shares_isa" as const, provider: "Vanguard", name: "ISA", currentValue: 200_000 },
           { id: "a4", personId: "p1", type: "cash_savings" as const, provider: "Marcus", name: "Cash", currentValue: 50_000 },
         ],
-        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
       });
       const result = computeHeroData(h, [], "household");
       // Non-pension accounts: ISA 200k + cash 50k = 250k; estate = 250k + 1500k = 1750k
@@ -312,6 +315,7 @@ describe("computeHeroData", () => {
           { id: "a1", personId: "p1", type: "sipp", provider: "AJ Bell", name: "SIPP", currentValue: 2_000_000 },
           { id: "a2", personId: "p1", type: "cash_savings", provider: "Marcus", name: "Cash", currentValue: 50_000 },
         ],
+        properties: [],
         iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
       });
       const result = computeHeroData(h, [], "household");
@@ -325,15 +329,17 @@ describe("computeHeroData", () => {
       recentDate.setFullYear(recentDate.getFullYear() - 3);
       const hWithGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
         iht: {
-          estimatedPropertyValue: 1_500_000,
+          estimatedPropertyValue: 0,
           passingToDirectDescendants: false,
           gifts: [{ id: "g1", date: recentDate.toISOString().split("T")[0], amount: 100_000, recipient: "Nephew", description: "Gift" }],
         },
       });
       const hNoGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
-        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
       });
       const withGift = computeHeroData(hWithGift, [], "household");
       const noGift = computeHeroData(hNoGift, [], "household");
@@ -347,15 +353,17 @@ describe("computeHeroData", () => {
       oldDate.setFullYear(oldDate.getFullYear() - 8);
       const hOldGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
         iht: {
-          estimatedPropertyValue: 1_500_000,
+          estimatedPropertyValue: 0,
           passingToDirectDescendants: false,
           gifts: [{ id: "g1", date: oldDate.toISOString().split("T")[0], amount: 100_000, recipient: "Nephew", description: "Old gift" }],
         },
       });
       const hNoGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
-        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
       });
       const oldGiftResult = computeHeroData(hOldGift, [], "household");
       const noGiftResult = computeHeroData(hNoGift, [], "household");
@@ -370,20 +378,86 @@ describe("computeHeroData", () => {
       const justOver7YearsAgo = new Date(now.getTime() - sevenYearsMs - 1000);
       const hBoundaryGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
         iht: {
-          estimatedPropertyValue: 1_500_000,
+          estimatedPropertyValue: 0,
           passingToDirectDescendants: false,
           gifts: [{ id: "g1", date: justOver7YearsAgo.toISOString().split("T")[0], amount: 100_000, recipient: "Nephew", description: "Boundary gift" }],
         },
       });
       const hNoGift = makeHousehold({
         persons: [makeHousehold().persons[0]],
-        iht: { estimatedPropertyValue: 1_500_000, passingToDirectDescendants: false, gifts: [] },
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 1_500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
       });
       const boundaryResult = computeHeroData(hBoundaryGift, [], "household");
       const noGiftResult = computeHeroData(hNoGift, [], "household");
       // Gift at >= 7 years should not erode NRB
       expect(boundaryResult.ihtLiability).toBe(noGiftResult.ihtLiability);
+    });
+  });
+
+  describe("pension vs accessible split", () => {
+    it("splits investable net worth into pension and accessible", () => {
+      // Default fixture: SIPP 800k + workplace 320k = 1.12M pension
+      // ISA 200k + cash 50k + cash 30k = 280k accessible
+      const h = makeHousehold();
+      const result = computeHeroData(h, [], "household");
+      expect(result.pensionTotal).toBe(1_120_000);
+      expect(result.accessibleNetWorth).toBe(280_000);
+      expect(result.investableNetWorth).toBe(1_400_000);
+      expect(result.pensionTotal + result.accessibleNetWorth).toBe(result.investableNetWorth);
+    });
+
+    it("handles person-view filtering for pension split", () => {
+      const h = makeHousehold();
+      // p1 has: SIPP 800k, ISA 200k, cash 50k
+      const p1 = computeHeroData(h, [], "p1");
+      expect(p1.pensionTotal).toBe(800_000);
+      expect(p1.accessibleNetWorth).toBe(250_000);
+
+      // p2 has: workplace 320k, cash 30k
+      const p2 = computeHeroData(h, [], "p2");
+      expect(p2.pensionTotal).toBe(320_000);
+      expect(p2.accessibleNetWorth).toBe(30_000);
+    });
+
+    it("returns zero pension when no pension accounts exist", () => {
+      const h = makeHousehold({
+        accounts: [
+          { id: "a3", personId: "p1", type: "stocks_and_shares_isa" as const, provider: "V", name: "ISA", currentValue: 100_000 },
+          { id: "a4", personId: "p1", type: "cash_savings" as const, provider: "M", name: "Cash", currentValue: 50_000 },
+        ],
+      });
+      const result = computeHeroData(h, [], "household");
+      expect(result.pensionTotal).toBe(0);
+      expect(result.accessibleNetWorth).toBe(150_000);
+    });
+  });
+
+  describe("investable_net_worth metric subtext", () => {
+    it("shows accessible vs pension split in subtext", () => {
+      const h = makeHousehold({
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
+      });
+      const heroData = computeHeroData(h, [], "household");
+      const resolved = resolveMetricData("investable_net_worth", heroData);
+      expect(resolved.subtext).toContain("accessible");
+      expect(resolved.subtext).toContain("pension");
+      expect(resolved.subtext).toContain("property");
+    });
+
+    it("shows simple text when no pension or property", () => {
+      const h = makeHousehold({
+        accounts: [
+          { id: "a1", personId: "p1", type: "cash_savings" as const, provider: "M", name: "Cash", currentValue: 50_000 },
+        ],
+        properties: [],
+      });
+      const heroData = computeHeroData(h, [], "household");
+      const resolved = resolveMetricData("investable_net_worth", heroData);
+      // No pension → no split shown → falls back to "liquid financial assets"
+      expect(resolved.subtext).toBe("liquid financial assets");
     });
   });
 });
@@ -590,5 +664,72 @@ describe("getRecommendationUrgency", () => {
   it("marks emergency fund as standing", () => {
     const urgency = getRecommendationUrgency("emergency-fund-low");
     expect(urgency).toBe("standing");
+  });
+});
+
+// ============================================================
+// resolveMetricData
+// ============================================================
+
+describe("resolveMetricData", () => {
+  const household = makeHousehold();
+  const snapshots = makeSnapshots();
+  const heroData = computeHeroData(household, snapshots, "household");
+
+  it("resolves cash_position with correct label and icon key", () => {
+    const result = resolveMetricData("cash_position", heroData);
+    expect(result.label).toBe("Cash Position");
+    expect(result.iconKey).toBe("banknote");
+    expect(result.rawValue).toBe(heroData.cashPosition);
+  });
+
+  it("resolves retirement_countdown metric", () => {
+    const result = resolveMetricData("retirement_countdown", heroData);
+    expect(result.label).toBe("Retirement");
+    expect(result.iconKey).toBe("clock");
+  });
+
+  it("resolves fire_progress with color coding", () => {
+    const result = resolveMetricData("fire_progress", heroData);
+    expect(result.label).toBe("FIRE Progress");
+    expect(result.value).toContain("%");
+    expect(result.iconKey).toBe("target");
+  });
+
+  it("resolves period_change as N/A when insufficient snapshots", () => {
+    const noSnapData = computeHeroData(household, [], "household");
+    const result = resolveMetricData("period_change", noSnapData);
+    expect(result.value).toBe("N/A");
+    expect(result.subtext).toContain("Needs");
+  });
+
+  it("resolves cash_runway with valid months when outgoings exist", () => {
+    const result = resolveMetricData("cash_runway", heroData);
+    expect(result.label).toBe("Cash Cushion");
+    expect(result.iconKey).toBe("shield");
+    // With default fixture data, there should be outgoings
+    if (heroData.hasOutgoings) {
+      expect(result.value).toContain("mo");
+    }
+  });
+
+  it("resolves iht_liability metric", () => {
+    const result = resolveMetricData("iht_liability", heroData);
+    expect(result.label).toBe("IHT Liability");
+    expect(result.iconKey).toBe("shield");
+  });
+
+  it("resolves investable_net_worth metric", () => {
+    const result = resolveMetricData("investable_net_worth", heroData);
+    expect(result.label).toBe("Investable Assets");
+    expect(result.iconKey).toBe("banknote");
+    expect(result.rawValue).toBe(heroData.investableNetWorth);
+  });
+
+  it("returns a valid fallback for unknown metric types", () => {
+    // Test the default branch with a cast
+    const result = resolveMetricData("unknown_type" as never, heroData);
+    expect(result.label).toBe("Retirement Income");
+    expect(result.iconKey).toBe("sunrise");
   });
 });

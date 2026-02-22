@@ -62,6 +62,7 @@ const emptyHousehold: HouseholdData = {
     scenarioRates: [0.05, 0.07, 0.09],
   },
   emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6, monthlyLifestyleSpending: 0 },
+  properties: [],
   iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
   committedOutgoings: [],
   dashboardConfig: { heroMetrics: ["projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway"] },

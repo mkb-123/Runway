@@ -61,6 +61,15 @@ const utilityLinks = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+// Bottom nav — 5 most-used destinations for mobile
+const BOTTOM_NAV_ITEMS = [
+  { href: "/", label: "Home", icon: LayoutDashboard },
+  { href: "/income", label: "Income", icon: Wallet },
+  { href: "/projections", label: "Plan", icon: TrendingUp },
+  { href: "/retirement", label: "Retire", icon: Sunset },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
+
 export function Navigation() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -72,6 +81,7 @@ export function Navigation() {
   };
 
   return (
+    <>
     <header
       className={cn(
         "sticky top-0 z-50 w-full border-b backdrop-blur supports-[backdrop-filter]:bg-background/60 print:hidden",
@@ -151,7 +161,7 @@ export function Navigation() {
           <ThemeToggle />
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Open menu">
+              <Button variant="ghost" size="icon" aria-label="Open menu" className="min-h-[44px] min-w-[44px]">
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
@@ -223,5 +233,39 @@ export function Navigation() {
         </div>
       </div>
     </header>
+
+      {/* Mobile Bottom Navigation — fixed bar with key destinations */}
+      <nav
+        className={cn(
+          "fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden print:hidden",
+          isScenarioMode
+            ? "border-amber-300 bg-amber-50/95 dark:border-amber-800 dark:bg-amber-950/95"
+            : "bg-background/95"
+        )}
+        aria-label="Quick navigation"
+      >
+        <div className="flex items-center justify-around px-1 py-1">
+          {BOTTOM_NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex min-h-[48px] min-w-[48px] flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors",
+                  active
+                    ? "text-primary"
+                    : "text-muted-foreground"
+                )}
+              >
+                <Icon className="size-5" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    </>
   );
 }

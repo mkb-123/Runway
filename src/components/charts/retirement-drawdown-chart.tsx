@@ -1,5 +1,10 @@
 "use client";
 
+// ============================================================
+// Retirement Drawdown Chart
+// ============================================================
+// Rendering layer only — financial logic lives in src/lib/retirement.ts.
+
 import {
   AreaChart,
   Area,
@@ -11,6 +16,7 @@ import {
   Legend,
 } from "recharts";
 import { formatCurrencyAxis, formatCurrencyTooltip } from "@/lib/format";
+import { buildDrawdownData } from "@/lib/retirement";
 
 interface RetirementDrawdownChartProps {
   startingPot: number;
@@ -20,48 +26,6 @@ interface RetirementDrawdownChartProps {
   scenarioRates: number[];
   statePensionAge?: number;
   statePensionAnnual?: number;
-}
-
-interface DataPoint {
-  age: number;
-  [key: string]: number;
-}
-
-function buildDrawdownData(
-  startingPot: number,
-  annualSpend: number,
-  retirementAge: number,
-  endAge: number,
-  scenarioRates: number[],
-  statePensionAge: number,
-  statePensionAnnual: number
-): DataPoint[] {
-  const data: DataPoint[] = [];
-
-  // Track pot for each scenario
-  const pots = scenarioRates.map(() => startingPot);
-
-  for (let age = retirementAge; age <= endAge; age++) {
-    const point: DataPoint = { age };
-
-    for (let i = 0; i < scenarioRates.length; i++) {
-      const label = `${(scenarioRates[i] * 100).toFixed(0)}%`;
-
-      // State pension reduces withdrawal from pot
-      const statePension = age >= statePensionAge ? statePensionAnnual : 0;
-      const withdrawalFromPot = Math.max(0, annualSpend - statePension);
-
-      // Grow pot, then withdraw
-      pots[i] = pots[i] * (1 + scenarioRates[i]) - withdrawalFromPot;
-      if (pots[i] < 0) pots[i] = 0;
-
-      point[label] = Math.round(pots[i]);
-    }
-
-    data.push(point);
-  }
-
-  return data;
 }
 
 const SCENARIO_COLORS = [
@@ -88,12 +52,14 @@ export function RetirementDrawdownChart({
     endAge,
     scenarioRates,
     statePensionAge,
-    statePensionAnnual
+    statePensionAnnual,
+    true // Tax-aware: gross up pension withdrawals for income tax
   );
 
   const rateLabels = scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`);
 
   return (
+    <>
     <div className="h-[300px] sm:h-[400px] w-full" role="img" aria-label="Retirement pot drawdown projection over time">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
@@ -153,5 +119,9 @@ export function RetirementDrawdownChart({
         </AreaChart>
       </ResponsiveContainer>
     </div>
+    <p className="mt-2 text-[11px] text-muted-foreground">
+      Withdrawals are grossed up for income tax (25% PCLS tax-free, remainder taxed as income).
+    </p>
+    </>
   );
 }

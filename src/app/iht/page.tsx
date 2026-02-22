@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useScenarioData } from "@/context/use-scenario-data";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
@@ -14,7 +15,8 @@ import {
   calculateYearsUntilIHTExceeded,
   yearsSince,
 } from "@/lib/iht";
-import { getAccountTaxWrapper, annualiseContribution } from "@/types";
+import { projectTotalPropertyEquity } from "@/lib/property";
+import { getAccountTaxWrapper, annualiseContribution, getTotalPropertyEquity } from "@/types";
 import type { TaxWrapper } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -58,7 +60,10 @@ export default function IHTPage() {
     const giaVal = wrapperTotals.get("gia") ?? 0;
     const cashVal = wrapperTotals.get("cash") ?? 0;
     const pbVal = wrapperTotals.get("premium_bonds") ?? 0;
-    const baseInEstate = baseHousehold.iht.estimatedPropertyValue + isaVal + giaVal + cashVal + pbVal;
+    const basePropertyEquity = baseHousehold.properties.reduce(
+      (s, p) => s + Math.max(0, p.estimatedValue - p.mortgageBalance), 0
+    );
+    const baseInEstate = basePropertyEquity + isaVal + giaVal + cashVal + pbVal;
     const numberOfPersons = selectedView === "household" ? baseHousehold.persons.length : 1;
     const giftsWithin7Years = baseHousehold.iht.gifts
       .filter((g) => yearsSince(g.date) < 7)
@@ -71,9 +76,11 @@ export default function IHTPage() {
     const baseAnnualSavingsInEstate = baseContribs
       .filter((c) => c.target === "isa" || c.target === "gia")
       .reduce((sum, c) => sum + annualiseContribution(c.amount, c.frequency), 0);
+    const basePropertyValue = baseHousehold.properties.reduce((s, p) => s + p.estimatedValue, 0);
+    const baseMortgageBalance = baseHousehold.properties.reduce((s, p) => s + p.mortgageBalance, 0);
     return {
       totalNetWorth: totalNW, inEstate: baseInEstate, taxableAmount: result.taxableAmount, ihtLiability: result.ihtLiability,
-      propertyValue: baseHousehold.iht.estimatedPropertyValue, isaValue: isaVal, giaValue: giaVal, cashValue: cashVal,
+      propertyValue: basePropertyValue, mortgageBalance: baseMortgageBalance, isaValue: isaVal, giaValue: giaVal, cashValue: cashVal,
       premiumBondsValue: pbVal, pensionValue: pensionVal, outsideEstate: pensionVal, annualSavingsInEstate: baseAnnualSavingsInEstate,
     };
   }, [baseHousehold, selectedView]);
@@ -98,11 +105,13 @@ export default function IHTPage() {
     const giaValue = wrapperTotals.get("gia") ?? 0;
     const cashValue = wrapperTotals.get("cash") ?? 0;
     const premiumBondsValue = wrapperTotals.get("premium_bonds") ?? 0;
-    const propertyValue = ihtConfig.estimatedPropertyValue;
+    const propertyValue = household.properties.reduce((s, p) => s + p.estimatedValue, 0);
+    const mortgageBalance = household.properties.reduce((s, p) => s + p.mortgageBalance, 0);
+    const propertyEquity = Math.max(0, propertyValue - mortgageBalance);
 
-    // Pensions are normally outside the estate
+    // Pensions are normally outside the estate; mortgage reduces estate
     const inEstate =
-      propertyValue + isaValue + giaValue + cashValue + premiumBondsValue;
+      propertyEquity + isaValue + giaValue + cashValue + premiumBondsValue;
     const outsideEstate = pensionValue;
 
     // --- 7-Year Gift Tracker ---
@@ -158,11 +167,19 @@ export default function IHTPage() {
       );
     // Use mid scenario growth rate for estate projection
     const midGrowthRate = getMidScenarioRate(household.retirement.scenarioRates, 0.05);
+    // Property equity projection function for estate growth (includes appreciation + amortization)
+    const currentPropertyEquity = getTotalPropertyEquity(household.properties);
+    const hasPropertyGrowth = household.properties.some((p) => p.appreciationRate || (p.mortgageRate && p.mortgageTerm));
+    const propertyEquityAtYear = hasPropertyGrowth
+      ? (year: number) => projectTotalPropertyEquity(household.properties, year)
+      : undefined;
     const yearsUntilExceeded = calculateYearsUntilIHTExceeded(
       inEstate,
       combinedThreshold,
       annualSavingsInEstate,
-      midGrowthRate
+      midGrowthRate,
+      propertyEquityAtYear,
+      currentPropertyEquity
     );
 
     // Data for the sheltered vs exposed pie chart
@@ -182,6 +199,7 @@ export default function IHTPage() {
     // Breakdown for estate composition
     const estateBreakdown = [
       { label: "Property", value: propertyValue, inEstate: true },
+      ...(mortgageBalance > 0 ? [{ label: "Mortgage", value: -mortgageBalance, inEstate: true }] : []),
       { label: "ISA", value: isaValue, inEstate: true },
       { label: "GIA", value: giaValue, inEstate: true },
       { label: "Cash Savings", value: cashValue, inEstate: true },
@@ -193,6 +211,7 @@ export default function IHTPage() {
       ihtConfig,
       totalNetWorth,
       propertyValue,
+      mortgageBalance,
       pensionValue,
       inEstate,
       outsideEstate,
@@ -213,6 +232,7 @@ export default function IHTPage() {
       shelteredVsExposedData,
       estateBreakdown,
       numberOfPersons,
+      hasPropertyGrowth,
     };
   }, [household, filteredAccounts, selectedView]);
 
@@ -220,6 +240,7 @@ export default function IHTPage() {
     ihtConfig,
     totalNetWorth,
     propertyValue,
+    mortgageBalance,
     inEstate,
     outsideEstate,
     nilRateBandPerPerson,
@@ -239,6 +260,7 @@ export default function IHTPage() {
     shelteredVsExposedData,
     estateBreakdown,
     numberOfPersons,
+    hasPropertyGrowth,
   } = ihtData;
 
   return (
@@ -249,7 +271,8 @@ export default function IHTPage() {
 
       <SettingsBar label="IHT assumptions" settingsTab="iht">
         <Badge variant="secondary" className="text-xs">
-          Property: {formatCurrency(ihtData.propertyValue)}
+          Property: {formatCurrency(propertyValue)}
+          {mortgageBalance > 0 && ` (${formatCurrency(mortgageBalance)} mortgage)`}
         </Badge>
         <Badge variant="secondary" className="text-xs">
           {ihtData.ihtConfig.passingToDirectDescendants ? "RNRB applies" : "No RNRB"}
@@ -312,6 +335,7 @@ export default function IHTPage() {
                 {estateBreakdown.map((item) => {
                   const baseValueMap: Record<string, number> = {
                     "Property": baseIhtData.propertyValue,
+                    "Mortgage": -(baseIhtData.mortgageBalance ?? 0),
                     "ISA": baseIhtData.isaValue,
                     "GIA": baseIhtData.giaValue,
                     "Cash Savings": baseIhtData.cashValue,
@@ -338,6 +362,28 @@ export default function IHTPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* RNRB status note on property */}
+          {propertyValue > 0 && (
+            <div className="mt-4 rounded-lg border p-3 text-sm">
+              {ihtConfig.passingToDirectDescendants ? (
+                <p>
+                  <span className="font-medium">RNRB: {formatCurrency(UK_TAX_CONSTANTS.iht.residenceNilRateBand)}</span>
+                  {numberOfPersons > 1 && ` × ${numberOfPersons} = ${formatCurrency(UK_TAX_CONSTANTS.iht.residenceNilRateBand * numberOfPersons)}`}
+                  {" "}— estate passes to{" "}
+                  <Link href="/settings?tab=iht" className="underline underline-offset-2 hover:text-primary">direct descendants</Link>,
+                  {" "}residence nil-rate band applies to property.
+                </p>
+              ) : (
+                <p className="text-muted-foreground">
+                  <span className="font-medium">RNRB: £0 (not applicable)</span>
+                  {" "}— no{" "}
+                  <Link href="/settings?tab=iht" className="underline underline-offset-2 hover:text-primary">direct descendants</Link>.
+                  {" "}The £{(UK_TAX_CONSTANTS.iht.residenceNilRateBand / 1000).toFixed(0)}k residence nil-rate band does not apply, reducing your threshold by {formatCurrency(UK_TAX_CONSTANTS.iht.residenceNilRateBand * numberOfPersons)}.
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
       </CollapsibleSection>
@@ -360,9 +406,9 @@ export default function IHTPage() {
                 </span>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className={`flex items-center justify-between rounded-lg border p-3${!ihtConfig.passingToDirectDescendants ? " opacity-50" : ""}`}>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">
+                  <span className={`text-sm${!ihtConfig.passingToDirectDescendants ? " line-through" : ""}`}>
                     Residence Nil Rate Band (
                     {formatCurrency(residenceNilRateBandPerPerson)} per person x{" "}
                     {numberOfPersons})
@@ -373,14 +419,14 @@ export default function IHTPage() {
                     <Badge variant="outline">Not applicable</Badge>
                   )}
                 </div>
-                <span className="font-semibold">
+                <span className={`font-semibold${!ihtConfig.passingToDirectDescendants ? " line-through" : ""}`}>
                   {formatCurrency(totalResidenceNilRateBand)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between rounded-lg border bg-green-50 dark:bg-green-950/20 p-3">
                 <span className="text-sm font-medium">
-                  Combined Couple Allowance
+                  {numberOfPersons > 1 ? "Combined Couple Allowance" : "Total Allowance"}
                 </span>
                 <span className="text-lg font-bold">
                   {formatCurrency(combinedThreshold)}
@@ -444,7 +490,7 @@ export default function IHTPage() {
           <CardContent>
             <div className="grid gap-6 md:grid-cols-2">
               <div>
-                <AllocationPie data={shelteredVsExposedData} height={280} />
+                <AllocationPie data={shelteredVsExposedData} />
               </div>
               <div className="flex flex-col justify-center space-y-4">
                 <div className="rounded-lg border bg-green-50 dark:bg-green-950/20 p-4">
@@ -565,6 +611,19 @@ export default function IHTPage() {
                 </div>
               </div>
 
+              {hasPropertyGrowth && (
+                <div className="rounded-lg border p-4 mb-4">
+                  <p className="text-sm text-muted-foreground">
+                    Property Appreciation
+                  </p>
+                  <p className="text-lg font-semibold tabular-nums">
+                    {household.properties.filter((p) => p.appreciationRate).map((p) =>
+                      `${p.label}: ${formatPercent(p.appreciationRate ?? 0)}/yr`
+                    ).join(", ") || "Mortgage amortization only"}
+                  </p>
+                </div>
+              )}
+
               <div className="rounded-lg border bg-muted/50 p-4">
                 {yearsUntilExceeded === 0 ? (
                   <p className="text-sm">
@@ -580,7 +639,9 @@ export default function IHTPage() {
                     At the current savings rate of{" "}
                     {formatCurrency(annualSavingsInEstate)} per year into
                     estate-exposed accounts, with assumed investment growth of{" "}
-                    {formatPercent(midGrowthRate)}/yr, your estate will exceed the{" "}
+                    {formatPercent(midGrowthRate)}/yr
+                    {hasPropertyGrowth && " and property appreciation"}
+                    , your estate will exceed the{" "}
                     {formatCurrency(combinedThreshold)} IHT threshold in
                     approximately{" "}
                     <span className="font-medium">
@@ -592,7 +653,9 @@ export default function IHTPage() {
                 ) : (
                   <p className="text-sm">
                     Even with assumed investment growth of{" "}
-                    {formatPercent(midGrowthRate)}/yr, your estate is projected
+                    {formatPercent(midGrowthRate)}/yr
+                    {hasPropertyGrowth && " and property appreciation"}
+                    , your estate is projected
                     to remain below the IHT threshold for the foreseeable future.
                   </p>
                 )}

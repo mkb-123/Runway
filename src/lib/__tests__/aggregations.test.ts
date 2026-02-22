@@ -27,6 +27,7 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
     children: [],
     retirement: { targetAnnualIncome: 50000, withdrawalRate: 0.04, includeStatePension: true, scenarioRates: [0.05, 0.07] },
     emergencyFund: { monthlyEssentialExpenses: 3000, targetMonths: 6, monthlyLifestyleSpending: 1500 },
+    properties: [],
     iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
     committedOutgoings: [],
     dashboardConfig: { heroMetrics: ["projected_retirement_income"] },

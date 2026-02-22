@@ -130,27 +130,35 @@ export function calculateIHT(
 
 /**
  * Calculate how many years until the estate exceeds the IHT threshold,
- * given annual savings flowing into the estate and investment growth.
+ * given annual savings flowing into the estate, investment growth, and
+ * optional property equity projection function.
  *
  * @param currentEstateValue - Current in-estate value
  * @param combinedThreshold - NRB + RNRB combined threshold
  * @param annualSavingsInEstate - Annual contributions to estate-exposed accounts
  * @param growthRate - Annual investment growth rate (decimal, e.g. 0.05). Defaults to 0.
+ * @param propertyEquityAtYear - Optional function returning total property equity at year N
+ * @param currentPropertyEquity - Current property equity included in currentEstateValue
  * @returns null if estate won't exceed threshold within 100 years, 0 if already exceeded, else years
  */
 export function calculateYearsUntilIHTExceeded(
   currentEstateValue: number,
   combinedThreshold: number,
   annualSavingsInEstate: number,
-  growthRate: number = 0
+  growthRate: number = 0,
+  propertyEquityAtYear?: (year: number) => number,
+  currentPropertyEquity: number = 0
 ): number | null {
   if (currentEstateValue >= combinedThreshold) return 0;
-  if (annualSavingsInEstate <= 0 && growthRate <= 0) return null;
+  if (annualSavingsInEstate <= 0 && growthRate <= 0 && !propertyEquityAtYear) return null;
 
-  let estate = currentEstateValue;
+  // Non-property portion of estate grows with savings + investment growth
+  let nonPropertyEstate = currentEstateValue - currentPropertyEquity;
   for (let year = 1; year <= 100; year++) {
-    estate = estate * (1 + growthRate) + annualSavingsInEstate;
-    if (estate >= combinedThreshold) return year;
+    nonPropertyEstate = nonPropertyEstate * (1 + growthRate) + annualSavingsInEstate;
+    const propertyEquity = propertyEquityAtYear ? propertyEquityAtYear(year) : currentPropertyEquity;
+    const totalEstate = nonPropertyEstate + propertyEquity;
+    if (totalEstate >= combinedThreshold) return year;
   }
   return null;
 }
