@@ -396,6 +396,70 @@ describe("computeHeroData", () => {
       expect(boundaryResult.ihtLiability).toBe(noGiftResult.ihtLiability);
     });
   });
+
+  describe("pension vs accessible split", () => {
+    it("splits investable net worth into pension and accessible", () => {
+      // Default fixture: SIPP 800k + workplace 320k = 1.12M pension
+      // ISA 200k + cash 50k + cash 30k = 280k accessible
+      const h = makeHousehold();
+      const result = computeHeroData(h, [], "household");
+      expect(result.pensionTotal).toBe(1_120_000);
+      expect(result.accessibleNetWorth).toBe(280_000);
+      expect(result.investableNetWorth).toBe(1_400_000);
+      expect(result.pensionTotal + result.accessibleNetWorth).toBe(result.investableNetWorth);
+    });
+
+    it("handles person-view filtering for pension split", () => {
+      const h = makeHousehold();
+      // p1 has: SIPP 800k, ISA 200k, cash 50k
+      const p1 = computeHeroData(h, [], "p1");
+      expect(p1.pensionTotal).toBe(800_000);
+      expect(p1.accessibleNetWorth).toBe(250_000);
+
+      // p2 has: workplace 320k, cash 30k
+      const p2 = computeHeroData(h, [], "p2");
+      expect(p2.pensionTotal).toBe(320_000);
+      expect(p2.accessibleNetWorth).toBe(30_000);
+    });
+
+    it("returns zero pension when no pension accounts exist", () => {
+      const h = makeHousehold({
+        accounts: [
+          { id: "a3", personId: "p1", type: "stocks_and_shares_isa" as const, provider: "V", name: "ISA", currentValue: 100_000 },
+          { id: "a4", personId: "p1", type: "cash_savings" as const, provider: "M", name: "Cash", currentValue: 50_000 },
+        ],
+      });
+      const result = computeHeroData(h, [], "household");
+      expect(result.pensionTotal).toBe(0);
+      expect(result.accessibleNetWorth).toBe(150_000);
+    });
+  });
+
+  describe("investable_net_worth metric subtext", () => {
+    it("shows accessible vs pension split in subtext", () => {
+      const h = makeHousehold({
+        properties: [{ id: "prop-1", label: "Home", estimatedValue: 500_000, ownerPersonIds: ["p1"], mortgageBalance: 0 }],
+      });
+      const heroData = computeHeroData(h, [], "household");
+      const resolved = resolveMetricData("investable_net_worth", heroData);
+      expect(resolved.subtext).toContain("accessible");
+      expect(resolved.subtext).toContain("pension");
+      expect(resolved.subtext).toContain("property");
+    });
+
+    it("shows simple text when no pension or property", () => {
+      const h = makeHousehold({
+        accounts: [
+          { id: "a1", personId: "p1", type: "cash_savings" as const, provider: "M", name: "Cash", currentValue: 50_000 },
+        ],
+        properties: [],
+      });
+      const heroData = computeHeroData(h, [], "household");
+      const resolved = resolveMetricData("investable_net_worth", heroData);
+      // No pension → no split shown → falls back to "liquid financial assets"
+      expect(resolved.subtext).toBe("liquid financial assets");
+    });
+  });
 });
 
 // ============================================================

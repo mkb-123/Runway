@@ -75,6 +75,10 @@ export interface HeroMetricData {
   investableNetWorth: number;
   /** Total property equity */
   totalPropertyEquity: number;
+  /** Pension pot total (workplace + SIPP — locked until pension access age) */
+  pensionTotal: number;
+  /** Accessible assets (investable minus pensions) — ISA, GIA, cash, premium bonds */
+  accessibleNetWorth: number;
 }
 
 /** REC-E: Upcoming cash event */
@@ -119,6 +123,12 @@ export function computeHeroData(
   const cashPosition = accounts
     .filter((a) => a.type === "cash_savings" || a.type === "cash_isa" || a.type === "premium_bonds")
     .reduce((sum, a) => sum + a.currentValue, 0);
+
+  // --- Pension vs accessible split ---
+  const pensionTotal = accounts
+    .filter((a) => a.type === "workplace_pension" || a.type === "sipp")
+    .reduce((sum, a) => sum + a.currentValue, 0);
+  const accessibleNetWorth = totalNetWorth - pensionTotal;
 
   // --- Snapshot changes (person-filtered) ---
   const snapshotChanges = computeSnapshotChanges(snapshots, personId);
@@ -271,6 +281,8 @@ export function computeHeroData(
           .filter((p) => p.ownerPersonIds.includes(personId))
           .reduce((sum, p) => sum + getPropertyEquity(p) / Math.max(1, p.ownerPersonIds.length), 0)
       : getTotalPropertyEquity(household.properties),
+    pensionTotal,
+    accessibleNetWorth,
   };
 }
 
@@ -891,14 +903,18 @@ export function resolveMetricData(
     case "investable_net_worth": {
       const investable = data.investableNetWorth;
       const propertyEquity = data.totalPropertyEquity;
+      const pension = data.pensionTotal;
+      const accessible = data.accessibleNetWorth;
+      // Build informative subtext: show accessible vs locked pension split
+      const parts: string[] = [];
+      if (pension > 0) parts.push(`${formatCompact(accessible)} accessible, ${formatCompact(pension)} pension`);
+      if (propertyEquity > 0) parts.push(`excl. ${formatCompact(propertyEquity)} property`);
       return {
         label: "Investable Assets",
         value: formatCompact(investable),
         rawValue: investable,
         format: formatCompact,
-        subtext: propertyEquity > 0
-          ? `excl. ${formatCompact(propertyEquity)} property equity`
-          : "liquid financial assets",
+        subtext: parts.length > 0 ? parts.join(" · ") : "liquid financial assets",
         color: "",
         iconKey: "banknote",
       };

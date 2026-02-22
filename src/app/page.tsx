@@ -72,7 +72,8 @@ import { SchoolFeeTimelineChart } from "@/components/charts/school-fee-timeline-
 import { generateSchoolFeeTimeline, findLastSchoolFeeYear } from "@/lib/school-fees";
 import { StaleTaxBanner } from "@/components/stale-tax-banner";
 import { PropertyEquityChart } from "@/components/charts/property-equity-chart";
-import { projectPropertyEquity, calculateMortgagePayoffYears } from "@/lib/property";
+import { MortgageAmortizationChart } from "@/components/charts/mortgage-amortization-chart";
+import { projectPropertyEquity, calculateMortgagePayoffYears, generateAmortizationSchedule } from "@/lib/property";
 
 // ============================================================
 // Hero Metric — resolve type to display properties
@@ -484,6 +485,14 @@ export default function Home() {
     }
 
     return { projections, mortgagePayoffYear };
+  }, [household.properties]);
+
+  // Amortization schedules for properties with active mortgages
+  const amortizationSchedules = useMemo(() => {
+    return household.properties
+      .filter((p) => p.mortgageBalance > 0 && p.mortgageRate && p.mortgageTerm && p.mortgageStartDate)
+      .map((p) => ({ label: p.label, schedule: generateAmortizationSchedule(p) }))
+      .filter((s) => s.schedule.length > 0);
   }, [household.properties]);
 
   const latestSnapshot = snapshots[snapshots.length - 1];
@@ -969,6 +978,21 @@ export default function Home() {
               </p>
             </CardContent>
           </Card>
+          {amortizationSchedules.map((s) => (
+            <Card key={s.label}>
+              <CardHeader>
+                <div className="flex items-baseline justify-between">
+                  <CardTitle className="text-base">{s.label} — Mortgage Breakdown</CardTitle>
+                  <span className="hidden text-xs text-muted-foreground sm:inline">
+                    Interest vs principal over remaining term
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <MortgageAmortizationChart schedule={s.schedule} label={s.label} />
+              </CardContent>
+            </Card>
+          ))}
         </CollapsibleSection>
       )}
 
