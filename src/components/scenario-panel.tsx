@@ -842,8 +842,8 @@ export function ScenarioPanel() {
             </div>
           </Section>
 
-          {/* Apply / Reset — sticky footer on mobile */}
-          <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 py-3">
+          {/* Apply / Reset — sticky footer with safe-area padding for mobile browser chrome */}
+          <div className="sticky bottom-0 -mx-4 border-t bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <div className="flex gap-2">
               <Button
                 onClick={() => {

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Navigation } from "@/components/layout/navigation";
 import { ScenarioBanner } from "@/components/scenario-banner";
 import { SaveErrorBanner } from "@/components/save-error-banner";
@@ -13,6 +13,12 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Runway",
   description: "UK household net worth tracker and financial planner",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

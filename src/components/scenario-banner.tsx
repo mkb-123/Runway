@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useScenario } from "@/context/scenario-context";
 import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/format";
 
 export function ScenarioBanner() {
   const { isScenarioMode, scenarioLabel, disableScenario } = useScenario();
@@ -36,29 +36,33 @@ export function ScenarioBanner() {
       />
 
       {/* Sticky banner below nav */}
-      <div className="sticky top-14 z-40 border-b-2 border-amber-400 bg-amber-50 px-4 py-2.5 shadow-sm dark:border-amber-700 dark:bg-amber-950 print:hidden">
-        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-7 items-center justify-center rounded-full bg-amber-200 dark:bg-amber-800">
+      <div className="sticky top-16 z-40 border-b-2 border-amber-400 bg-amber-50 px-4 py-2 shadow-sm dark:border-amber-700 dark:bg-amber-950 print:hidden">
+        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-200 dark:bg-amber-800">
               <FlaskConical className="size-4 text-amber-700 dark:text-amber-300" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                <span className="text-sm font-semibold text-amber-900 dark:text-amber-100 truncate">
                   What-If: {scenarioLabel}
                 </span>
                 <Badge
                   variant="outline"
-                  className="border-amber-400 text-[10px] text-amber-700 dark:border-amber-600 dark:text-amber-300"
+                  className="border-amber-400 text-[10px] text-amber-700 dark:border-amber-600 dark:text-amber-300 shrink-0 hidden sm:inline-flex"
                 >
                   Not saved
                 </Badge>
               </div>
-              {/* Side-by-side base vs scenario net worth */}
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                Net worth: {formatCurrency(baseNW)}{" "}
-                <span className="mx-1" aria-hidden="true">&rarr;</span>{" "}
-                <span className="font-semibold">{formatCurrency(scenarioNW)}</span>{" "}
+              {/* Compact on mobile, full on desktop */}
+              <p className="text-xs text-amber-700 dark:text-amber-400 tabular-nums">
+                <span className="hidden sm:inline">
+                  Net worth: {formatCurrency(baseNW)} &rarr; <span className="font-semibold">{formatCurrency(scenarioNW)}</span>
+                </span>
+                <span className="sm:hidden">
+                  {formatCurrencyCompact(baseNW)} &rarr; <span className="font-semibold">{formatCurrencyCompact(scenarioNW)}</span>
+                </span>
+                {" "}
                 <span className={diff < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}>
                   ({diff >= 0 ? "+" : ""}{diffPct.toFixed(1)}%)
                 </span>
@@ -69,10 +73,11 @@ export function ScenarioBanner() {
             variant="outline"
             size="sm"
             onClick={disableScenario}
-            className="border-amber-400 text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-200 dark:hover:bg-amber-900"
+            className="shrink-0 border-amber-400 text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-200 dark:hover:bg-amber-900"
           >
             <X className="mr-1 size-3" />
-            Exit What-If
+            <span className="hidden sm:inline">Exit What-If</span>
+            <span className="sm:hidden">Exit</span>
           </Button>
         </div>
       </div>
