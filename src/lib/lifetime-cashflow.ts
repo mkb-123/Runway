@@ -14,7 +14,7 @@
 
 import type { HouseholdData, Person, PersonIncome } from "@/types";
 import { annualiseOutgoing, annualiseContribution, getDeferredBonus } from "@/types";
-import { calculateTakeHomePay, calculateIncomeTax } from "@/lib/tax";
+import { calculateTakeHomePay, calculateTakeHomePayWithStudentLoan, calculateIncomeTax } from "@/lib/tax";
 import { calculateProRataStatePension, calculateAge } from "@/lib/projections";
 
 // --- Types ---
@@ -280,7 +280,10 @@ function calculateEmploymentIncome(personStates: PersonState[], yearOffset: numb
 
     // Tax is calculated on the full gross (salary + bonus), preserving pension method
     const grownIncome: PersonIncome = { ...state.personIncome, grossSalary: totalGrossIncome };
-    const takeHome = calculateTakeHomePay(grownIncome);
+    const studentLoanPlan = state.person.studentLoanPlan ?? "none";
+    const takeHome = studentLoanPlan !== "none"
+      ? calculateTakeHomePayWithStudentLoan(grownIncome, studentLoanPlan)
+      : calculateTakeHomePay(grownIncome);
     total += takeHome.takeHome;
   }
   return total;

@@ -51,7 +51,7 @@ import {
 import { annualiseOutgoing, getHouseholdGrossIncome, OUTGOING_CATEGORY_LABELS, OUTGOING_FREQUENCY_LABELS } from "@/types";
 import { TAX_WRAPPER_LABELS } from "@/types";
 import type { TaxWrapper, HeroMetricType } from "@/types";
-import { calculateTotalAnnualContributions, calculateHouseholdStatePension } from "@/lib/aggregations";
+import { calculateTotalAnnualContributions, calculatePersonalAnnualContributions, calculateHouseholdStatePension } from "@/lib/aggregations";
 import { calculateCashRunway } from "@/lib/cash-flow";
 
 import { NetWorthTrajectoryChart } from "@/components/charts/net-worth-trajectory";
@@ -77,6 +77,7 @@ interface HeroMetricData {
   retirementCountdownYears: number;
   retirementCountdownMonths: number;
   savingsRate: number;
+  personalSavingsRate: number;
   fireProgress: number;
   netWorthAfterCommitments: number;
   totalAnnualCommitments: number;
@@ -171,7 +172,7 @@ function resolveMetric(
         value: `${data.savingsRate.toFixed(1)}%`,
         rawValue: data.savingsRate,
         format: (n: number) => `${n.toFixed(1)}%`,
-        subtext: "of gross income",
+        subtext: `${data.personalSavingsRate.toFixed(1)}% personal`,
         color: data.savingsRate >= 20
           ? "text-emerald-600 dark:text-emerald-400"
           : data.savingsRate < 10
@@ -452,10 +453,14 @@ export default function Home() {
   }, [household, totalNetWorth, totalStatePensionAnnual]);
 
   // --- Savings rate + FIRE progress ---
-  const savingsRate = useMemo(() => {
+  const { savingsRate, personalSavingsRate } = useMemo(() => {
     const totalContrib = calculateTotalAnnualContributions(household.contributions, household.income);
+    const personalContrib = calculatePersonalAnnualContributions(household.contributions, household.income);
     const inc = getHouseholdGrossIncome(household.income, household.bonusStructures);
-    return inc > 0 ? (totalContrib / inc) * 100 : 0;
+    return {
+      savingsRate: inc > 0 ? (totalContrib / inc) * 100 : 0,
+      personalSavingsRate: inc > 0 ? (personalContrib / inc) * 100 : 0,
+    };
   }, [household]);
 
   const requiredPotForFIRE = useMemo(() =>
@@ -471,10 +476,14 @@ export default function Home() {
   }, [requiredPotForFIRE, totalNetWorth, filteredNetWorth, selectedView]);
 
   // --- Base metrics for what-if comparison ---
-  const baseSavingsRate = useMemo(() => {
+  const { baseSavingsRate, basePersonalSavingsRate } = useMemo(() => {
     const totalContrib = calculateTotalAnnualContributions(baseHousehold.contributions, baseHousehold.income);
+    const personalContrib = calculatePersonalAnnualContributions(baseHousehold.contributions, baseHousehold.income);
     const inc = getHouseholdGrossIncome(baseHousehold.income, baseHousehold.bonusStructures);
-    return inc > 0 ? (totalContrib / inc) * 100 : 0;
+    return {
+      baseSavingsRate: inc > 0 ? (totalContrib / inc) * 100 : 0,
+      basePersonalSavingsRate: inc > 0 ? (personalContrib / inc) * 100 : 0,
+    };
   }, [baseHousehold]);
 
   const baseStatePensionAnnual = useMemo(
@@ -557,6 +566,7 @@ export default function Home() {
       retirementCountdownYears,
       retirementCountdownMonths,
       savingsRate,
+      personalSavingsRate,
       fireProgress,
       netWorthAfterCommitments: totalNetWorth - totalAnnualCommitments,
       totalAnnualCommitments,
@@ -569,7 +579,7 @@ export default function Home() {
       totalNetWorth, filteredNetWorth, selectedView, cashPosition,
       monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent,
       retirementCountdownYears, retirementCountdownMonths,
-      savingsRate, fireProgress, totalAnnualCommitments,
+      savingsRate, personalSavingsRate, fireProgress, totalAnnualCommitments,
       projectedRetirementIncome, projectedRetirementIncomeStatePension,
       household.retirement.targetAnnualIncome, cashRunway,
     ]
@@ -587,6 +597,7 @@ export default function Home() {
       retirementCountdownYears: baseRetCountdownYears,
       retirementCountdownMonths: baseRetCountdownMonths,
       savingsRate: baseSavingsRate,
+      personalSavingsRate: basePersonalSavingsRate,
       fireProgress: baseFireProgress,
       netWorthAfterCommitments: baseTotalNetWorth - baseCommitments,
       totalAnnualCommitments: baseCommitments,
@@ -599,7 +610,7 @@ export default function Home() {
       baseTotalNetWorth, baseFilteredNetWorth, selectedView, baseCashPosition,
       monthOnMonthChange, monthOnMonthPercent, yearOnYearChange, yearOnYearPercent,
       baseRetCountdownYears, baseRetCountdownMonths,
-      baseSavingsRate, baseFireProgress, baseCommitments,
+      baseSavingsRate, basePersonalSavingsRate, baseFireProgress, baseCommitments,
       baseProjectedRetirementIncome, baseProjectedRetirementIncomeStatePension,
       baseHousehold.retirement.targetAnnualIncome, baseCashRunway,
     ]
