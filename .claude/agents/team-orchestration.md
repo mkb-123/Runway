@@ -165,7 +165,7 @@ When agents disagree:
    - **James** (52, married, stable): retirement timing, pension bridge, tax optimisation
    - **Priya** (35, married with 3 kids): cash flow survival, school fees, bonus deployment
    - **Marcus** (45, married, entrepreneur): illiquid equity, pension catch-up, exit scenarios
-   - **Eleanor** (59, single, no children): IHT with no RNRB, DB+SIPP drawdown, estate distribution
+   - **Eleanor** (59, single, no children): IHT with no RNRB, SIPP drawdown to 90, estate distribution
 
 2. **Financial Advisor vs Mobile Web Designer** — If the advisor says users need it but the designer says it's cluttered: find a progressive disclosure solution (show summary, let users drill in).
 
