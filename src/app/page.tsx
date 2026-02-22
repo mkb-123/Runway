@@ -594,8 +594,7 @@ export default function Home() {
     const priorityOrder: Record<RecommendationPriority, number> = { high: 0, medium: 1, low: 2 };
     return recs
       .map((r) => ({ rec: r, urgency: getRecommendationUrgency(r.id) }))
-      .sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || priorityOrder[a.rec.priority] - priorityOrder[b.rec.priority])
-      .map((r) => r);
+      .sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || priorityOrder[a.rec.priority] - priorityOrder[b.rec.priority]);
   }, [recommendations, selectedView, household.persons, dismissedIds]);
 
   // REC-D: Cap mobile recommendations — show 2 by default, expand for more

@@ -445,7 +445,7 @@ export default function RetirementPage() {
     <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader
         title="Retirement Planning"
-        description="Track your progress toward financial independence"
+        description="Pot size, pension bridge, FIRE progress, and income timeline."
       >
         <PersonToggle />
       </PageHeader>

@@ -243,7 +243,7 @@ export default function IHTPage() {
 
   return (
     <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-      <PageHeader title="Inheritance Tax Planning" description="Estimate your estate value, IHT liability, and track gifts within the 7-year window.">
+      <PageHeader title="Estate & IHT Planning" description="Estate value, IHT liability, pension shelter, and 7-year gift tracking.">
         <PersonToggle />
       </PageHeader>
 
@@ -429,10 +429,10 @@ export default function IHTPage() {
       </CollapsibleSection>
 
       {/* IHT-Sheltered vs Exposed */}
-      <CollapsibleSection title="IHT-Sheltered vs Exposed" summary="Pension vs estate split" storageKey="iht-sheltered">
+      <CollapsibleSection title="Sheltered vs Exposed" summary="Pension assets outside estate vs in-estate assets" storageKey="iht-sheltered" defaultOpen>
         <Card>
           <CardHeader>
-            <CardTitle>IHT-Sheltered vs Exposed</CardTitle>
+            <CardTitle>Pension Shelter vs Estate Exposure</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-6 md:grid-cols-2">
@@ -469,7 +469,7 @@ export default function IHTPage() {
       </CollapsibleSection>
 
       {/* 7-Year Gift Tracker */}
-      <CollapsibleSection title="7-Year Gift Tracker" summary="PET tracking" storageKey="iht-gifts">
+      <CollapsibleSection title="7-Year Gift Tracker" summary="Gifts that reduce your nil-rate band" storageKey="iht-gifts" defaultOpen>
         <Card>
           <CardHeader>
             <CardTitle>7-Year Gift Tracker</CardTitle>

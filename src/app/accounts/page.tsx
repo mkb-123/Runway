@@ -97,7 +97,7 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-      <PageHeader title="Accounts" description="Overview of all accounts grouped by person.">
+      <PageHeader title="Accounts" description="Net worth by tax wrapper — pension, ISA, GIA, cash.">
         <PersonToggle />
       </PageHeader>
 
@@ -111,7 +111,14 @@ export default function AccountsPage() {
           {wrapperSummary.map(([wrapper, total]) => (
             <Card key={wrapper}>
               <CardContent className="pt-4 pb-3 px-4">
-                <div className="text-xs text-muted-foreground uppercase tracking-wider">{TAX_WRAPPER_LABELS[wrapper]}</div>
+                <div className="flex items-center justify-between gap-1">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">{TAX_WRAPPER_LABELS[wrapper]}</div>
+                  {grandTotal > 0 && (
+                    <div className="text-xs font-medium text-muted-foreground tabular-nums">
+                      {Math.round((total / grandTotal) * 100)}%
+                    </div>
+                  )}
+                </div>
                 <div className="text-lg font-bold tabular-nums mt-1">
                   <ScenarioDelta base={baseWrapperTotals.get(wrapper) ?? total} scenario={total} format={formatCurrency} />
                 </div>
