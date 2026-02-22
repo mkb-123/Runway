@@ -29,6 +29,22 @@ export const UK_TAX_CONSTANTS = {
     employeeRateAboveUEL: 0.02, // 2% above UEL
   },
 
+  // --- National Insurance (Self-Employment) ---
+  selfEmploymentNI: {
+    /** Class 2: flat-rate weekly contribution (£3.45/wk × 52 = £179.40/yr) */
+    class2WeeklyRate: 3.45,
+    /** Class 2: small profits threshold — exempt below this */
+    class2SmallProfitsThreshold: 6_725,
+    /** Class 4: lower profits limit */
+    class4LowerProfitsLimit: 12_570,
+    /** Class 4: upper profits limit */
+    class4UpperProfitsLimit: 50_270,
+    /** Class 4: main rate (between LPL and UPL) */
+    class4MainRate: 0.06, // 6% for 2024/25
+    /** Class 4: additional rate (above UPL) */
+    class4AdditionalRate: 0.02, // 2% above UPL
+  },
+
   // --- Student Loan Repayment ---
   studentLoan: {
     plan1: { threshold: 24_990, rate: 0.09 },
@@ -93,3 +109,18 @@ export const UK_TAX_CONSTANTS = {
 } as const;
 
 export type UKTaxConstants = typeof UK_TAX_CONSTANTS;
+
+/**
+ * Returns true if the current date is past the end of the tax year
+ * these constants apply to. When stale, recommendations and tax
+ * calculations should display a prominent warning.
+ */
+export function isTaxYearStale(now: Date = new Date()): boolean {
+  return now >= new Date(TAX_YEAR_END);
+}
+
+/**
+ * Pension tax-free lump sum fraction (25% PCLS).
+ * Used to estimate tax on pension drawdown.
+ */
+export const PENSION_TAX_FREE_LUMP_SUM_FRACTION = 0.25;

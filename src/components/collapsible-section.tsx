@@ -1,24 +1,30 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { ChevronRight } from "lucide-react";
 
 /**
  * Collapsible section header — reusable across all pages.
  * Persists open/closed state in localStorage via storageKey.
  * When collapsed, shows a summary string on the right.
+ *
+ * Supports lazy rendering: when `lazy` is true, children are not
+ * rendered until the section is first opened. This defers heavy
+ * chart components until the user actually needs them.
  */
 export function CollapsibleSection({
   title,
   summary,
   defaultOpen = false,
   storageKey,
+  lazy = false,
   children,
 }: {
   title: string;
   summary?: string;
   defaultOpen?: boolean;
   storageKey: string;
+  lazy?: boolean;
   children: React.ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(() => {
@@ -31,9 +37,13 @@ export function CollapsibleSection({
     }
   });
 
+  // Track if the section has ever been opened (for lazy rendering)
+  const hasBeenOpened = useRef(isOpen);
+
   const toggle = useCallback(() => {
     setIsOpen((prev) => {
       const next = !prev;
+      if (next) hasBeenOpened.current = true;
       try {
         localStorage.setItem(`nw-section-${storageKey}`, String(next));
       } catch {
@@ -42,6 +52,9 @@ export function CollapsibleSection({
       return next;
     });
   }, [storageKey]);
+
+  // Lazy: skip rendering children until first open
+  const shouldRender = !lazy || hasBeenOpened.current;
 
   return (
     <div>
@@ -65,7 +78,7 @@ export function CollapsibleSection({
         className={`grid transition-all duration-250 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
       >
         <div className="overflow-hidden">
-          <div className="mt-3">{children}</div>
+          <div className="mt-3">{shouldRender ? children : null}</div>
         </div>
       </div>
     </div>

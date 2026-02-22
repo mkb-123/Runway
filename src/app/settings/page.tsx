@@ -254,7 +254,7 @@ function SettingsPageInner() {
       <SettingsSummaryBar household={household} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full overflow-x-auto gap-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <TabsList className="relative w-full overflow-x-auto gap-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] [mask-image:linear-gradient(90deg,black_calc(100%-2rem),transparent)] sm:[mask-image:none]">
           <TabsTrigger value="household" className="gap-1.5 shrink-0">
             <Users className="size-3.5" />
             <span className="hidden sm:inline">Household</span>

@@ -5,6 +5,7 @@ import {
   getStatusSentence,
   detectLifeStage,
   getRecommendationUrgency,
+  resolveMetricData,
 } from "../dashboard";
 import type { HouseholdData, NetWorthSnapshot } from "@/types";
 
@@ -590,5 +591,65 @@ describe("getRecommendationUrgency", () => {
   it("marks emergency fund as standing", () => {
     const urgency = getRecommendationUrgency("emergency-fund-low");
     expect(urgency).toBe("standing");
+  });
+});
+
+// ============================================================
+// resolveMetricData
+// ============================================================
+
+describe("resolveMetricData", () => {
+  const household = makeHousehold();
+  const snapshots = makeSnapshots();
+  const heroData = computeHeroData(household, snapshots, "household");
+
+  it("resolves cash_position with correct label and icon key", () => {
+    const result = resolveMetricData("cash_position", heroData);
+    expect(result.label).toBe("Cash Position");
+    expect(result.iconKey).toBe("banknote");
+    expect(result.rawValue).toBe(heroData.cashPosition);
+  });
+
+  it("resolves retirement_countdown metric", () => {
+    const result = resolveMetricData("retirement_countdown", heroData);
+    expect(result.label).toBe("Retirement");
+    expect(result.iconKey).toBe("clock");
+  });
+
+  it("resolves fire_progress with color coding", () => {
+    const result = resolveMetricData("fire_progress", heroData);
+    expect(result.label).toBe("FIRE Progress");
+    expect(result.value).toContain("%");
+    expect(result.iconKey).toBe("target");
+  });
+
+  it("resolves period_change as N/A when insufficient snapshots", () => {
+    const noSnapData = computeHeroData(household, [], "household");
+    const result = resolveMetricData("period_change", noSnapData);
+    expect(result.value).toBe("N/A");
+    expect(result.subtext).toContain("Needs");
+  });
+
+  it("resolves cash_runway with valid months when outgoings exist", () => {
+    const result = resolveMetricData("cash_runway", heroData);
+    expect(result.label).toBe("Cash Cushion");
+    expect(result.iconKey).toBe("shield");
+    // With default fixture data, there should be outgoings
+    if (heroData.hasOutgoings) {
+      expect(result.value).toContain("mo");
+    }
+  });
+
+  it("resolves iht_liability metric", () => {
+    const result = resolveMetricData("iht_liability", heroData);
+    expect(result.label).toBe("IHT Liability");
+    expect(result.iconKey).toBe("shield");
+  });
+
+  it("returns a valid fallback for unknown metric types", () => {
+    // Test the default branch with a cast
+    const result = resolveMetricData("unknown_type" as never, heroData);
+    expect(result.label).toBe("Retirement Income");
+    expect(result.iconKey).toBe("sunrise");
   });
 });
