@@ -21,6 +21,7 @@ import {
   CalendarDays,
   Users,
   ChevronDown,
+  Camera,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -242,7 +243,7 @@ const statusColorClasses = {
 // ============================================================
 
 export default function Home() {
-  const { snapshots: snapshotsData } = useData();
+  const { snapshots: snapshotsData, takeSnapshot } = useData();
   const { isScenarioMode, savedScenarios } = useScenario();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
@@ -845,12 +846,32 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          {snapshots.length > 1 && (
-            <Card className="border-t border-t-primary/20">
-              <CardHeader>
-                <CardTitle>Net Worth History</CardTitle>
-              </CardHeader>
-              <CardContent>
+          <Card className="border-t border-t-primary/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Net Worth History</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {snapshots.length === 0
+                      ? "No snapshots yet. Take your first one to start tracking."
+                      : snapshots.length === 1
+                        ? "1 snapshot. Take another next month to see trends."
+                        : `${snapshots.length} snapshots. Auto-captured monthly on each visit.`}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 shrink-0"
+                  onClick={takeSnapshot}
+                >
+                  <Camera className="size-3.5" />
+                  <span className="hidden sm:inline">Snapshot</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {snapshots.length > 1 ? (
                 <NetWorthHistoryChart
                   snapshots={snapshots}
                   propertyAddedDate={
@@ -859,9 +880,21 @@ export default function Home() {
                       : undefined
                   }
                 />
-              </CardContent>
-            </Card>
-          )}
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Camera className="size-10 text-muted-foreground/40 mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    {snapshots.length === 0
+                      ? "Take your first snapshot to start tracking net worth over time."
+                      : "Come back next month and take another snapshot to see your progress."}
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    Snapshots capture your current account balances by wrapper type.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card className="border-t border-t-primary/20">
             <CardHeader>

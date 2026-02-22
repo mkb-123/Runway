@@ -14,6 +14,8 @@ import {
   Circle,
   Download,
   Upload,
+  Camera,
+  Trash2,
 } from "lucide-react";
 import { useData } from "@/context/data-context";
 import {
@@ -32,6 +34,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
+import { formatCurrency } from "@/lib/format";
 
 const RunwayExportSchema = z.object({
   _runway: z.literal(true),
@@ -69,6 +72,8 @@ function SettingsPageInner() {
     snapshots,
     updateHousehold,
     updateSnapshots,
+    takeSnapshot,
+    deleteSnapshot,
     clearAllData,
     loadExampleData,
   } = useData();
@@ -339,6 +344,63 @@ function SettingsPageInner() {
           />
         </TabsContent>
       </Tabs>
+
+      {/* Snapshot Management */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Net Worth Snapshots</CardTitle>
+              <CardDescription>
+                Snapshots record your account balances over time. They are captured automatically when you update data, and monthly on each visit.
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={takeSnapshot}>
+              <Camera className="size-3.5" />
+              <span className="hidden sm:inline">Take Snapshot</span>
+              <span className="sm:hidden">Snap</span>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {snapshots.snapshots.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No snapshots yet. Take your first snapshot or update your accounts to start tracking.
+            </p>
+          ) : (
+            <div className="space-y-1 max-h-[300px] overflow-y-auto">
+              {[...snapshots.snapshots].reverse().map((snap) => (
+                <div
+                  key={snap.date}
+                  className="flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-muted/50"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted-foreground font-mono text-xs w-[80px]">{snap.date}</span>
+                    <span className="font-medium">{formatCurrency(snap.totalNetWorth)}</span>
+                    <span className="text-xs text-muted-foreground hidden sm:inline">
+                      {snap.byWrapper.map((w) => `${w.wrapper}: ${formatCurrency(w.value)}`).join(" · ")}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="size-7 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => deleteSnapshot(snap.date)}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          {snapshots.snapshots.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-3">
+              {snapshots.snapshots.length} snapshot{snapshots.snapshots.length !== 1 ? "s" : ""} stored.
+              Oldest: {snapshots.snapshots[0]?.date}. Latest: {snapshots.snapshots[snapshots.snapshots.length - 1]?.date}.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Data Management */}
       <Card>
