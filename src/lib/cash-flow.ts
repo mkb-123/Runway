@@ -9,7 +9,7 @@
 // - Configurable bonus payment month (was hardcoded to March)
 // - Tax applied to bonus and vesting income (was gross, overstated by ~40%)
 
-import type { HouseholdData, DeferredBonusTranche } from "@/types";
+import type { HouseholdData, DeferredBonusTranche, PersonIncome } from "@/types";
 import { annualiseOutgoing } from "@/types";
 import type { CashFlowMonth } from "@/components/charts/cash-flow-timeline";
 import { calculateTakeHomePay } from "@/lib/tax";
@@ -38,10 +38,11 @@ export function generateCashFlowTimeline(household: HouseholdData): CashFlowMont
   const startYear = now.getFullYear();
   const startMonth = now.getMonth(); // 0-indexed
 
-  // Pre-generate all deferred tranches from simplified bonus structures
-  const allTranches: DeferredBonusTranche[] = household.bonusStructures.flatMap(
-    (bonus) => generateDeferredTranches(bonus)
-  );
+  // Pre-generate all deferred tranches, tagged with personId for correct attribution
+  const tranchesByPerson = new Map<string, DeferredBonusTranche[]>();
+  for (const bonus of household.bonusStructures) {
+    tranchesByPerson.set(bonus.personId, generateDeferredTranches(bonus));
+  }
 
   const months: CashFlowMonth[] = [];
 
@@ -52,7 +53,7 @@ export function generateCashFlowTimeline(household: HouseholdData): CashFlowMont
 
     const salary = calculateMonthlySalaryForMonth(household, i);
     const bonus = calculateNetBonusForMonth(household, monthIdx, i);
-    const deferredVesting = calculateNetDeferredVestingForMonth(household, allTranches, year, monthIdx, i);
+    const deferredVesting = calculateNetDeferredVestingForMonth(household, tranchesByPerson, year, monthIdx, i);
     const { committed, lifestyle } = calculateOutgoingsForMonth(household, monthIdx);
 
     const totalIncome = salary + bonus + deferredVesting;
@@ -115,10 +116,10 @@ function calculateNetBonusForMonth(household: HouseholdData, monthIdx: number, m
 
 /**
  * Calculate the net (after tax and NI) amount of a bonus payment,
- * applying marginal tax on top of the person's salary.
+ * applying marginal tax on top of the person's grown salary.
  */
-function calculateNetBonusAmount(income: { grossSalary: number; employeePensionContribution: number; pensionContributionMethod: "salary_sacrifice" | "net_pay" | "relief_at_source" }, grossBonus: number, yearsElapsed: number): number {
-  const salaryGrowthRate = 0; // Already grown by caller context
+function calculateNetBonusAmount(income: PersonIncome, grossBonus: number, yearsElapsed: number): number {
+  const salaryGrowthRate = income.salaryGrowthRate ?? 0;
   const grownSalary = income.grossSalary * Math.pow(1 + salaryGrowthRate, yearsElapsed);
 
   // Tax on salary alone
@@ -138,24 +139,24 @@ function calculateNetBonusAmount(income: { grossSalary: number; employeePensionC
 
 /**
  * Check if any generated deferred tranches vest in this specific month.
+ * Uses per-person tranche map to avoid double-counting.
  * Applies marginal tax and NI to the vested amount.
  */
 function calculateNetDeferredVestingForMonth(
   household: HouseholdData,
-  tranches: DeferredBonusTranche[],
+  tranchesByPerson: Map<string, DeferredBonusTranche[]>,
   year: number,
   monthIdx: number,
   monthOffset: number
 ): number {
   let total = 0;
+  const yearsElapsed = monthOffset / 12;
 
-  // Group tranches by person (via bonus structures)
   for (const bonus of household.bonusStructures) {
     const personIncome = household.income.find((i) => i.personId === bonus.personId);
     if (!personIncome) continue;
 
-    // Find tranches for this person that vest in this month
-    const personTranches = tranches.filter((t) => {
+    const personTranches = (tranchesByPerson.get(bonus.personId) ?? []).filter((t) => {
       const vestDate = parseDate(t.vestingDate);
       return vestDate && vestDate.getFullYear() === year && vestDate.getMonth() === monthIdx;
     });
@@ -163,7 +164,6 @@ function calculateNetDeferredVestingForMonth(
     if (personTranches.length === 0) continue;
 
     const grossVesting = personTranches.reduce((sum, t) => sum + estimateVestedValue(t), 0);
-    const yearsElapsed = monthOffset / 12;
     total += calculateNetBonusAmount(personIncome, grossVesting, yearsElapsed);
   }
 
@@ -190,8 +190,7 @@ function calculateOutgoingsForMonth(
         }
         break;
       case "annually":
-        // Assume annual outgoings in January (month 0)
-        // Spread for display: show as monthly average
+        // Spread annual outgoings evenly across all months for smoother display
         committed += annualised / 12;
         break;
     }

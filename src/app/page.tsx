@@ -438,13 +438,17 @@ export default function Home() {
     return inc > 0 ? (totalContrib / inc) * 100 : 0;
   }, [household]);
 
-  const fireProgress = useMemo(() => {
-    const req = calculateAdjustedRequiredPot(
+  const requiredPotForFIRE = useMemo(() =>
+    calculateAdjustedRequiredPot(
       household.retirement.targetAnnualIncome, household.retirement.withdrawalRate,
       household.retirement.includeStatePension, totalStatePensionAnnual
-    );
-    return req > 0 ? (totalNetWorth / req) * 100 : 0;
-  }, [household.retirement, totalNetWorth, totalStatePensionAnnual]);
+    ), [household.retirement, totalStatePensionAnnual]);
+
+  // FIRE progress respects person-view selection
+  const fireProgress = useMemo(() => {
+    const viewNetWorth = selectedView === "household" ? totalNetWorth : filteredNetWorth;
+    return requiredPotForFIRE > 0 ? (viewNetWorth / requiredPotForFIRE) * 100 : 0;
+  }, [requiredPotForFIRE, totalNetWorth, filteredNetWorth, selectedView]);
 
   // --- Base metrics for what-if comparison ---
   const baseSavingsRate = useMemo(() => {
