@@ -145,6 +145,9 @@ function Section({
 
 // --- Range Slider with Value ---
 
+// BUG-007: All form inputs must have htmlFor/id linkage for WCAG compliance
+let rangeIdCounter = 0;
+
 function RangeInput({
   label,
   value,
@@ -154,6 +157,7 @@ function RangeInput({
   current,
   format,
   onChange,
+  id: externalId,
 }: {
   label: string;
   value: number;
@@ -163,17 +167,20 @@ function RangeInput({
   current: number;
   format: (v: number) => string;
   onChange: (v: number) => void;
+  id?: string;
 }) {
+  const inputId = externalId ?? `range-input-${++rangeIdCounter}`;
   const changed = value !== current;
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label className="text-xs text-muted-foreground">{label}</Label>
+        <Label htmlFor={inputId} className="text-xs text-muted-foreground">{label}</Label>
         <span className={`text-sm font-medium tabular-nums ${changed ? "text-primary" : ""}`}>
           {format(value)}
         </span>
       </div>
       <input
+        id={inputId}
         type="range"
         min={min}
         max={max}
