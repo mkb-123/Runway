@@ -52,6 +52,7 @@ import { annualiseOutgoing, getHouseholdGrossIncome, OUTGOING_CATEGORY_LABELS, O
 import { TAX_WRAPPER_LABELS } from "@/types";
 import type { TaxWrapper, HeroMetricType } from "@/types";
 import { calculateTotalAnnualContributions, calculateHouseholdStatePension } from "@/lib/aggregations";
+import { calculateCashRunway } from "@/lib/cash-flow";
 
 import { NetWorthTrajectoryChart } from "@/components/charts/net-worth-trajectory";
 import { ByPersonChart } from "@/components/charts/by-person-chart";
@@ -81,6 +82,7 @@ interface HeroMetricData {
   totalAnnualCommitments: number;
   projectedRetirementIncome: number;
   projectedRetirementIncomeStatePension: number;
+  cashRunway: number;
 }
 
 interface ResolvedMetric {
@@ -203,6 +205,19 @@ function resolveMetric(
         color: "",
         icon: Sunrise,
       };
+    case "cash_runway": {
+      const months = data.cashRunway;
+      const color = months < 6 ? "text-red-600 dark:text-red-400" : months < 12 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
+      return {
+        label: "Cash Runway",
+        value: months >= 999 ? "∞" : `${months.toFixed(1)}mo`,
+        rawValue: months,
+        format: (n: number) => n >= 999 ? "∞" : `${n.toFixed(1)}mo`,
+        subtext: "of total outgoings covered",
+        color,
+        icon: Shield,
+      };
+    }
   }
 }
 
@@ -502,6 +517,10 @@ export default function Home() {
     };
   }, [baseHousehold, baseTotalNetWorth, baseStatePensionAnnual]);
 
+  // --- Cash runway ---
+  const cashRunway = useMemo(() => calculateCashRunway(household), [household]);
+  const baseCashRunway = useMemo(() => calculateCashRunway(baseHousehold), [baseHousehold]);
+
   // --- Hero data ---
   const heroData: HeroMetricData = useMemo(
     () => ({
@@ -519,6 +538,7 @@ export default function Home() {
       totalAnnualCommitments,
       projectedRetirementIncome,
       projectedRetirementIncomeStatePension,
+      cashRunway,
     }),
     [
       totalNetWorth, filteredNetWorth, selectedView, cashPosition,
@@ -526,6 +546,7 @@ export default function Home() {
       retirementCountdownYears, retirementCountdownMonths,
       savingsRate, fireProgress, totalAnnualCommitments,
       projectedRetirementIncome, projectedRetirementIncomeStatePension,
+      cashRunway,
     ]
   );
 
@@ -546,6 +567,7 @@ export default function Home() {
       totalAnnualCommitments: baseCommitments,
       projectedRetirementIncome: baseProjectedRetirementIncome,
       projectedRetirementIncomeStatePension: baseProjectedRetirementIncomeStatePension,
+      cashRunway: baseCashRunway,
     }),
     [
       baseTotalNetWorth, baseFilteredNetWorth, selectedView, baseCashPosition,
@@ -553,6 +575,7 @@ export default function Home() {
       baseRetCountdownYears, baseRetCountdownMonths,
       baseSavingsRate, baseFireProgress, baseCommitments,
       baseProjectedRetirementIncome, baseProjectedRetirementIncomeStatePension,
+      baseCashRunway,
     ]
   );
 

@@ -68,6 +68,8 @@ export interface BonusStructure {
   vestingGapYears: number;
   /** Expected annual return on deferred amounts while vesting */
   estimatedAnnualReturn: number;
+  /** Month cash bonus is paid (0=Jan, 1=Feb, ..., 11=Dec). Defaults to 2 (March). */
+  bonusPaymentMonth?: number;
 }
 
 /** Derived: deferred portion = total - cash (never negative) */
@@ -199,6 +201,11 @@ export type CommittedOutgoingCategory =
   | "rent"
   | "childcare"
   | "insurance"
+  | "utilities"
+  | "subscriptions"
+  | "transport"
+  | "health"
+  | "loan_repayment"
   | "other";
 
 export type OutgoingFrequency = "monthly" | "termly" | "annually";
@@ -222,6 +229,11 @@ export const OUTGOING_CATEGORY_LABELS: Record<CommittedOutgoingCategory, string>
   rent: "Rent",
   childcare: "Childcare",
   insurance: "Insurance",
+  utilities: "Utilities",
+  subscriptions: "Subscriptions",
+  transport: "Transport",
+  health: "Health",
+  loan_repayment: "Loan Repayment",
   other: "Other",
 };
 
@@ -254,7 +266,8 @@ export type HeroMetricType =
   | "savings_rate"
   | "fire_progress"
   | "net_worth_after_commitments"
-  | "projected_retirement_income";
+  | "projected_retirement_income"
+  | "cash_runway";
 
 export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   net_worth: "Total Net Worth",
@@ -266,6 +279,7 @@ export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
   fire_progress: "FIRE Progress",
   net_worth_after_commitments: "Net Worth After Commitments",
   projected_retirement_income: "Projected Retirement Income",
+  cash_runway: "Cash Runway",
 };
 
 export interface DashboardConfig {
