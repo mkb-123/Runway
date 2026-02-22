@@ -167,3 +167,47 @@ Employment pension contributions are fixed at today's amount even when salaryGro
 The `calculateCashRunway` function uses all household accounts regardless of person-view selection. When viewing a single person's dashboard, cash runway should reflect only that person's liquid assets.
 
 ---
+
+### FEAT-019: Saved scenario descriptions and preview [MEDIUM]
+
+**Status:** OPEN
+**Reported by:** HNW Customer (James), HNW Customer (Priya)
+**Files:** `src/context/scenario-context.tsx`, `src/components/scenario-panel.tsx`
+
+Saved scenarios show only the name (e.g. "Custom Scenario") with no description of what changed. Auto-generate a human-readable summary from `ScenarioOverrides` (e.g. "Tom salary: £80k → £30k, Market: -30%"). Show impact preview (net worth delta) without needing to fully load the scenario.
+
+---
+
+### FEAT-020: Life-stage dashboard metrics (school fees, pension bridge, next bonus) [MEDIUM]
+
+**Status:** OPEN
+**Reported by:** HNW Customer (James), HNW Customer (Priya)
+**Files:** `src/app/page.tsx`, `src/types/index.ts`
+
+Expand `HeroMetricType` with life-stage-appropriate metrics:
+- **School fee countdown** — years until last child finishes (Priya)
+- **Next income event** — next bonus vesting date and amount (Priya)
+- **Pension bridge gap** — years of accessible savings needed before pension access (James)
+- **Per-person retirement countdown** — separate countdowns for each person (James)
+
+---
+
+### FEAT-021: Scenario-aware recommendations diff [MEDIUM]
+
+**Status:** OPEN
+**Reported by:** HNW Customer (James), HNW Customer (Priya)
+**Files:** `src/app/page.tsx`, `src/lib/recommendations.ts`
+
+When a scenario is applied, the recommendations engine already re-runs against scenario data (line 384-387 of page.tsx). But there is no visual diff between base and scenario recommendations. Add "New in this scenario" / "Resolved by this scenario" badges to show which recommendations changed and why.
+
+---
+
+### FEAT-022: Multi-year time-phased scenarios [HIGH]
+
+**Status:** OPEN
+**Reported by:** HNW Customer (James), HNW Customer (Priya)
+**Files:** `src/context/scenario-context.tsx`, `src/lib/scenario.ts`
+
+Scenarios are static snapshots — overrides apply to current data instantly with no concept of time. James wants "retire at 57, keep saving until then, then draw down." Priya wants "Tom earns 30k for 2 years then recovers." Needs a scenario timeline allowing overrides at specific dates or age milestones.
+
+---
