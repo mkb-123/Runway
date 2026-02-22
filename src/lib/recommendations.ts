@@ -560,16 +560,25 @@ export function generateRecommendations(
       recommendations.push(...analyze(ctx));
     }
 
-    // FEAT-014: Coordinate ISA usage — deduct ISA top-up from available allowance for Bed & ISA
+    // FEAT-014 + James feedback: Coordinate ISA usage — Bed & ISA takes priority over
+    // generic ISA top-up because it achieves both goals (shelter gains + use ISA allowance).
     const isaUsed = personContributions.isaContribution;
     const isaRemaining = UK_TAX_CONSTANTS.isaAnnualAllowance - isaUsed;
-    // If we already recommended ISA top-up, the Bed & ISA gets what's left (zero, to avoid exceeding allowance)
-    // If the ISA recommendation exists, it claims the remaining allowance — Bed & ISA gets nothing extra
-    const isaRecommendation = recommendations.find(
-      (r) => (r.id === `isa-topup-${person.id}` || r.id === `isa-unused-${person.id}`)
-    );
-    const isaRemainingForBedAndIsa = isaRecommendation ? 0 : isaRemaining;
-    recommendations.push(...analyzeBedAndISA(ctx, isaRemainingForBedAndIsa));
+
+    // Try Bed & ISA first (it uses the ISA allowance more effectively when gains exist)
+    const bedAndIsaRecs = analyzeBedAndISA(ctx, isaRemaining);
+    recommendations.push(...bedAndIsaRecs);
+
+    // If Bed & ISA claimed the ISA allowance, suppress generic ISA top-up to avoid exceeding allowance
+    if (bedAndIsaRecs.length > 0) {
+      // Remove any ISA top-up recommendations for this person (Bed & ISA covers ISA usage)
+      const isaTopUpIdx = recommendations.findIndex(
+        (r) => r.id === `isa-topup-${person.id}` || r.id === `isa-unused-${person.id}`
+      );
+      if (isaTopUpIdx !== -1) {
+        recommendations.splice(isaTopUpIdx, 1);
+      }
+    }
   }
 
   // Household-level analysis

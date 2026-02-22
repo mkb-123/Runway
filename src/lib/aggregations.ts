@@ -84,6 +84,25 @@ export function calculateTotalAnnualContributions(
 }
 
 /**
+ * Calculate personal annual contributions (excluding employer pension contributions).
+ * Shows the individual's discretionary savings effort.
+ */
+export function calculatePersonalAnnualContributions(
+  contributions: Contribution[],
+  income: PersonIncome[]
+): number {
+  const discretionary = contributions.reduce(
+    (sum, c) => sum + annualiseContribution(c.amount, c.frequency),
+    0
+  );
+  const employeePension = income.reduce(
+    (sum, i) => sum + i.employeePensionContribution,
+    0
+  );
+  return discretionary + employeePension;
+}
+
+/**
  * Calculate the household's total annual state pension entitlement.
  * Pro-rates based on each person's NI qualifying years.
  */
