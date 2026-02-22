@@ -474,7 +474,7 @@ Single source of truth. Never hardcode rates elsewhere.
 
 | File | Hook | State | Persistence |
 |------|------|-------|-------------|
-| `data-context.tsx` | `useData()` | `household`, `snapshots`, `isHydrated` + mutations (`updateHousehold`, `resetToDefaults`, etc.) + computed helpers (`getTotalNetWorth`, `getNetWorthByPerson`, etc.) | localStorage: `nw-household`, `nw-snapshots` |
+| `data-context.tsx` | `useData()` | `household`, `snapshots`, `isHydrated` + mutations (`updateHousehold`, `takeSnapshot`, `deleteSnapshot`, `resetToDefaults`, etc.) + computed helpers (`getTotalNetWorth`, `getNetWorthByPerson`, etc.) + auto-snapshot on every `updateHousehold` call | localStorage: `nw-household`, `nw-snapshots` |
 | `scenario-context.tsx` | `useScenario()` | `isScenarioMode`, `overrides`, `savedScenarios[]` + `enableScenario()`, `applyOverrides()` | localStorage: `nw-saved-scenarios` |
 | `person-view-context.tsx` | `usePersonView()` | `selectedView` (household or personId), `isHouseholdView` | Session only |
 | `privacy-context.tsx` | `usePrivacy()` | `blurred`, `toggle()` — auto-blur after 5min, default blur if >24h stale, Ctrl+Shift+B | localStorage: `nw-privacy-blurred`, `nw-last-visit` |
