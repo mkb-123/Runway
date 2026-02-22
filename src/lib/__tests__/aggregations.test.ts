@@ -29,7 +29,7 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
     emergencyFund: { monthlyEssentialExpenses: 3000, targetMonths: 6, monthlyLifestyleSpending: 1500 },
     iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
     committedOutgoings: [],
-    dashboardConfig: { heroMetrics: ["net_worth"] },
+    dashboardConfig: { heroMetrics: ["projected_retirement_income"] },
     ...overrides,
   };
 }

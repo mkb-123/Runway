@@ -23,6 +23,8 @@ interface NetWorthTrajectoryChartProps {
   snapshots: NetWorthSnapshot[];
   scenarios: ScenarioProjection[];
   milestones?: MilestoneMarker[];
+  /** Year when the mid-scenario projection crosses the FIRE target. Rendered as a vertical dashed marker. */
+  retirementTargetYear?: number | null;
 }
 
 const SCENARIO_COLORS = [
@@ -37,6 +39,7 @@ export function NetWorthTrajectoryChart({
   snapshots,
   scenarios,
   milestones = [],
+  retirementTargetYear = null,
 }: NetWorthTrajectoryChartProps) {
   // Build unified data array: historical snapshots + projected future years
   // Historical points use the snapshot date's year as the label
@@ -135,7 +138,7 @@ export function NetWorthTrajectoryChart({
           />
           <Legend />
 
-          {/* Milestone reference lines */}
+          {/* Milestone reference lines (horizontal) */}
           {milestones.map((m) => (
             <ReferenceLine
               key={m.label}
@@ -150,6 +153,22 @@ export function NetWorthTrajectoryChart({
               }}
             />
           ))}
+
+          {/* Retirement target year — vertical marker at the year mid-scenario crosses FIRE target */}
+          {retirementTargetYear != null && (
+            <ReferenceLine
+              x={retirementTargetYear.toString()}
+              stroke="var(--primary)"
+              strokeDasharray="5 3"
+              strokeWidth={1.5}
+              label={{
+                value: `Target ~${retirementTargetYear}`,
+                position: "insideTopLeft",
+                fontSize: 11,
+                fill: "var(--primary)",
+              }}
+            />
+          )}
 
           {/* Historical line */}
           <Line

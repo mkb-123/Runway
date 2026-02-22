@@ -138,7 +138,7 @@ describe("migrateHouseholdData", () => {
       expect(migrated.committedOutgoings).toEqual([]);
     });
 
-    it("adds default dashboardConfig if missing", () => {
+    it("adds default dashboardConfig with 5 hero metrics if missing", () => {
       const data = {
         contributions: [],
         emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
@@ -146,7 +146,9 @@ describe("migrateHouseholdData", () => {
 
       const migrated = migrateHouseholdData(data);
       const dc = migrated.dashboardConfig as Record<string, unknown>;
-      expect(dc.heroMetrics).toEqual(["net_worth", "cash_position", "retirement_countdown"]);
+      expect(dc.heroMetrics).toEqual([
+        "projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway",
+      ]);
     });
   });
 
@@ -166,6 +168,115 @@ describe("migrateHouseholdData", () => {
       expect(contributions).toHaveLength(4);
       expect(contributions.filter((c) => c.personId === "p1")).toHaveLength(2);
       expect(contributions.filter((c) => c.personId === "p2")).toHaveLength(2);
+    });
+  });
+
+  describe("person field defaults (migration 6)", () => {
+    it("back-fills pensionAccessAge and stateRetirementAge if missing", () => {
+      const legacy = {
+        persons: [
+          { id: "p1", name: "Alice", relationship: "self", dateOfBirth: "1980-01-01", plannedRetirementAge: 60 },
+        ],
+        contributions: [],
+        emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+      };
+
+      const migrated = migrateHouseholdData(legacy);
+      const persons = migrated.persons as Array<Record<string, unknown>>;
+      expect(persons[0].pensionAccessAge).toBe(57);
+      expect(persons[0].stateRetirementAge).toBe(67);
+    });
+
+    it("preserves existing pensionAccessAge and stateRetirementAge", () => {
+      const current = {
+        persons: [
+          {
+            id: "p1",
+            name: "Bob",
+            relationship: "self",
+            dateOfBirth: "1975-06-01",
+            plannedRetirementAge: 55,
+            pensionAccessAge: 55,
+            stateRetirementAge: 68,
+            niQualifyingYears: 35,
+            studentLoanPlan: "plan1",
+          },
+        ],
+        contributions: [],
+        emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+      };
+
+      const migrated = migrateHouseholdData(current);
+      const persons = migrated.persons as Array<Record<string, unknown>>;
+      // Custom values must be preserved (idempotent)
+      expect(persons[0].pensionAccessAge).toBe(55);
+      expect(persons[0].stateRetirementAge).toBe(68);
+    });
+
+    it("back-fills studentLoanPlan with 'none' if missing", () => {
+      const legacy = {
+        persons: [
+          { id: "p1", name: "Carol", relationship: "self", dateOfBirth: "1985-01-01" },
+        ],
+        contributions: [],
+        emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+      };
+
+      const migrated = migrateHouseholdData(legacy);
+      const persons = migrated.persons as Array<Record<string, unknown>>;
+      expect(persons[0].studentLoanPlan).toBe("none");
+    });
+  });
+
+  describe("hero metrics 5-slot expansion (migration 10)", () => {
+    it("expands old 3-item heroMetrics to 5 items", () => {
+      const data = {
+        contributions: [],
+        emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+        dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
+      };
+
+      const migrated = migrateHouseholdData(data);
+      const dc = migrated.dashboardConfig as Record<string, unknown>;
+      const metrics = dc.heroMetrics as string[];
+      expect(metrics).toHaveLength(5);
+      // net_worth replaced → projected_retirement_income in slot 0
+      expect(metrics[0]).toBe("projected_retirement_income");
+      expect(metrics[1]).toBe("cash_position");
+      expect(metrics[2]).toBe("retirement_countdown");
+      // Slots 3–4 filled with non-duplicate additions
+      expect(metrics[3]).toBe("period_change");
+      expect(metrics[4]).toBe("savings_rate");
+    });
+
+    it("is idempotent — 5-item arrays are not modified", () => {
+      const existing = ["projected_retirement_income", "period_change", "savings_rate", "retirement_countdown", "cash_runway"];
+      const data = {
+        contributions: [],
+        emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+        dashboardConfig: { heroMetrics: existing },
+      };
+
+      const migrated = migrateHouseholdData(data);
+      const dc = migrated.dashboardConfig as Record<string, unknown>;
+      expect(dc.heroMetrics).toEqual(existing);
+    });
+
+    it("respects user customisation — does not override existing slot values", () => {
+      const data = {
+        contributions: [],
+        emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },
+        dashboardConfig: { heroMetrics: ["iht_liability", "savings_rate", "cash_runway"] },
+      };
+
+      const migrated = migrateHouseholdData(data);
+      const dc = migrated.dashboardConfig as Record<string, unknown>;
+      const metrics = dc.heroMetrics as string[];
+      expect(metrics).toHaveLength(5);
+      // Original 3 preserved
+      expect(metrics.slice(0, 3)).toEqual(["iht_liability", "savings_rate", "cash_runway"]);
+      // No duplicates in the final array
+      expect(new Set(metrics).size).toBe(5);
     });
   });
 });

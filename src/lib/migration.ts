@@ -37,6 +37,7 @@ export function migrateHouseholdData(raw: Record<string, unknown>): Record<strin
   data = migrateDeferredBonusSimplified(data);
   data = migrateChildrenDefault(data);
   data = migrateBonusTotalModel(data);
+  data = migrateHeroMetricsFiveSlots(data);
   return data;
 }
 
@@ -163,12 +164,17 @@ function migrateDashboardConfigDefault(data: Record<string, unknown>): Record<st
   if (data.dashboardConfig && typeof data.dashboardConfig === "object") return data;
   return {
     ...data,
-    dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
+    dashboardConfig: {
+      heroMetrics: ["projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway"],
+    },
   };
 }
 
 /**
- * Migration 6: Add plannedRetirementAge and default niQualifyingYears to persons
+ * Migration 6: Add default values for person fields added over time.
+ * Handles: plannedRetirementAge, niQualifyingYears, studentLoanPlan,
+ *          pensionAccessAge, stateRetirementAge.
+ * All checks are idempotent — already-set values are preserved.
  */
 function migratePersonDefaults(data: Record<string, unknown>): Record<string, unknown> {
   const persons = data.persons;
@@ -179,14 +185,25 @@ function migratePersonDefaults(data: Record<string, unknown>): Record<string, un
     const person = p as Record<string, unknown>;
     const result = { ...person };
 
-    // Default plannedRetirementAge if missing
     if (typeof result.plannedRetirementAge !== "number") {
       result.plannedRetirementAge = 60;
     }
 
-    // Default niQualifyingYears to full if missing
     if (typeof result.niQualifyingYears !== "number") {
       result.niQualifyingYears = 35;
+    }
+
+    if (typeof result.studentLoanPlan !== "string") {
+      result.studentLoanPlan = "none";
+    }
+
+    // pensionAccessAge and stateRetirementAge were added later — back-fill UK defaults
+    if (typeof result.pensionAccessAge !== "number") {
+      result.pensionAccessAge = 57;
+    }
+
+    if (typeof result.stateRetirementAge !== "number") {
+      result.stateRetirementAge = 67;
     }
 
     return result;
@@ -313,4 +330,39 @@ function migrateBonusTotalModel(data: Record<string, unknown>): Record<string, u
   });
 
   return { ...data, bonusStructures: updated };
+}
+
+/**
+ * Migration 10: Expand heroMetrics to 5 slots + replace removed "net_worth" metric.
+ *
+ * "net_worth" was removed as a hero metric type (it is a lagging indicator with no
+ * goal orientation). Any occurrence is replaced with "projected_retirement_income".
+ *
+ * Arrays shorter than 5 slots are filled with useful defaults (no duplicates).
+ */
+function migrateHeroMetricsFiveSlots(data: Record<string, unknown>): Record<string, unknown> {
+  const config = data.dashboardConfig;
+  if (typeof config !== "object" || config === null) return data;
+  const dc = config as Record<string, unknown>;
+  const metrics = dc.heroMetrics;
+  if (!Array.isArray(metrics)) return data;
+
+  // Step 1: Replace removed "net_worth" with "projected_retirement_income"
+  let working: string[] = metrics.map((m) => m === "net_worth" ? "projected_retirement_income" : m);
+
+  // Step 2: Deduplicate (e.g. if "net_worth" was slot 0 and "projected_retirement_income" was slot 1)
+  working = working.filter((m, i, arr) => arr.indexOf(m) === i);
+
+  // Step 3: Expand to 5 slots if needed
+  if (working.length < 5) {
+    const additions = ["period_change", "projected_retirement_income", "savings_rate", "retirement_countdown", "cash_position"];
+    for (const candidate of additions) {
+      if (working.length >= 5) break;
+      if (!working.includes(candidate)) working.push(candidate);
+    }
+  }
+
+  // Only write back if changed
+  if (JSON.stringify(working) === JSON.stringify(metrics)) return data;
+  return { ...data, dashboardConfig: { ...dc, heroMetrics: working } };
 }

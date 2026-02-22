@@ -55,10 +55,12 @@ export const PersonSchema = z.object({
   relationship: RelationshipSchema,
   dateOfBirth: z.string(),
   plannedRetirementAge: z.number().int().min(0).max(120).default(60),
-  pensionAccessAge: z.number().int().min(0).max(120),
-  stateRetirementAge: z.number().int().min(0).max(120),
+  // Default 57: minimum pension access age from April 2028 (was 55, rises to 57)
+  pensionAccessAge: z.number().int().min(0).max(120).default(57),
+  // Default 67: current state pension age for those born after April 1960
+  stateRetirementAge: z.number().int().min(0).max(120).default(67),
   niQualifyingYears: z.number().int().min(0).max(100).default(35),
-  studentLoanPlan: StudentLoanPlanSchema,
+  studentLoanPlan: StudentLoanPlanSchema.default("none"),
 });
 
 export const AccountSchema = z.object({
@@ -98,6 +100,7 @@ export const PersonIncomeSchema = z.object({
   pensionContributionMethod: PensionContributionMethodSchema,
   salaryGrowthRate: z.number().min(-0.5).max(0.5).optional(),
   bonusGrowthRate: z.number().min(-0.5).max(0.5).optional(),
+  priorYearPensionContributions: z.array(z.number().min(0)).max(3).optional(),
 });
 
 // --- Contributions & Planning ---
@@ -173,7 +176,6 @@ export const CommittedOutgoingSchema = z.object({
 // --- Dashboard Configuration ---
 
 export const HeroMetricTypeSchema = z.enum([
-  "net_worth",
   "cash_position",
   "retirement_countdown",
   "period_change",
@@ -183,10 +185,14 @@ export const HeroMetricTypeSchema = z.enum([
   "net_worth_after_commitments",
   "projected_retirement_income",
   "cash_runway",
+  "school_fee_countdown",
+  "pension_bridge_gap",
+  "per_person_retirement",
+  "iht_liability",
 ]);
 
 export const DashboardConfigSchema = z.object({
-  heroMetrics: z.tuple([HeroMetricTypeSchema, HeroMetricTypeSchema, HeroMetricTypeSchema]),
+  heroMetrics: z.array(HeroMetricTypeSchema).min(1).max(5),
 });
 
 // --- IHT ---
@@ -243,7 +249,7 @@ export const HouseholdDataSchema = z.object({
   emergencyFund: EmergencyFundConfigSchema,
   committedOutgoings: z.array(CommittedOutgoingSchema).default([]),
   dashboardConfig: DashboardConfigSchema.default({
-    heroMetrics: ["net_worth", "cash_position", "retirement_countdown"],
+    heroMetrics: ["projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway"],
   }),
   iht: IHTConfigSchema,
 });

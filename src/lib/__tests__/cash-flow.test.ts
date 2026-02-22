@@ -68,7 +68,7 @@ function buildMinimalHousehold(overrides?: {
     },
     committedOutgoings: [],
     dashboardConfig: {
-      heroMetrics: ["net_worth", "fire_progress", "retirement_countdown"],
+      heroMetrics: ["projected_retirement_income", "fire_progress", "retirement_countdown"],
     },
   };
 }

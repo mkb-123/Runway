@@ -51,7 +51,7 @@ const navGroups = [
       { href: "/projections", label: "Projections", icon: TrendingUp },
       { href: "/retirement", label: "Retirement", icon: Sunset },
       { href: "/tax-planning", label: "Tax Planning", icon: Calculator },
-      { href: "/iht", label: "IHT", icon: Shield },
+      { href: "/iht", label: "Estate", icon: Shield },
     ],
   },
 ];
@@ -91,7 +91,7 @@ export function Navigation() {
         <nav className="hidden flex-1 items-center gap-0.5 overflow-x-auto lg:flex">
           {navGroups.map((group) => (
             <div key={group.label} className="flex items-center">
-              <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+              <span className="mr-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/90">
                 {group.label}
               </span>
               {group.links.map((link) => {

@@ -3,18 +3,18 @@
 ## Team Structure
 
 ```
-                       ┌─────────────────────┐
-                       │   TEAM LEAD (Claude) │
-                       │  Final decision maker│
-                       └─────────┬───────────┘
-                                 │
-     ┌───────────┬───────────┬───┴────┬───────────┬───────────┬───────────┬───────────┬───────────┐
-     │           │           │        │           │           │           │           │           │
-┌────┴─────┐ ┌──┴────┐ ┌────┴───┐ ┌──┴──────┐ ┌──┴──────────┐ ┌──┴──────────┐ ┌──┴──────────┐ ┌──┴──────────┐
-│  Mobile  │ │Chart- │ │Finan-  │ │Devil's  │ │ HNW Customer│ │ HNW Customer│ │   Senior    │ │     QA      │
-│  Web     │ │  ing  │ │ cial   │ │Advocate │ │  (James)    │ │  (Priya)    │ │    Web      │ │  Engineer   │
-│ Designer │ │Expert │ │Advisor │ │         │ │             │ │             │ │  Architect  │ │   (Sam)     │
-└──────────┘ └───────┘ └────────┘ └─────────┘ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
+                                        ┌─────────────────────┐
+                                        │   TEAM LEAD (Claude) │
+                                        │  Final decision maker│
+                                        └──────────┬──────────┘
+                                                   │
+   ┌──────────┬──────────┬──────────┬─────────────┼─────────────┬──────────┬──────────┬──────────┐
+   │          │          │          │             │             │          │          │          │
+┌──┴───┐ ┌───┴──┐ ┌─────┴──┐ ┌────┴────┐ ┌──────┴──────┐ ┌───┴─────┐ ┌──┴──────┐ ┌┴────────┐ ┌┴────────┐  ┌─────────┐
+│Mobile│ │Chart │ │Finan-  │ │Devil's  │ │ HNW Customer│ │   HNW   │ │   HNW   │ │   HNW   │ │ Senior  │  │   QA    │
+│ Web  │ │Expert│ │cial    │ │Advocate │ │  (James)    │ │Customer │ │Customer │ │Customer │ │  Web    │  │Engineer │
+│Design│ │      │ │Advisor │ │         │ │             │ │ (Priya) │ │(Marcus) │ │(Eleanor)│ │Architect│  │  (Sam)  │
+└──────┘ └──────┘ └────────┘ └─────────┘ └─────────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘  └─────────┘
 ```
 
 ## When to Convene the Team
@@ -66,27 +66,37 @@ Each agent responds in character, using their defined response format:
    - Tests it against her family's situation: bonus tranches, school fees, variable household income.
    - Flags if the feature assumes stable income or retirement-first priorities.
 
-**2. Financial Advisor speaks third**
+**1c. HNW Customer (Marcus) speaks third**
+   - Reacts as an entrepreneur with non-PAYE income complexity. Does it handle illiquid equity, employer contributions, tapered allowances?
+   - Tests it against his situation: company equity, pension catch-up, exit scenario modelling.
+   - Flags if the feature assumes a standard employment relationship.
+
+**1d. HNW Customer (Eleanor) speaks fourth**
+   - Reacts as a single near-retiree managing alone. Does it assume a spouse? Does it handle DB + SIPP + state pension as separate streams?
+   - Tests it against her situation: IHT with no RNRB, drawdown depletion risk, DB timing decision.
+   - Flags if the feature ignores self-employment, estate planning depth, or single-person edge cases.
+
+**2. Financial Advisor speaks fifth**
    - Validates the user need. Is this something real clients care about?
    - Provides priority ranking (Priority 1-5).
    - Flags any regulatory or accuracy concerns.
 
-**3. Mobile Web Designer speaks fourth**
+**3. Mobile Web Designer speaks sixth**
    - Evaluates the responsive design — does it work at 375px AND 1440px?
    - Assesses touch targets, thumb zones, and interaction patterns.
    - Proposes specific responsive implementation (breakpoints, layout, components).
 
-**4. Charting Expert speaks fifth** (if charts are involved)
+**4. Charting Expert speaks seventh** (if charts are involved)
    - Audits chart type selection.
    - Recommends specific Recharts implementation.
    - Warns about visualisation anti-patterns.
 
-**5. Senior Web Architect speaks sixth**
+**5. Senior Web Architect speaks eighth**
    - Evaluates separation of concerns — is logic in the right layer?
    - Checks for inline computation, duplication, and testability.
    - Assesses overall code architecture and maintainability.
 
-**6. QA Engineer (Sam) speaks seventh**
+**6. QA Engineer (Sam) speaks ninth**
    - Hunts for cross-page inconsistencies, duplicated concepts, and confusing labels.
    - Tests edge cases: empty data, single-person households, zero values, boundary conditions.
    - Cross-references every data field across Settings and display pages.
@@ -124,6 +134,8 @@ As Team Lead, I (Claude) will:
 ### Agent Consensus
 - HNW Customer (James): [WANT / NEUTRAL / DON'T NEED] — [one line]
 - HNW Customer (Priya): [WANT / NEUTRAL / DON'T NEED] — [one line]
+- HNW Customer (Marcus): [WANT / NEUTRAL / DON'T NEED] — [one line]
+- HNW Customer (Eleanor): [WANT / NEUTRAL / DON'T NEED] — [one line]
 - Financial Advisor: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Mobile Web Designer: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Charting Expert: [SUPPORT / CONCERN / OPPOSE] — [one line]
@@ -147,9 +159,13 @@ As Team Lead, I (Claude) will:
 
 When agents disagree:
 
-1. **HNW Customers vs anyone** — If both James and Priya say "I wouldn't use this", that's a kill signal. If only one of them wants it, consider whether the feature serves a specific life-stage need. Features should solve real user problems across different household types.
+1. **HNW Customers vs anyone** — If three or more of James, Priya, Marcus, and Eleanor say "I wouldn't use this", that's a kill signal. If only one or two want it, consider whether the feature serves a specific life-stage or household-type need that is genuinely worth supporting.
 
-1a. **James vs Priya** — When they disagree, it usually reflects a life-stage difference (retirement-focused vs cash-flow-focused). The right answer is typically to support both perspectives — e.g., configurable dashboard priorities, or showing both retirement readiness and cash flow survival metrics.
+1a. **James vs Priya vs Marcus vs Eleanor** — Disagreements usually reflect life-stage or household-type differences. The right answer is typically to support multiple perspectives rather than optimise for one. Use their comparison tables to diagnose the root tension:
+   - **James** (52, married, stable): retirement timing, pension bridge, tax optimisation
+   - **Priya** (35, married with 3 kids): cash flow survival, school fees, bonus deployment
+   - **Marcus** (45, married, entrepreneur): illiquid equity, pension catch-up, exit scenarios
+   - **Eleanor** (59, single, no children): IHT with no RNRB, SIPP drawdown to 90, estate distribution
 
 2. **Financial Advisor vs Mobile Web Designer** — If the advisor says users need it but the designer says it's cluttered: find a progressive disclosure solution (show summary, let users drill in).
 

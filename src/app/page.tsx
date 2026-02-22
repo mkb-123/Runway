@@ -9,7 +9,6 @@ import {
   X,
   Lightbulb,
   ArrowRight,
-  Wallet2,
   Banknote,
   Clock,
   BarChart3,
@@ -89,15 +88,6 @@ function resolveMetric(
   data: HeroMetricData
 ): ResolvedMetric {
   switch (type) {
-    case "net_worth":
-      return {
-        label: data.isPersonView ? "Net Worth (Personal)" : "Net Worth",
-        value: formatCurrencyCompact(data.totalNetWorth),
-        rawValue: data.totalNetWorth,
-        format: formatCurrencyCompact,
-        color: "",
-        icon: Wallet2,
-      };
     case "cash_position":
       return {
         label: "Cash Position",
@@ -209,16 +199,16 @@ function resolveMetric(
         icon: Target,
       };
     case "net_worth_after_commitments":
-      // REC-K: Show as "years of coverage" instead of misleading subtraction
+      // REC-K: "years of net worth vs annual outgoings"
       return {
-        label: "Commitment Coverage",
+        label: "Commitments Covered",
         value: data.commitmentCoverageYears >= 999
           ? "N/A"
           : `${data.commitmentCoverageYears.toFixed(1)}yr`,
         rawValue: data.commitmentCoverageYears,
         format: (n: number) => n >= 999 ? "N/A" : `${n.toFixed(1)}yr`,
         subtext: data.totalAnnualCommitments > 0
-          ? `${formatCurrencyCompact(data.totalNetWorth)} covers ${formatCurrencyCompact(data.totalAnnualCommitments)}/yr`
+          ? `yrs net worth covers ${formatCurrencyCompact(data.totalAnnualCommitments)}/yr outgoings`
           : "No committed outgoings",
         color: data.commitmentCoverageYears >= 15
           ? "text-emerald-600 dark:text-emerald-400"
@@ -257,7 +247,7 @@ function resolveMetric(
       // QA-4: Show "No outgoings" instead of green "∞" when nothing configured
       if (!data.hasOutgoings) {
         return {
-          label: "Cash Runway",
+          label: "Cash Cushion",
           value: "N/A",
           rawValue: 0,
           format: () => "N/A",
@@ -266,13 +256,13 @@ function resolveMetric(
           icon: Shield,
         };
       }
-      const color = months < 6 ? "text-red-600 dark:text-red-400" : months < 12 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
+      const color = months < 3 ? "text-red-600 dark:text-red-400" : months < 6 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
       return {
-        label: "Cash Runway",
+        label: "Cash Cushion",
         value: `${months.toFixed(1)}mo`,
         rawValue: months,
         format: (n: number) => `${n.toFixed(1)}mo`,
-        subtext: "of total outgoings covered",
+        subtext: "months of outgoings if income stopped",
         color,
         icon: Shield,
       };
@@ -328,6 +318,34 @@ function resolveMetric(
         icon: Clock,
       };
     }
+    case "iht_liability": {
+      const liability = data.ihtLiability;
+      return {
+        label: "IHT Liability",
+        value: liability <= 0 ? "£0" : formatCurrencyCompact(liability),
+        rawValue: liability,
+        format: (n: number) => n <= 0 ? "£0" : formatCurrencyCompact(n),
+        subtext: liability <= 0 ? "Below IHT threshold" : "estimated on current estate",
+        color: liability > 500_000
+          ? "text-red-600 dark:text-red-400"
+          : liability > 100_000
+            ? "text-amber-600 dark:text-amber-400"
+            : liability <= 0
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "",
+        icon: Shield,
+      };
+    }
+    // Safety fallback — "net_worth" removed in migration 10; handles stale localStorage
+    default:
+      return {
+        label: "Retirement Income",
+        value: `${formatCurrencyCompact(data.projectedRetirementIncome)}/yr`,
+        rawValue: data.projectedRetirementIncome,
+        format: (n: number) => `${formatCurrencyCompact(n)}/yr`,
+        color: "",
+        icon: Sunrise,
+      };
   }
 }
 
@@ -576,8 +594,7 @@ export default function Home() {
     const priorityOrder: Record<RecommendationPriority, number> = { high: 0, medium: 1, low: 2 };
     return recs
       .map((r) => ({ rec: r, urgency: getRecommendationUrgency(r.id) }))
-      .sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || priorityOrder[a.rec.priority] - priorityOrder[b.rec.priority])
-      .map((r) => r);
+      .sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || priorityOrder[a.rec.priority] - priorityOrder[b.rec.priority]);
   }, [recommendations, selectedView, household.persons, dismissedIds]);
 
   // REC-D: Cap mobile recommendations — show 2 by default, expand for more
@@ -593,7 +610,7 @@ export default function Home() {
     [household.persons]
   );
 
-  const { scenarios, scenarioRates, projectionYears, milestones } = useMemo(() => {
+  const { scenarios, scenarioRates, projectionYears, milestones, retirementTargetYear } = useMemo(() => {
     const monthlyContrib = calculateTotalAnnualContributions(household.contributions, household.income) / 12;
     const rates = household.retirement.scenarioRates;
     const years = 30;
@@ -607,7 +624,21 @@ export default function Home() {
       { label: "\u00A31m", value: 1_000_000 },
       { label: "\u00A32m", value: 2_000_000 },
     ].filter((m) => m.value > 0);
-    return { scenarios: projScenarios, scenarioRates: rates, projectionYears: years, milestones: ms };
+
+    // Find the year the mid-scenario crosses the FIRE target (vertical marker on chart)
+    const currentYear = new Date().getFullYear();
+    let retirementTargetYear: number | null = null;
+    if (targetPot > 0 && projScenarios.length > 0) {
+      const midScenario = projScenarios[Math.floor(projScenarios.length / 2)];
+      for (let i = 0; i < midScenario.projections.length; i++) {
+        if (midScenario.projections[i].value >= targetPot) {
+          retirementTargetYear = currentYear + i + 1;
+          break;
+        }
+      }
+    }
+
+    return { scenarios: projScenarios, scenarioRates: rates, projectionYears: years, milestones: ms, retirementTargetYear };
   }, [household, totalNetWorth, totalStatePensionAnnual]);
 
   // =============================================
@@ -686,8 +717,8 @@ export default function Home() {
         </p>
       </div>
 
-      {/* Getting Started */}
-      {(!bannerDismissed || household.persons.length === 0) && (
+      {/* Getting Started — always shown when no accounts exist, otherwise dismissible */}
+      {(!bannerDismissed || household.persons.length === 0 || household.accounts.length === 0) && (
         <div className="relative rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
           <button
             onClick={dismissBanner}
@@ -870,7 +901,7 @@ export default function Home() {
                           {metric.trend === "down" && <TrendingDown className="size-4 text-red-500" />}
                         </div>
                         {metric.subtext && (
-                          <span className="mt-0.5 block text-[11px] text-muted-foreground truncate">{metric.subtext}</span>
+                          <span className="mt-0.5 block text-[11px] text-muted-foreground line-clamp-2">{metric.subtext}</span>
                         )}
                       </CardContent>
                     </Card>
@@ -882,54 +913,32 @@ export default function Home() {
         );
       })()}
 
-      {/* REC-E: Next Cash Events strip */}
+      {/* REC-E: Next Cash Events strip — links to Income page for detail */}
       {cashEvents.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-muted-foreground/10 bg-muted/30 px-4 py-3">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <CalendarDays className="size-4 text-muted-foreground" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Next Events</span>
-          </div>
-          {cashEvents.slice(0, 3).map((event, i) => (
-            <div key={i} className="flex items-center gap-2 text-sm">
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(event.date)}
-              </span>
-              <span className="text-xs">{event.label}</span>
-              <span className={`text-xs font-semibold tabular-nums ${event.type === "inflow" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                {event.type === "inflow" ? "+" : ""}{formatCurrencyCompact(Math.abs(event.amount))}
-              </span>
+        <Link href="/income" className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-muted-foreground/10 bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <CalendarDays className="size-4 text-muted-foreground" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Next Events</span>
             </div>
-          ))}
-        </div>
+            {cashEvents.slice(0, 3).map((event, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(event.date)}
+                </span>
+                <span className="text-xs">{event.label}</span>
+                <span className={`text-xs font-semibold tabular-nums ${event.type === "inflow" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                  {event.type === "inflow" ? "+" : ""}{formatCurrencyCompact(Math.abs(event.amount))}
+                </span>
+              </div>
+            ))}
+            <ArrowRight className="ml-auto size-3.5 text-muted-foreground shrink-0" />
+          </div>
+        </Link>
       )}
 
-      {/* REC-D: What-If CTA — collapsed to small button after first use */}
-      {!isScenarioMode && (
-        hasUsedScenarios ? (
-          <div className="flex items-center gap-2">
-            <ScenarioPanel />
-            <span className="text-xs text-muted-foreground">Open scenario panel</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-              <FlaskConical className="size-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">What would happen if...?</p>
-              <p className="text-xs text-muted-foreground hidden sm:block">
-                Model salary changes, pension sacrifice, market crashes, or early retirement
-              </p>
-              <p className="text-xs text-muted-foreground sm:hidden">
-                Model scenarios and see the impact
-              </p>
-            </div>
-            <ScenarioPanel />
-          </div>
-        )
-      )}
-
-      {/* RECOMMENDATIONS — with urgency tiers (REC-F), capped on mobile (REC-D) */}
+      {/* RECOMMENDATIONS — with urgency tiers (REC-F), capped on mobile (REC-D)
+          Placed before charts: actionable content above exploratory content */}
       {(filteredRecommendations.length > 0 || resolvedByScenario.size > 0) && (
         <CollapsibleSection
           title="Recommendations"
@@ -1013,51 +1022,76 @@ export default function Home() {
         </CollapsibleSection>
       )}
 
-      {/* PRIMARY CHARTS */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="border-t border-t-primary/20">
-          <CardHeader>
-            <div className="flex items-baseline justify-between">
-              <CardTitle>Net Worth Trajectory</CardTitle>
-              <span className="hidden text-xs text-muted-foreground sm:inline">
-                {scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over {projectionYears}yr
-              </span>
+      {/* What-If CTA — after actionable content, before exploratory charts */}
+      {!isScenarioMode && (
+        hasUsedScenarios ? (
+          <div className="flex items-center gap-2">
+            <ScenarioPanel />
+            <span className="text-xs text-muted-foreground">Open scenario panel</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <FlaskConical className="size-5 text-primary" />
             </div>
-          </CardHeader>
-          <CardContent>
-            <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} />
-            <p className="mt-3 text-[11px] text-muted-foreground">
-              Projections are estimates, not guarantees. Capital is at risk. Past performance does not predict future returns.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-t border-t-primary/20">
-          <CardHeader>
-            <div className="flex items-baseline justify-between">
-              <CardTitle>Net Worth by Wrapper</CardTitle>
-              <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">What would happen if...?</p>
+              <p className="text-xs text-muted-foreground hidden sm:block">
+                Model salary changes, pension sacrifice, market crashes, or early retirement
+              </p>
+              <p className="text-xs text-muted-foreground sm:hidden">
+                Model scenarios and see the impact
+              </p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <WrapperSplitChart data={byWrapper} />
-          </CardContent>
-        </Card>
-      </div>
+            <ScenarioPanel />
+          </div>
+        )
+      )}
 
-      {/* SECONDARY SECTIONS */}
-      <CollapsibleSection title="Liquid vs Illiquid" summary="Accessible wealth vs locked pensions" storageKey="liquidity">
-        <Card>
-          <CardContent className="pt-6">
-            <LiquiditySplitChart accounts={filteredAccounts} />
-          </CardContent>
-        </Card>
+      {/* PRIMARY CHARTS — collapsible like all other content sections */}
+      <CollapsibleSection
+        title="Net Worth Trajectory & Allocation"
+        summary={`${scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over ${projectionYears}yr · ${wrapperSummary}`}
+        defaultOpen
+        storageKey="charts-primary"
+      >
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card className="border-t border-t-primary/20">
+            <CardHeader>
+              <div className="flex items-baseline justify-between">
+                <CardTitle>Net Worth Trajectory</CardTitle>
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  {scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over {projectionYears}yr
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} retirementTargetYear={retirementTargetYear} />
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Projections are estimates, not guarantees. Capital is at risk. Past performance does not predict future returns.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-t border-t-primary/20">
+            <CardHeader>
+              <div className="flex items-baseline justify-between">
+                <CardTitle>Net Worth by Wrapper</CardTitle>
+                <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <WrapperSplitChart data={byWrapper} />
+            </CardContent>
+          </Card>
+        </div>
       </CollapsibleSection>
 
       {selectedView === "household" && (
         <CollapsibleSection
           title="Net Worth by Person"
           summary={byPerson.map((p) => `${p.name}: ${formatCurrencyCompact(p.value)}`).join(", ")}
+          defaultOpen
           storageKey="by-person"
         >
           <Card>
@@ -1067,6 +1101,14 @@ export default function Home() {
           </Card>
         </CollapsibleSection>
       )}
+
+      <CollapsibleSection title="Liquid vs Illiquid" summary="Accessible wealth vs locked pensions" defaultOpen storageKey="liquidity">
+        <Card>
+          <CardContent className="pt-6">
+            <LiquiditySplitChart accounts={filteredAccounts} />
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {household.committedOutgoings.length > 0 && (() => {
         const categoryTotals = household.committedOutgoings.reduce<Record<string, number>>((acc, o) => {

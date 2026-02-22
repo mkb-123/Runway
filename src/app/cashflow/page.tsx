@@ -62,36 +62,14 @@ export default function CashFlowPage() {
     if (data.length === 0) return null;
 
     const currentYear = data[0];
-    const peakIncome = data.reduce((max, d) => Math.max(max, d.totalIncome), 0);
-    const peakExpenditure = data.reduce((max, d) => Math.max(max, d.totalExpenditure), 0);
 
-    // Find the first year where income drops below expenditure (the "crossover")
+    // First year where income drops below expenditure (the "crossover")
     const crossoverYear = data.find((d, i) => i > 0 && d.surplus < 0 && data[i - 1].surplus >= 0);
 
-    // Find years with shortfall
+    // All years with a shortfall
     const shortfallYears = data.filter((d) => d.surplus < 0);
 
-    // Total lifetime income and expenditure
-    const totalLifetimeIncome = data.reduce((sum, d) => sum + d.totalIncome, 0);
-    const totalLifetimeExpenditure = data.reduce((sum, d) => sum + d.totalExpenditure, 0);
-
-    // Find when employment income stops (retirement)
-    const retirementYear = data.find((d, i) => i > 0 && d.employmentIncome === 0 && data[i - 1].employmentIncome > 0);
-
-    // Find when all income runs out (including pots depleted)
-    const depletionYear = data.find((d) => d.totalIncome === 0 && d.totalExpenditure > 0);
-
-    return {
-      currentYear,
-      peakIncome,
-      peakExpenditure,
-      crossoverYear,
-      shortfallYears,
-      totalLifetimeIncome,
-      totalLifetimeExpenditure,
-      retirementYear,
-      depletionYear,
-    };
+    return { currentYear, crossoverYear, shortfallYears };
   }, [data]);
 
   // --- Base (un-overridden) metrics for what-if comparison ---
@@ -121,8 +99,9 @@ export default function CashFlowPage() {
   const baseMetrics = useMemo(() => {
     if (baseData.length === 0) return null;
     const currentYear = baseData[0];
+    const crossoverYear = baseData.find((d, i) => i > 0 && d.surplus < 0 && baseData[i - 1].surplus >= 0);
     const shortfallYears = baseData.filter((d) => d.surplus < 0);
-    return { currentYear, shortfallYears };
+    return { currentYear, crossoverYear, shortfallYears };
   }, [baseData]);
 
   // School fee timeline data (must be above early returns to satisfy rules-of-hooks)
@@ -156,6 +135,17 @@ export default function CashFlowPage() {
 
   const primaryPerson = filteredHousehold.persons.find((p) => p.relationship === "self") ?? filteredHousehold.persons[0];
   const currentAge = calculateAge(primaryPerson.dateOfBirth);
+
+  // Ages that are semantically important for the year-by-year table:
+  // retirement, pension access, state pension, crossover (if any), and last year.
+  const keyAges = new Set([
+    currentAge,
+    primaryPerson.plannedRetirementAge,
+    primaryPerson.pensionAccessAge,
+    primaryPerson.stateRetirementAge,
+    ...(metrics?.crossoverYear ? [metrics.crossoverYear.age] : []),
+    data.length > 0 ? data[data.length - 1].age : currentAge,
+  ]);
 
   return (
     <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
@@ -238,36 +228,42 @@ export default function CashFlowPage() {
             </CardContent>
           </Card>
 
-          {/* Shortfall Warning or All Clear */}
+          {/* Crossover / Coverage */}
           <Card>
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-2 mb-1.5">
                 <div className={`flex size-6 items-center justify-center rounded-md ${
-                  metrics.shortfallYears.length > 0
+                  metrics.crossoverYear != null
                     ? "bg-amber-100 dark:bg-amber-950"
+                    : metrics.shortfallYears.length > 0
+                    ? "bg-red-100 dark:bg-red-950"
                     : "bg-emerald-100 dark:bg-emerald-950"
                 }`}>
-                  {metrics.shortfallYears.length > 0
-                    ? <AlertTriangle className="size-3.5 text-amber-600 dark:text-amber-400" />
+                  {metrics.crossoverYear != null || metrics.shortfallYears.length > 0
+                    ? <AlertTriangle className={`size-3.5 ${metrics.crossoverYear != null ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`} />
                     : <Calendar className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                   }
                 </div>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {metrics.shortfallYears.length > 0 ? "Shortfall" : "Coverage"}
+                  {metrics.crossoverYear != null ? "Crossover" : metrics.shortfallYears.length > 0 ? "Shortfall" : "Coverage"}
                 </span>
               </div>
-              {metrics.shortfallYears.length > 0 ? (
+              {metrics.crossoverYear != null ? (
                 <>
                   <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-amber-600 dark:text-amber-400">
-                    <ScenarioDelta
-                      base={baseMetrics?.shortfallYears.length ?? metrics.shortfallYears.length}
-                      scenario={metrics.shortfallYears.length}
-                      format={(n) => `${Math.round(n)} yr${Math.round(n) !== 1 ? "s" : ""}`}
-                      showPercent={false}
-                    />
+                    Age {metrics.crossoverYear.age}
                   </span>
                   <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                    income below spending
+                    income first drops below spending
+                  </span>
+                </>
+              ) : metrics.shortfallYears.length > 0 ? (
+                <>
+                  <span className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-red-600 dark:text-red-400">
+                    From year 1
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                    currently spending more than income
                   </span>
                 </>
               ) : (
@@ -276,7 +272,7 @@ export default function CashFlowPage() {
                     Fully funded
                   </span>
                   <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                    income covers spending
+                    income covers spending to 95
                   </span>
                 </>
               )}
@@ -286,24 +282,23 @@ export default function CashFlowPage() {
       )}
 
       {/* Main Chart */}
-      <Card className="border-t border-t-primary/20">
-        <CardHeader>
-          <div className="flex items-baseline justify-between">
-            <CardTitle>Lifetime Cash Flow</CardTitle>
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              Real terms (today&apos;s money) at {(growthRate * 100).toFixed(0)}% growth
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <LifetimeCashFlowChart data={data} events={events} primaryPersonName={primaryPersonName} />
-          <p className="mt-3 text-[11px] text-muted-foreground">
-            Projections are estimates in today&apos;s money, not guarantees. Capital is at risk.
-            Past performance does not predict future returns. Employment income shown net of
-            tax, NI, and pension deductions.
-          </p>
-        </CardContent>
-      </Card>
+      <CollapsibleSection
+        title="Lifetime Cash Flow"
+        summary={`Real terms at ${(growthRate * 100).toFixed(0)}% growth · age ${currentAge} to 95`}
+        defaultOpen
+        storageKey="cashflow-main-chart"
+      >
+        <Card className="border-t border-t-primary/20">
+          <CardContent className="pt-6">
+            <LifetimeCashFlowChart data={data} events={events} primaryPersonName={primaryPersonName} />
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Projections are estimates in today&apos;s money, not guarantees. Capital is at risk.
+              Past performance does not predict future returns. Employment income shown net of
+              tax, NI, and pension deductions.
+            </p>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {/* School Fees — summary + timeline */}
       {hasSchoolFees && (
@@ -390,7 +385,7 @@ export default function CashFlowPage() {
               </thead>
               <tbody>
                 {data
-                  .filter((_, i) => i % 5 === 0 || i === data.length - 1)
+                  .filter((row, i) => keyAges.has(row.age) || i % 5 === 0 || i === data.length - 1)
                   .map((row) => (
                     <tr key={row.age} className="border-b border-border/50 last:border-0">
                       <td className="py-2 pr-4 font-medium tabular-nums">{row.age}</td>
