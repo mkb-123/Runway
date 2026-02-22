@@ -41,6 +41,11 @@ import { FireMetricsCard } from "@/components/retirement/fire-metrics-card";
 import { Badge } from "@/components/ui/badge";
 import { SettingsBar } from "@/components/settings-bar";
 import { ScenarioDelta } from "@/components/scenario-delta";
+import { generateDrawdownPlan, compareDrawdownStrategies } from "@/lib/drawdown";
+import type { AccountPot } from "@/lib/drawdown";
+import { DrawdownStrategyChart } from "@/components/charts/drawdown-strategy-chart";
+import { computeSuccessProbability } from "@/lib/monte-carlo";
+import { getAccountTaxWrapper } from "@/types";
 
 export default function RetirementPage() {
   // Scenario-aware data
@@ -441,6 +446,78 @@ export default function RetirementPage() {
     });
   }, [basePersons, baseAccounts, basePersonContribBreakdown, midRate, yearsToRetirement]);
 
+  // --- Drawdown strategy analysis ---
+  const drawdownPots: AccountPot[] = useMemo(() => {
+    // Build projected pots at retirement by wrapper type
+    const wrapperTotals: Record<string, number> = {};
+    for (const input of personRetirementInputs) {
+      wrapperTotals["pension"] = (wrapperTotals["pension"] ?? 0) + input.pensionPot;
+      wrapperTotals["isa"] = (wrapperTotals["isa"] ?? 0) + input.accessibleWealth;
+    }
+    // Split accessible wealth into ISA vs GIA vs cash based on current account types
+    const currentAccessible = accounts.filter(a => isAccountAccessible(a.type));
+    const totalCurrentAccessible = currentAccessible.reduce((s, a) => s + a.currentValue, 0);
+    const projectedAccessible = wrapperTotals["isa"] ?? 0;
+
+    const pots: AccountPot[] = [
+      { type: "pension", balance: wrapperTotals["pension"] ?? 0 },
+    ];
+    if (totalCurrentAccessible > 0) {
+      // Split proportionally based on current allocations
+      const isaShare = currentAccessible.filter(a => getAccountTaxWrapper(a.type) === "isa").reduce((s, a) => s + a.currentValue, 0) / totalCurrentAccessible;
+      const giaShare = currentAccessible.filter(a => getAccountTaxWrapper(a.type) === "gia").reduce((s, a) => s + a.currentValue, 0) / totalCurrentAccessible;
+      const cashShare = 1 - isaShare - giaShare;
+      pots.push({ type: "isa", balance: projectedAccessible * isaShare });
+      pots.push({ type: "gia", balance: projectedAccessible * giaShare });
+      pots.push({ type: "cash", balance: projectedAccessible * cashShare });
+    } else {
+      pots.push({ type: "isa", balance: projectedAccessible });
+    }
+    return pots;
+  }, [personRetirementInputs, accounts]);
+
+  const optimalDrawdownPlan = useMemo(
+    () => generateDrawdownPlan(
+      drawdownPots,
+      retirement.targetAnnualIncome,
+      totalStatePensionAnnual,
+      primaryPerson?.stateRetirementAge ?? 67,
+      effectiveRetirementAge,
+      95,
+      midRate,
+      "tax_optimal"
+    ),
+    [drawdownPots, retirement.targetAnnualIncome, totalStatePensionAnnual, primaryPerson, effectiveRetirementAge, midRate]
+  );
+
+  const drawdownComparison = useMemo(
+    () => compareDrawdownStrategies(
+      drawdownPots,
+      retirement.targetAnnualIncome,
+      totalStatePensionAnnual,
+      primaryPerson?.stateRetirementAge ?? 67,
+      effectiveRetirementAge,
+      95,
+      midRate
+    ),
+    [drawdownPots, retirement.targetAnnualIncome, totalStatePensionAnnual, primaryPerson, effectiveRetirementAge, midRate]
+  );
+
+  // Success probability (Monte Carlo)
+  const successProbability = useMemo(
+    () => computeSuccessProbability(
+      {
+        currentValue: currentPot,
+        annualContribution: totalAnnualContributions,
+        expectedReturn: midRate,
+        volatility: 0.15,
+        years: yearsToRetirement,
+      },
+      requiredPot
+    ),
+    [currentPot, totalAnnualContributions, midRate, yearsToRetirement, requiredPot]
+  );
+
   return (
     <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader
@@ -680,7 +757,63 @@ export default function RetirementPage() {
         />
       </CollapsibleSection>
 
-      {/* 8. Disclaimer (always at the bottom) */}
+      {/* 8. Drawdown Strategy */}
+      <CollapsibleSection
+        title="Drawdown Strategy"
+        summary={drawdownComparison.taxSaving > 0
+          ? `Tax-optimal saves ${formatCurrencyCompact(drawdownComparison.taxSaving)} in tax`
+          : "Tax-optimal drawdown sequence"}
+        storageKey="retirement-drawdown-strategy"
+        lazy
+      >
+        <Card>
+          <CardHeader>
+            <div className="flex items-baseline justify-between">
+              <CardTitle>Tax-Optimal Drawdown Sequence</CardTitle>
+              {drawdownComparison.taxSaving > 0 && (
+                <Badge variant="default" className="text-xs">
+                  Saves {formatCurrencyCompact(drawdownComparison.taxSaving)}
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Draws from GIA first (use CGT allowance), then ISA (tax-free), then pension (25% PCLS + income tax).
+              Compared to proportional drawdown across all wrappers.
+            </p>
+            <DrawdownStrategyChart plan={optimalDrawdownPlan} />
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-lg border bg-muted/30 p-3 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Tax-Optimal Tax</p>
+                <p className="text-lg font-bold tabular-nums">{formatCurrencyCompact(drawdownComparison.optimalTaxPaid)}</p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Proportional Tax</p>
+                <p className="text-lg font-bold tabular-nums">{formatCurrencyCompact(drawdownComparison.proportionalTaxPaid)}</p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Success Probability</p>
+                <p className={`text-lg font-bold tabular-nums ${
+                  successProbability >= 0.75 ? "text-emerald-600 dark:text-emerald-400" :
+                  successProbability >= 0.5 ? "text-amber-600 dark:text-amber-400" :
+                  "text-red-600 dark:text-red-400"
+                }`}>{Math.round(successProbability * 100)}%</p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pots Last To</p>
+                <p className="text-lg font-bold tabular-nums">
+                  {optimalDrawdownPlan.exhaustionAge
+                    ? `Age ${optimalDrawdownPlan.exhaustionAge}`
+                    : "95+"}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
+
+      {/* 9. Disclaimer (always at the bottom) */}
       <p className="text-xs text-muted-foreground italic">
         Capital at risk — projections are illustrative only and do not
         constitute financial advice. Figures are shown in today&apos;s money

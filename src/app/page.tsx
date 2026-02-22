@@ -641,40 +641,7 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* REC-B: School fee funding strip for school-fee households */}
-                {showSchoolFeeStrip && heroData.schoolFeeYearsRemaining > 0 && (
-                  <div className="mt-5 pt-4 border-t border-primary/10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <GraduationCap className="size-3.5 text-muted-foreground" />
-                        <span className="text-xs font-medium text-muted-foreground">School Fee Commitment</span>
-                      </div>
-                      <span className="text-xs font-bold tabular-nums">
-                        {heroData.schoolFeeYearsRemaining}yr remaining
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* REC-G: Couples snapshot for multi-person households */}
-                {household.persons.length >= 2 && selectedView === "household" && (
-                  <div className="mt-4 pt-3 border-t border-primary/10">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Users className="size-3.5 text-muted-foreground" />
-                      <span className="text-xs font-medium text-muted-foreground">At a Glance</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {heroData.perPersonRetirement.map((p) => (
-                        <div key={p.name} className="rounded-md bg-muted/40 px-3 py-2">
-                          <span className="text-xs font-medium">{p.name}</span>
-                          <span className="ml-2 text-xs tabular-nums text-muted-foreground">
-                            {p.years === 0 && p.months === 0 ? "Retired" : `${p.years}y ${p.months}m to retirement`}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* School fee strip and couples snapshot moved to dedicated sections below */}
               </CardContent>
             </Card>
 

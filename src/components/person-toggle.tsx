@@ -18,13 +18,13 @@ export function PersonToggle() {
   if (persons.length < 2) return null;
 
   const options = [
-    ...persons.map((p) => ({ id: p.id, label: p.name, short: p.name.split(" ")[0] })),
     { id: "household" as const, label: "Household", short: "All" },
+    ...persons.map((p) => ({ id: p.id, label: p.name, short: p.name.split(" ")[0] })),
   ];
 
   return (
     <div
-      className="inline-flex items-center rounded-lg bg-muted p-1 text-sm"
+      className="inline-flex items-center gap-0.5 rounded-lg border border-border/50 bg-muted/50 p-0.5 text-xs"
       role="tablist"
       aria-label="View filter"
     >
@@ -35,11 +35,11 @@ export function PersonToggle() {
           aria-selected={selectedView === opt.id}
           onClick={() => setSelectedView(opt.id)}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-            "min-h-[44px] min-w-[44px]",
+            "rounded-md px-2.5 py-1.5 text-xs font-medium transition-all duration-150",
+            "min-h-[32px] min-w-[32px]",
             selectedView === opt.id
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
+              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
           )}
         >
           <span className="hidden sm:inline">{opt.label}</span>

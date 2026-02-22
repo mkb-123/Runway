@@ -147,7 +147,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (656 tests)
+- **Testing:** Vitest + Testing Library (690 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
@@ -380,6 +380,20 @@ Single source of truth. Never hardcode rates elsewhere.
 - Helpers: `parseCSVRow()`, `parseDate()`, `parseAmount()`
 - Types: `EmmaTransaction`, `EmmaParseResult`, `EmmaSpendingSummary`
 
+#### `monte-carlo.ts` — Stochastic Net Worth Simulation
+- `runMonteCarloSimulation(config) → MonteCarloResult` — 1000-run simulation with log-normal returns, seeded PRNG
+- `computeSuccessProbability(config, targetValue) → number` — probability of reaching target at end of simulation
+- Types: `MonteCarloConfig`, `MonteCarloResult`, `MonteCarloYearResult`
+
+#### `sensitivity.ts` — Sensitivity Analysis ("What Moves the Needle")
+- `calculateSensitivity(household) → SensitivityResult` — varies each input ±10% and measures impact on projected pot at retirement
+- Types: `SensitivityInput`, `SensitivityResult`
+
+#### `drawdown.ts` — Tax-Optimal Drawdown Sequencing
+- `generateDrawdownPlan(pots, annualNeed, ...) → DrawdownPlan` — year-by-year drawdown: GIA first (CGT allowance) → ISA (tax-free) → pension (PCLS + income tax)
+- `compareDrawdownStrategies(pots, ...) → { optimalTaxPaid, proportionalTaxPaid, taxSaving }` — tax comparison between strategies
+- Types: `DrawdownStrategy`, `AccountPot`, `DrawdownYearResult`, `DrawdownPlan`
+
 #### `recommendations.ts` — Actionable Financial Recommendations
 - `generateRecommendations(household) → Recommendation[]` — master function calling 10+ analyzers
 - Individual analyzers: `analyzeSalaryTaper`, `analyzePensionAllowance` (taper), `analyzeSalaryContribution`, `analyzePensionDeficit`, `analyzeISA`, `analyzeGIA`, `analyzeBedAndISA`, `analyzeCGTAllowance`, `analyzeStudentLoan`, `analyzeEmergencyFund`
@@ -534,6 +548,9 @@ Single source of truth. Never hardcode rates elsewhere.
 | `property-equity-chart.tsx` | Property equity trajectory with mortgage paydown (area) | Dashboard |
 | `effective-tax-rate-chart.tsx` | Tax rate over income ranges (line) | Tax Planning |
 | `tax-band-chart.tsx` | Income by tax band (stacked bar) | Tax Planning |
+| `monte-carlo-chart.tsx` | Monte Carlo fan chart with percentile bands (area) | Projections |
+| `sensitivity-chart.tsx` | Tornado chart showing input impact ranking (bar) | Projections |
+| `drawdown-strategy-chart.tsx` | Tax-optimal drawdown sequence by wrapper (stacked area) | Retirement |
 
 ### src/components/retirement/ — Retirement Sub-Components
 
@@ -580,6 +597,10 @@ Single source of truth. Never hardcode rates elsewhere.
 | `property.test.ts` | Property equity, mortgage balance, net worth with property, per-person split |
 | `property-projections.test.ts` | Property appreciation, mortgage amortization, payoff calculation, IHT integration with property growth |
 | `emma-import.test.ts` | CSV parsing, date/amount parsing, spending analysis, recurring payment detection, category classification |
+| `cross-page-integration.test.ts` | Cross-page projection consistency: required pot, contributions, projected pot, lifetime cashflow, person-view, growth rate, accessible/locked wealth |
+| `monte-carlo.test.ts` | Monte Carlo simulation: timeline shape, percentile ordering, determinism, contribution impact, success probability |
+| `sensitivity.test.ts` | Sensitivity analysis: input ranking, growth rate impact, retirement age impact, empty household |
+| `drawdown.test.ts` | Drawdown sequencing: tax-optimal order (GIA→ISA→pension), state pension offset, strategy comparison |
 
 ### Key Data Flows
 
