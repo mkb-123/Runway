@@ -991,39 +991,62 @@ export default function Home() {
         </CollapsibleSection>
       )}
 
-      {household.committedOutgoings.length > 0 && (
-        <CollapsibleSection
-          title="Committed Outgoings"
-          summary={`${formatCurrencyCompact(totalAnnualCommitments)}/yr across ${household.committedOutgoings.length} items`}
-          storageKey="commitments"
-        >
-          <Card>
-            <CardContent className="pt-4 pb-2">
-              <div className="space-y-1">
-                {[...household.committedOutgoings]
-                  .sort((a, b) => annualiseOutgoing(b.amount, b.frequency) - annualiseOutgoing(a.amount, a.frequency))
-                  .map((o) => {
-                    const annual = annualiseOutgoing(o.amount, o.frequency);
-                    return (
-                      <div key={o.id} className="flex items-center gap-3 py-1.5 border-b last:border-0">
-                        <Badge variant="outline" className="text-[10px] shrink-0 w-20 justify-center">
-                          {OUTGOING_CATEGORY_LABELS[o.category]}
-                        </Badge>
-                        <span className="text-sm flex-1 truncate">{o.label || OUTGOING_CATEGORY_LABELS[o.category]}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {OUTGOING_FREQUENCY_LABELS[o.frequency]}
-                        </span>
-                        <span className="text-sm font-medium tabular-nums shrink-0 w-20 text-right">
-                          {formatCurrencyCompact(annual)}/yr
-                        </span>
-                      </div>
-                    );
-                  })}
+      {household.committedOutgoings.length > 0 && (() => {
+        // Group by category for summary
+        const categoryTotals = household.committedOutgoings.reduce<Record<string, number>>((acc, o) => {
+          const annual = annualiseOutgoing(o.amount, o.frequency);
+          acc[o.category] = (acc[o.category] ?? 0) + annual;
+          return acc;
+        }, {});
+        const sortedCategories = Object.entries(categoryTotals).sort(([, a], [, b]) => b - a);
+
+        return (
+          <CollapsibleSection
+            title="Committed Outgoings"
+            summary={`${formatCurrencyCompact(totalAnnualCommitments)}/yr across ${household.committedOutgoings.length} items`}
+            storageKey="commitments"
+          >
+            <div className="space-y-3">
+              {/* Category summary bar */}
+              <div className="flex flex-wrap gap-2">
+                {sortedCategories.map(([category, total]) => (
+                  <div key={category} className="flex items-center gap-1.5 rounded-md bg-muted/50 px-2.5 py-1.5">
+                    <span className="text-xs text-muted-foreground">{OUTGOING_CATEGORY_LABELS[category as keyof typeof OUTGOING_CATEGORY_LABELS]}</span>
+                    <span className="text-xs font-semibold tabular-nums">{formatCurrencyCompact(total)}/yr</span>
+                  </div>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        </CollapsibleSection>
-      )}
+
+              {/* Line items */}
+              <Card>
+                <CardContent className="pt-4 pb-2">
+                  <div className="space-y-1">
+                    {[...household.committedOutgoings]
+                      .sort((a, b) => annualiseOutgoing(b.amount, b.frequency) - annualiseOutgoing(a.amount, a.frequency))
+                      .map((o) => {
+                        const annual = annualiseOutgoing(o.amount, o.frequency);
+                        return (
+                          <div key={o.id} className="flex items-center gap-3 py-1.5 border-b last:border-0">
+                            <Badge variant="outline" className="text-[10px] shrink-0 w-20 justify-center">
+                              {OUTGOING_CATEGORY_LABELS[o.category]}
+                            </Badge>
+                            <span className="text-sm flex-1 truncate">{o.label || OUTGOING_CATEGORY_LABELS[o.category]}</span>
+                            <span className="hidden text-xs text-muted-foreground shrink-0 sm:inline">
+                              {OUTGOING_FREQUENCY_LABELS[o.frequency]}
+                            </span>
+                            <span className="text-sm font-medium tabular-nums shrink-0 w-20 text-right">
+                              {formatCurrencyCompact(annual)}/yr
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </CollapsibleSection>
+        );
+      })()}
     </div>
   );
 }
