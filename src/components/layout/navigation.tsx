@@ -151,7 +151,7 @@ export function Navigation() {
           <ThemeToggle />
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Open menu">
+              <Button variant="ghost" size="icon" aria-label="Open menu" className="min-h-[44px] min-w-[44px]">
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>

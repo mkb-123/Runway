@@ -448,7 +448,7 @@ export function ScenarioPanel() {
         <Button
           variant={isScenarioMode ? "default" : "outline"}
           size="sm"
-          className="gap-1.5"
+          className="gap-1.5 min-h-[44px]"
         >
           <FlaskConical className="size-3.5" />
           <span className="hidden sm:inline">What If</span>

@@ -9,8 +9,9 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { formatCurrencyAxis } from "@/lib/format";
+import { formatCurrencyAxis, formatCurrencyCompact } from "@/lib/format";
 import { calculateIncomeTax, calculateNI } from "@/lib/tax";
+import { UK_TAX_CONSTANTS } from "@/lib/tax-constants";
 
 interface EffectiveTaxRateChartProps {
   /** Max income to plot on X-axis */
@@ -54,10 +55,10 @@ function buildTaxCurveData(maxIncome: number, step: number): DataPoint[] {
 }
 
 const THRESHOLDS = [
-  { value: 12_570, label: "PA £12.6k" },
-  { value: 50_270, label: "Higher £50.3k" },
-  { value: 100_000, label: "PA Taper £100k" },
-  { value: 125_140, label: "Additional £125.1k" },
+  { value: UK_TAX_CONSTANTS.personalAllowance, label: `PA ${formatCurrencyCompact(UK_TAX_CONSTANTS.personalAllowance)}` },
+  { value: UK_TAX_CONSTANTS.incomeTax.basicRateUpperLimit, label: `Higher ${formatCurrencyCompact(UK_TAX_CONSTANTS.incomeTax.basicRateUpperLimit)}` },
+  { value: UK_TAX_CONSTANTS.personalAllowanceTaperThreshold, label: `PA Taper ${formatCurrencyCompact(UK_TAX_CONSTANTS.personalAllowanceTaperThreshold)}` },
+  { value: UK_TAX_CONSTANTS.incomeTax.higherRateUpperLimit, label: `Additional ${formatCurrencyCompact(UK_TAX_CONSTANTS.incomeTax.higherRateUpperLimit)}` },
 ];
 
 export function EffectiveTaxRateChart({

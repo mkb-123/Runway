@@ -976,6 +976,9 @@ export default function Home() {
                 />
               ))
             }
+            <p className="text-[11px] text-muted-foreground">
+              These suggestions are for informational purposes only and do not constitute financial advice. Speak to a qualified financial advisor before making investment or pension decisions.
+            </p>
             {/* FEAT-006: Show undo link when recommendations are dismissed */}
             {dismissedIds.size > 0 && (
               <button

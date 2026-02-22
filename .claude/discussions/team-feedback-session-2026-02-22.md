@@ -2,7 +2,8 @@
 
 **Date:** 2026-02-22
 **Branch:** `claude/team-feedback-session-D3CA6`
-**Participants:** James (HNW Customer), Priya (HNW Customer), Marcus (HNW Customer), Eleanor (HNW Customer), Financial Advisor, Mobile Web Designer, Charting Expert, Web Architect, QA Engineer (Sam), Devil's Advocate
+**Participants:** James (HNW Customer), Priya (HNW Customer), Eleanor (HNW Customer), Financial Advisor, Mobile Web Designer, Charting Expert, Web Architect, QA Engineer (Sam), Devil's Advocate
+**Note:** Marcus (entrepreneur/founder) persona removed — not target audience.
 
 ---
 
@@ -251,9 +252,9 @@ The risk is not in code quality (which is strong). The risk is in what the code 
 | # | Item | Effort | Raised By |
 |---|------|--------|-----------|
 | 1 | Update tax constants to 2025/26 or disable recs when stale | M | Devil's Advocate |
-| 2 | Fix export page swapped `calculateRequiredSavings` args | XS | QA Engineer |
-| 3 | Fix drawdown chart grow/draw convention inconsistency | S | Charting Expert |
-| 4 | Add FCA disclaimer to dashboard recommendations | S | Devil's Advocate |
+| 2 | ~~Fix export page swapped `calculateRequiredSavings` args~~ | XS | QA Engineer | **RESOLVED** |
+| 3 | ~~Fix drawdown chart grow/draw convention inconsistency~~ | S | Charting Expert | **RESOLVED** |
+| 4 | ~~Add FCA disclaimer to dashboard recommendations~~ | S | Devil's Advocate | **RESOLVED** |
 | 5 | Fix retirement drawdown to include tax on pension withdrawals | M | Eleanor, Financial Advisor |
 | 6 | Extract `buildIncomeTimeline` from chart to `src/lib/` + test | M | Charting Expert, Web Architect |
 
@@ -262,21 +263,20 @@ The risk is not in code quality (which is strong). The risk is in what the code 
 | # | Item | Effort | Raised By |
 |---|------|--------|-----------|
 | 7 | Wire up 4 dead chart components to their pages | S | Charting Expert |
-| 8 | Add pension carry-forward UI (3 year inputs in settings) | S | Marcus, Financial Advisor |
-| 9 | Unify chart colour system (single semantic colour map) | M | Charting Expert |
+| 8 | Add pension carry-forward UI (3 year inputs in settings) | S | Financial Advisor |
+| 9 | ~~Unify chart colour system (single semantic colour map)~~ | M | Charting Expert | **RESOLVED** (wrapper-split now uses CSS vars) |
 | 10 | Extract person-view filtering to shared utility | S | Web Architect |
 | 11 | Extract `resolveMetric` to `src/lib/dashboard.ts` + test | M | Web Architect |
 | 12 | Add self-employment income type with Class 4 NI | M | Eleanor |
-| 13 | Fix IHT label for single-person households | XS | Eleanor |
-| 14 | Add illiquid equity account type | S | Marcus |
+| 13 | ~~Fix IHT label for single-person households~~ | XS | Eleanor | **RESOLVED** |
 
 ### Tier 3 — UX Improvements
 
 | # | Item | Effort | Raised By |
 |---|------|--------|-----------|
-| 15 | Fix pie chart label overflow at narrow widths | S | Mobile Designer |
-| 16 | Enlarge touch targets to 44px minimum | S | Mobile Designer |
-| 17 | Make all chart heights responsive | S | Mobile Designer |
+| 15 | ~~Fix pie chart label overflow at narrow widths~~ | S | Mobile Designer | **RESOLVED** |
+| 16 | ~~Enlarge touch targets to 44px minimum~~ | S | Mobile Designer | **RESOLVED** |
+| 17 | ~~Make all chart heights responsive~~ | S | Mobile Designer | **RESOLVED** |
 | 18 | Add bottom navigation bar for mobile | M | Mobile Designer |
 | 19 | Replace 3 dashboard pies with horizontal stacked bar | M | Charting Expert |
 | 20 | Lazy-load chart components behind CollapsibleSections | M | Mobile Designer |
@@ -293,10 +293,8 @@ The risk is not in code quality (which is strong). The risk is in what the code 
 | 26 | Monte Carlo / probability bands on projections | L | Devil's Advocate |
 | 27 | DB pension modelling | M | James (Sarah's NHS pension) |
 | 28 | Bonus deployment advisor (where to put money when tranche lands) | L | Priya |
-| 29 | Company exit scenario modelling (BADR) | L | Marcus |
-| 30 | Dividend income + allowance modelling | M | Marcus |
-| 31 | Child benefit high-income charge | S | Priya |
-| 32 | University fee modelling | M | Priya |
+| 29 | Child benefit high-income charge | S | Priya |
+| 30 | University fee modelling | M | Priya |
 
 ---
 

@@ -329,9 +329,10 @@ function buildFullWorkbook(household: HouseholdData): XLSX.WorkBook {
   const targets = [500, 1000, 2000, 3000];
   retRows.push({ Item: "", "Value": "" }, { Item: "--- Required Monthly Savings ---", "Value": "" });
   for (const target of targets) {
-    const required = calculateRequiredSavings(grandTotal, requiredPot, retAge - currentAge, midRate);
+    const targetPot = target * 1000;
+    const required = calculateRequiredSavings(targetPot, grandTotal, retAge - currentAge, midRate);
     retRows.push({
-      Item: `To reach ${formatCurrency(target * 1000)} target`,
+      Item: `To reach ${formatCurrency(targetPot)} target`,
       "Value": formatCurrency(required / 12) + "/month",
     });
   }

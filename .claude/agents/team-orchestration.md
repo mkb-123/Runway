@@ -8,13 +8,13 @@
                                         │  Final decision maker│
                                         └──────────┬──────────┘
                                                    │
-   ┌──────────┬──────────┬──────────┬─────────────┼─────────────┬──────────┬──────────┬──────────┐
-   │          │          │          │             │             │          │          │          │
-┌──┴───┐ ┌───┴──┐ ┌─────┴──┐ ┌────┴────┐ ┌──────┴──────┐ ┌───┴─────┐ ┌──┴──────┐ ┌┴────────┐ ┌┴────────┐  ┌─────────┐
-│Mobile│ │Chart │ │Finan-  │ │Devil's  │ │ HNW Customer│ │   HNW   │ │   HNW   │ │   HNW   │ │ Senior  │  │   QA    │
-│ Web  │ │Expert│ │cial    │ │Advocate │ │  (James)    │ │Customer │ │Customer │ │Customer │ │  Web    │  │Engineer │
-│Design│ │      │ │Advisor │ │         │ │             │ │ (Priya) │ │(Marcus) │ │(Eleanor)│ │Architect│  │  (Sam)  │
-└──────┘ └──────┘ └────────┘ └─────────┘ └─────────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘  └─────────┘
+   ┌──────────┬──────────┬──────────┬─────────────┼─────────────┬──────────┬──────────┐
+   │          │          │          │             │             │          │          │
+┌──┴───┐ ┌───┴──┐ ┌─────┴──┐ ┌────┴────┐ ┌──────┴──────┐ ┌───┴─────┐ ┌┴────────┐ ┌┴────────┐  ┌─────────┐
+│Mobile│ │Chart │ │Finan-  │ │Devil's  │ │ HNW Customer│ │   HNW   │ │   HNW   │ │ Senior  │  │   QA    │
+│ Web  │ │Expert│ │cial    │ │Advocate │ │  (James)    │ │Customer │ │Customer │ │  Web    │  │Engineer │
+│Design│ │      │ │Advisor │ │         │ │             │ │ (Priya) │ │(Eleanor)│ │Architect│  │  (Sam)  │
+└──────┘ └──────┘ └────────┘ └─────────┘ └─────────────┘ └─────────┘ └─────────┘ └─────────┘  └─────────┘
 ```
 
 ## When to Convene the Team
@@ -66,12 +66,7 @@ Each agent responds in character, using their defined response format:
    - Tests it against her family's situation: bonus tranches, school fees, variable household income.
    - Flags if the feature assumes stable income or retirement-first priorities.
 
-**1c. HNW Customer (Marcus) speaks third**
-   - Reacts as an entrepreneur with non-PAYE income complexity. Does it handle illiquid equity, employer contributions, tapered allowances?
-   - Tests it against his situation: company equity, pension catch-up, exit scenario modelling.
-   - Flags if the feature assumes a standard employment relationship.
-
-**1d. HNW Customer (Eleanor) speaks fourth**
+**1c. HNW Customer (Eleanor) speaks third**
    - Reacts as a single near-retiree managing alone. Does it assume a spouse? Does it handle DB + SIPP + state pension as separate streams?
    - Tests it against her situation: IHT with no RNRB, drawdown depletion risk, DB timing decision.
    - Flags if the feature ignores self-employment, estate planning depth, or single-person edge cases.
@@ -134,7 +129,6 @@ As Team Lead, I (Claude) will:
 ### Agent Consensus
 - HNW Customer (James): [WANT / NEUTRAL / DON'T NEED] — [one line]
 - HNW Customer (Priya): [WANT / NEUTRAL / DON'T NEED] — [one line]
-- HNW Customer (Marcus): [WANT / NEUTRAL / DON'T NEED] — [one line]
 - HNW Customer (Eleanor): [WANT / NEUTRAL / DON'T NEED] — [one line]
 - Financial Advisor: [SUPPORT / CONCERN / OPPOSE] — [one line]
 - Mobile Web Designer: [SUPPORT / CONCERN / OPPOSE] — [one line]
@@ -159,12 +153,11 @@ As Team Lead, I (Claude) will:
 
 When agents disagree:
 
-1. **HNW Customers vs anyone** — If three or more of James, Priya, Marcus, and Eleanor say "I wouldn't use this", that's a kill signal. If only one or two want it, consider whether the feature serves a specific life-stage or household-type need that is genuinely worth supporting.
+1. **HNW Customers vs anyone** — If all three of James, Priya, and Eleanor say "I wouldn't use this", that's a kill signal. If only one wants it, consider whether the feature serves a specific life-stage or household-type need that is genuinely worth supporting.
 
-1a. **James vs Priya vs Marcus vs Eleanor** — Disagreements usually reflect life-stage or household-type differences. The right answer is typically to support multiple perspectives rather than optimise for one. Use their comparison tables to diagnose the root tension:
+1a. **James vs Priya vs Eleanor** — Disagreements usually reflect life-stage or household-type differences. The right answer is typically to support multiple perspectives rather than optimise for one. Use their comparison tables to diagnose the root tension:
    - **James** (52, married, stable): retirement timing, pension bridge, tax optimisation
    - **Priya** (35, married with 3 kids): cash flow survival, school fees, bonus deployment
-   - **Marcus** (45, married, entrepreneur): illiquid equity, pension catch-up, exit scenarios
    - **Eleanor** (59, single, no children): IHT with no RNRB, SIPP drawdown to 90, estate distribution
 
 2. **Financial Advisor vs Mobile Web Designer** — If the advisor says users need it but the designer says it's cluttered: find a progressive disclosure solution (show summary, let users drill in).

@@ -36,16 +36,13 @@ export function ByPersonChart({ data }: ByPersonChartProps) {
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={80}
-            outerRadius={140}
+            innerRadius={60}
+            outerRadius={100}
             paddingAngle={3}
             dataKey="value"
             nameKey="name"
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            label={({ name, percent }: any) =>
-              `${name}: ${((percent ?? 0) * 100).toFixed(1)}%`
-            }
-            labelLine={true}
+            label={false}
+            labelLine={false}
           >
             {data.map((_, index) => (
               <Cell

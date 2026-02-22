@@ -380,7 +380,7 @@ export default function IHTPage() {
 
               <div className="flex items-center justify-between rounded-lg border bg-green-50 dark:bg-green-950/20 p-3">
                 <span className="text-sm font-medium">
-                  Combined Couple Allowance
+                  {numberOfPersons > 1 ? "Combined Couple Allowance" : "Total Allowance"}
                 </span>
                 <span className="text-lg font-bold">
                   {formatCurrency(combinedThreshold)}

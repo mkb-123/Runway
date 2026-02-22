@@ -245,7 +245,7 @@ export function RetirementIncomeTimeline({
 
   return (
     <div
-      className="h-[450px] w-full"
+      className="h-[300px] sm:h-[450px] w-full"
       role="img"
       aria-label={accessibleSummary}
     >

@@ -50,7 +50,7 @@ export function SchoolFeeTimelineChart({ data, childrenList, lastSchoolFeeYear }
   const accessibleSummary = `School fee timeline from ${startYear} to ${endYear} for ${activeChildren.length} child${activeChildren.length !== 1 ? "ren" : ""}. Peak annual cost of ${formatCurrencyTooltip(peakYear.total)} in ${peakYear.calendarYear}.`;
 
   return (
-    <div className="h-[350px] w-full" role="img" aria-label={accessibleSummary}>
+    <div className="h-[300px] sm:h-[350px] w-full" role="img" aria-label={accessibleSummary}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 10, right: 20, left: 20, bottom: 5 }}>
           <XAxis

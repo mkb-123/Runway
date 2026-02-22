@@ -51,8 +51,8 @@ function buildDrawdownData(
       const statePension = age >= statePensionAge ? statePensionAnnual : 0;
       const withdrawalFromPot = Math.max(0, annualSpend - statePension);
 
-      // Grow pot, then withdraw
-      pots[i] = pots[i] * (1 + scenarioRates[i]) - withdrawalFromPot;
+      // Draw first, then grow (conservative convention — matches income timeline)
+      pots[i] = (pots[i] - withdrawalFromPot) * (1 + scenarioRates[i]);
       if (pots[i] < 0) pots[i] = 0;
 
       point[label] = Math.round(pots[i]);
