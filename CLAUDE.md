@@ -14,7 +14,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (490 tests)
+- **Testing:** Vitest + Testing Library (501 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories

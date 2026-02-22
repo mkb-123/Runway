@@ -18,6 +18,7 @@ import {
   Target,
   Shield,
   Sunrise,
+  FlaskConical,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,8 @@ import {
 } from "@/lib/format";
 import { useData } from "@/context/data-context";
 import { useScenarioData } from "@/context/use-scenario-data";
+import { useScenario } from "@/context/scenario-context";
+import { ScenarioPanel } from "@/components/scenario-panel";
 import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { CollapsibleSection } from "@/components/collapsible-section";
@@ -317,6 +320,7 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
 
 export default function Home() {
   const { snapshots: snapshotsData } = useData();
+  const { isScenarioMode } = useScenario();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
   const baseHousehold = scenarioData.baseHousehold;
@@ -686,7 +690,7 @@ export default function Home() {
   const heroMetrics = household.dashboardConfig.heroMetrics;
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       {/* Print header */}
       <div className="print-report-header hidden print:block">
         <h1>Runway — Financial Report</h1>
@@ -857,6 +861,22 @@ export default function Home() {
           </div>
         );
       })()}
+
+      {/* WHAT-IF CTA — prominent on dashboard when not in scenario mode */}
+      {!isScenarioMode && (
+        <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <FlaskConical className="size-4.5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">What would happen if...?</p>
+            <p className="text-xs text-muted-foreground">
+              Model salary changes, pension sacrifice, market crashes, or early retirement
+            </p>
+          </div>
+          <ScenarioPanel />
+        </div>
+      )}
 
       {/* RECOMMENDATIONS — collapsible */}
       {filteredRecommendations.length > 0 && (

@@ -183,7 +183,7 @@ export default function ProjectionsPage() {
   );
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader title="Projections" description={`Growth projections across multiple return scenarios over ${PROJECTION_YEARS} years`}>
         <PersonToggle />
       </PageHeader>

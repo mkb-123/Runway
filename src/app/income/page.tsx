@@ -224,7 +224,7 @@ export default function IncomePage() {
   }, [baseHousehold, selectedView]);
 
   return (
-    <div className="space-y-8 p-4 md:p-8">
+    <div className="space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader title="Income & Cash Flow" description="Detailed income tax breakdown, take-home pay, bonus structures, and cash flow analysis.">
         <PersonToggle />
       </PageHeader>
