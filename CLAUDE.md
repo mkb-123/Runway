@@ -531,6 +531,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | `lifetime-cashflow-chart.tsx` | Year-by-year surplus/deficit (bar + line) | Cashflow |
 | `cash-flow-timeline.tsx` | 24-month forward (grouped bar) | Income |
 | `school-fee-timeline-chart.tsx` | School fees with inflation (bar) | Income, Dashboard |
+| `property-equity-chart.tsx` | Property equity trajectory with mortgage paydown (area) | Dashboard |
 | `effective-tax-rate-chart.tsx` | Tax rate over income ranges (line) | Tax Planning |
 | `tax-band-chart.tsx` | Income by tax band (stacked bar) | Tax Planning |
 
