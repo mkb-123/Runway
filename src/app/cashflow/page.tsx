@@ -282,24 +282,23 @@ export default function CashFlowPage() {
       )}
 
       {/* Main Chart */}
-      <Card className="border-t border-t-primary/20">
-        <CardHeader>
-          <div className="flex items-baseline justify-between">
-            <CardTitle>Lifetime Cash Flow</CardTitle>
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              Real terms (today&apos;s money) at {(growthRate * 100).toFixed(0)}% growth
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <LifetimeCashFlowChart data={data} events={events} primaryPersonName={primaryPersonName} />
-          <p className="mt-3 text-[11px] text-muted-foreground">
-            Projections are estimates in today&apos;s money, not guarantees. Capital is at risk.
-            Past performance does not predict future returns. Employment income shown net of
-            tax, NI, and pension deductions.
-          </p>
-        </CardContent>
-      </Card>
+      <CollapsibleSection
+        title="Lifetime Cash Flow"
+        summary={`Real terms at ${(growthRate * 100).toFixed(0)}% growth · age ${currentAge} to 95`}
+        defaultOpen
+        storageKey="cashflow-main-chart"
+      >
+        <Card className="border-t border-t-primary/20">
+          <CardContent className="pt-6">
+            <LifetimeCashFlowChart data={data} events={events} primaryPersonName={primaryPersonName} />
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Projections are estimates in today&apos;s money, not guarantees. Capital is at risk.
+              Past performance does not predict future returns. Employment income shown net of
+              tax, NI, and pension deductions.
+            </p>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       {/* School Fees — summary + timeline */}
       {hasSchoolFees && (

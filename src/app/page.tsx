@@ -1045,39 +1045,45 @@ export default function Home() {
         )
       )}
 
-      {/* PRIMARY CHARTS */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="border-t border-t-primary/20">
-          <CardHeader>
-            <div className="flex items-baseline justify-between">
-              <CardTitle>Net Worth Trajectory</CardTitle>
-              <span className="hidden text-xs text-muted-foreground sm:inline">
-                {scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over {projectionYears}yr
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} retirementTargetYear={retirementTargetYear} />
-            <p className="mt-3 text-[11px] text-muted-foreground">
-              Projections are estimates, not guarantees. Capital is at risk. Past performance does not predict future returns.
-            </p>
-          </CardContent>
-        </Card>
+      {/* PRIMARY CHARTS — collapsible like all other content sections */}
+      <CollapsibleSection
+        title="Net Worth Trajectory & Allocation"
+        summary={`${scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over ${projectionYears}yr · ${wrapperSummary}`}
+        defaultOpen
+        storageKey="charts-primary"
+      >
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card className="border-t border-t-primary/20">
+            <CardHeader>
+              <div className="flex items-baseline justify-between">
+                <CardTitle>Net Worth Trajectory</CardTitle>
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  {scenarioRates.map((r) => `${(r * 100).toFixed(0)}%`).join("/")} over {projectionYears}yr
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <NetWorthTrajectoryChart snapshots={snapshots} scenarios={scenarios} milestones={milestones} retirementTargetYear={retirementTargetYear} />
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Projections are estimates, not guarantees. Capital is at risk. Past performance does not predict future returns.
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card className="border-t border-t-primary/20">
-          <CardHeader>
-            <div className="flex items-baseline justify-between">
-              <CardTitle>Net Worth by Wrapper</CardTitle>
-              <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <WrapperSplitChart data={byWrapper} />
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="border-t border-t-primary/20">
+            <CardHeader>
+              <div className="flex items-baseline justify-between">
+                <CardTitle>Net Worth by Wrapper</CardTitle>
+                <span className="hidden text-xs text-muted-foreground sm:inline">{wrapperSummary}</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <WrapperSplitChart data={byWrapper} />
+            </CardContent>
+          </Card>
+        </div>
+      </CollapsibleSection>
 
-      {/* SECONDARY SECTIONS */}
       <CollapsibleSection title="Liquid vs Illiquid" summary="Accessible wealth vs locked pensions" storageKey="liquidity">
         <Card>
           <CardContent className="pt-6">

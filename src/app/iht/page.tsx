@@ -261,6 +261,12 @@ export default function IHTPage() {
       )}
 
       {/* Estate Value Estimator */}
+      <CollapsibleSection
+        title="Estate Value Estimator"
+        summary={`In estate ${formatCurrency(inEstate)} · IHT ${formatCurrency(ihtLiability)}`}
+        defaultOpen
+        storageKey="iht-estate-estimator"
+      >
       <Card>
         <CardHeader>
           <CardTitle>Estate Value Estimator</CardTitle>
@@ -334,6 +340,7 @@ export default function IHTPage() {
           </div>
         </CardContent>
       </Card>
+      </CollapsibleSection>
 
       {/* IHT Threshold */}
       <CollapsibleSection title="IHT Threshold" summary="Nil rate bands & allowances" storageKey="iht-threshold" defaultOpen>
