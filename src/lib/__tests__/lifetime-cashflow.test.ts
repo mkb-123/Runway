@@ -64,7 +64,7 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
         frequency: "monthly" as const,
       },
     ],
-    dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
+    dashboardConfig: { heroMetrics: ["projected_retirement_income", "cash_position", "retirement_countdown"] },
     ...overrides,
   };
 }

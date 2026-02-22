@@ -64,7 +64,7 @@ const emptyHousehold: HouseholdData = {
   emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6, monthlyLifestyleSpending: 0 },
   iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
   committedOutgoings: [],
-  dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
+  dashboardConfig: { heroMetrics: ["projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway"] },
 };
 const emptySnapshots: SnapshotsData = { snapshots: [] };
 

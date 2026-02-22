@@ -849,7 +849,7 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               Dashboard Hero Metrics
-              <Badge variant="secondary">3 slots</Badge>
+              <Badge variant="secondary">5 slots</Badge>
             </CardTitle>
             <div className="flex items-center gap-3 text-xs shrink-0">
               <span className="text-muted-foreground">Shown on:</span>
@@ -869,7 +869,7 @@ export function HouseholdTab({ household, updateHousehold }: HouseholdTabProps) 
                 {renderField(
                   slotIndex === 0 ? "Primary Metric" : `Secondary ${slotIndex}`,
                   <Select
-                    value={household.dashboardConfig.heroMetrics[slotIndex] ?? "net_worth"}
+                    value={household.dashboardConfig.heroMetrics[slotIndex] ?? "projected_retirement_income"}
                     onValueChange={(val) => {
                       const updated = clone(household);
                       const metrics = [...updated.dashboardConfig.heroMetrics] as HeroMetricType[];

@@ -97,7 +97,7 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
     ],
     children: [],
     dashboardConfig: {
-      heroMetrics: ["net_worth", "cash_position", "retirement_countdown"],
+      heroMetrics: ["projected_retirement_income", "cash_position", "retirement_countdown"],
     },
     ...overrides,
   };

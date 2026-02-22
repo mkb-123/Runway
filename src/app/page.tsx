@@ -9,7 +9,6 @@ import {
   X,
   Lightbulb,
   ArrowRight,
-  Wallet2,
   Banknote,
   Clock,
   BarChart3,
@@ -89,15 +88,6 @@ function resolveMetric(
   data: HeroMetricData
 ): ResolvedMetric {
   switch (type) {
-    case "net_worth":
-      return {
-        label: data.isPersonView ? "Net Worth (Personal)" : "Net Worth",
-        value: formatCurrencyCompact(data.totalNetWorth),
-        rawValue: data.totalNetWorth,
-        format: formatCurrencyCompact,
-        color: "",
-        icon: Wallet2,
-      };
     case "cash_position":
       return {
         label: "Cash Position",
@@ -346,6 +336,16 @@ function resolveMetric(
         icon: Shield,
       };
     }
+    // Safety fallback — "net_worth" removed in migration 10; handles stale localStorage
+    default:
+      return {
+        label: "Retirement Income",
+        value: `${formatCurrencyCompact(data.projectedRetirementIncome)}/yr`,
+        rawValue: data.projectedRetirementIncome,
+        format: (n: number) => `${formatCurrencyCompact(n)}/yr`,
+        color: "",
+        icon: Sunrise,
+      };
   }
 }
 

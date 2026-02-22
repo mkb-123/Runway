@@ -165,7 +165,7 @@ function migrateDashboardConfigDefault(data: Record<string, unknown>): Record<st
   return {
     ...data,
     dashboardConfig: {
-      heroMetrics: ["net_worth", "period_change", "projected_retirement_income", "savings_rate", "retirement_countdown"],
+      heroMetrics: ["projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway"],
     },
   };
 }
@@ -333,28 +333,36 @@ function migrateBonusTotalModel(data: Record<string, unknown>): Record<string, u
 }
 
 /**
- * Migration 10: Expand heroMetrics from 3-slot tuple to 5-slot array.
+ * Migration 10: Expand heroMetrics to 5 slots + replace removed "net_worth" metric.
  *
- * Old: heroMetrics: ["net_worth", "cash_position", "retirement_countdown"]  (exactly 3)
- * New: heroMetrics: up to 5 items
+ * "net_worth" was removed as a hero metric type (it is a lagging indicator with no
+ * goal orientation). Any occurrence is replaced with "projected_retirement_income".
  *
- * Users with existing customisation keep their current selections in slots 0–2.
- * Slots 3 and 4 are filled with sensible defaults not already present.
+ * Arrays shorter than 5 slots are filled with useful defaults (no duplicates).
  */
 function migrateHeroMetricsFiveSlots(data: Record<string, unknown>): Record<string, unknown> {
   const config = data.dashboardConfig;
   if (typeof config !== "object" || config === null) return data;
   const dc = config as Record<string, unknown>;
   const metrics = dc.heroMetrics;
-  if (!Array.isArray(metrics) || metrics.length >= 5) return data;
+  if (!Array.isArray(metrics)) return data;
 
-  // Fill up to 5 slots, avoiding duplicates, using a priority list of useful additions
-  const additions = ["period_change", "projected_retirement_income", "savings_rate", "retirement_countdown", "cash_position"];
-  const filled = [...metrics];
-  for (const candidate of additions) {
-    if (filled.length >= 5) break;
-    if (!filled.includes(candidate)) filled.push(candidate);
+  // Step 1: Replace removed "net_worth" with "projected_retirement_income"
+  let working: string[] = metrics.map((m) => m === "net_worth" ? "projected_retirement_income" : m);
+
+  // Step 2: Deduplicate (e.g. if "net_worth" was slot 0 and "projected_retirement_income" was slot 1)
+  working = working.filter((m, i, arr) => arr.indexOf(m) === i);
+
+  // Step 3: Expand to 5 slots if needed
+  if (working.length < 5) {
+    const additions = ["period_change", "projected_retirement_income", "savings_rate", "retirement_countdown", "cash_position"];
+    for (const candidate of additions) {
+      if (working.length >= 5) break;
+      if (!working.includes(candidate)) working.push(candidate);
+    }
   }
 
-  return { ...data, dashboardConfig: { ...dc, heroMetrics: filled } };
+  // Only write back if changed
+  if (JSON.stringify(working) === JSON.stringify(metrics)) return data;
+  return { ...data, dashboardConfig: { ...dc, heroMetrics: working } };
 }

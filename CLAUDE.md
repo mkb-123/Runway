@@ -4,6 +4,81 @@
 
 **Read this file first — it is the complete index.** You should NOT need to read most source files before making changes; use this index to locate the right file and function, then read only what you need.
 
+### What this app is (one paragraph)
+
+Runway is a UK personal finance dashboard. Users enter household data (persons, accounts, income, pension contributions, bonuses, committed outgoings) once; the app computes tax liabilities, retirement projections, FIRE progress, IHT exposure, and cash flow forecasts entirely client-side. All state lives in `localStorage` under two keys: `nw-household` (household + config) and `nw-snapshots` (monthly net worth history). There is no backend. The UI is Next.js App Router with shadcn/ui components; all financial logic is pure functions in `src/lib/`.
+
+### HouseholdData shape (cheat sheet)
+
+```
+HouseholdData {
+  persons[]          — id, name, DOB, retirementAge, pensionAccessAge, stateRetirementAge, niQualifyingYears, studentLoanPlan
+  children[]         — id, name, DOB, schoolFeeAnnual, feeInflationRate, schoolStart/EndAge
+  accounts[]         — id, personId, type (AccountType), provider, name, currentValue, costBasis?
+  income[]           — personId, grossSalary, employer/employeePensionContribution, pensionMethod, salaryGrowthRate?, bonusGrowthRate?
+  bonusStructures[]  — personId, totalBonusAnnual, cashBonusAnnual, vestingYears, vestingGapYears, estimatedAnnualReturn
+  contributions[]    — id, personId, label, target (isa|pension|gia), amount, frequency (monthly|annually)
+  retirement         — targetAnnualIncome, withdrawalRate, includeStatePension, scenarioRates[]
+  emergencyFund      — monthlyEssentialExpenses, targetMonths, monthlyLifestyleSpending
+  committedOutgoings[] — id, category, label, amount, frequency (monthly|termly|annually), startDate?, endDate?
+  iht                — estimatedPropertyValue, passingToDirectDescendants, gifts[]
+  dashboardConfig    — heroMetrics: HeroMetricType[] (max 5; index 0 = primary)
+}
+```
+
+### Data flow
+
+```
+data/household.json (default)
+        │
+        ▼
+localStorage "nw-household"  ──→  migrateHouseholdData()  ──→  HouseholdDataSchema.safeParse()
+                                        (migration.ts)               (schemas.ts / Zod)
+                                                                            │
+                                                                            ▼
+                                                               DataProvider (data-context.tsx)
+                                                                   household, snapshots state
+                                                                            │
+                              ┌─────────────────┬──────────────────────────┤
+                              ▼                 ▼                          ▼
+                        useData()         useScenarioData()          computed helpers
+                      (raw state)    (scenario-applied state)   (getPersonById, getTotalNetWorth…)
+                              │                 │
+                              └────────┬────────┘
+                                       ▼
+                                  Page components
+                              call pure lib functions,
+                              render results
+```
+
+### Context pattern
+
+Every page calls one of two hooks:
+- `useData()` — raw household state + mutations (`updateHousehold`, `resetToDefaults`, etc.)
+- `useScenarioData()` — same interface but with scenario overrides applied via `applyScenarioOverrides()`
+
+Pages **never** compute financials inline. They call `src/lib/` functions and pass results to render.
+
+### Hero metric rendering flow
+
+```
+DashboardConfig.heroMetrics[0..4]  (HeroMetricType[])
+        │
+        ▼
+resolveMetric(type, heroData)      (src/app/page.tsx — switch statement)
+        │  ← heroData from computeHeroData(household, snapshots, selectedView)
+        │                           (src/lib/dashboard.ts)
+        ▼
+{ label, value, rawValue, format, color, icon, subtext }
+        │
+        ▼
+<HeroCard> or <SecondaryMetricCard>   (src/app/page.tsx)
+```
+
+To **add** a hero metric: (1) add to `HeroMetricType` union + `HERO_METRIC_LABELS` in `src/types/index.ts`, (2) add case to `resolveMetric()` in `src/app/page.tsx`, (3) add computed field to `HeroMetricData` interface + `computeHeroData()` in `src/lib/dashboard.ts`, (4) add test in `src/lib/__tests__/dashboard.test.ts`.
+
+To **remove** a hero metric: reverse the above + add replacement mapping in migration 10 (`migrateHeroMetricsFiveSlots`) so old localStorage values migrate cleanly.
+
 ### Most-changed files (highest churn — read before editing)
 - `src/app/page.tsx` — Dashboard: hero, metrics, collapsible sections, charts
 - `src/lib/dashboard.ts` — computeHeroData, getStatusSentence, getNextCashEvents
@@ -18,17 +93,44 @@
 - All pages use `CollapsibleSection` for content sections (not plain `Card`) — consistent UI
 - `heroMetrics[0]` = primary metric, `heroMetrics[1..4]` = secondary (max 5 total)
 - IHT 7-year gift filter uses `< 7` (not `<= 7`) — gifts at exactly 7 years are outside estate
+- Migrations are idempotent — running on already-migrated data must be a no-op
 
 ### Common tasks → file locations
-| Task | Files to read |
-|------|---------------|
-| Add a hero metric type | `src/types/index.ts` (HeroMetricType union + HERO_METRIC_LABELS), `src/app/page.tsx` (resolveMetric switch), `src/lib/dashboard.ts` (computeHeroData return value + HeroMetricData interface) |
-| Add a recommendation analyzer | `src/lib/recommendations.ts` (add analyzer fn + call in generateRecommendations), `src/lib/__tests__/recommendations.test.ts` |
+| Task | Files to read/edit |
+|------|-------------------|
+| Add a hero metric type | `src/types/index.ts` (union + labels), `src/app/page.tsx` (resolveMetric), `src/lib/dashboard.ts` (computeHeroData + HeroMetricData), `src/lib/__tests__/dashboard.test.ts` |
+| Remove a hero metric type | Same as above (reverse) + migration 10 in `src/lib/migration.ts` (add replacement mapping) |
+| Add a recommendation analyzer | `src/lib/recommendations.ts` (add fn + call in generateRecommendations), `src/lib/__tests__/recommendations.test.ts` |
 | Change a tax rate or threshold | `src/lib/tax-constants.ts` only, then update `src/lib/__tests__/tax-constants.test.ts` |
-| Add a new page | `src/app/<route>/page.tsx`, update navigation in `src/components/layout/navigation.tsx`, update CLAUDE.md page table |
-| Change localStorage schema | `src/lib/schemas.ts` (add Zod field + default), `src/lib/migration.ts` (add migration N+1), `src/types/index.ts` (type), `src/lib/__tests__/migration.test.ts` (test) |
-| Change dashboard section order | `src/app/page.tsx` — CollapsibleSection blocks near line 989–1160 |
-| Change collapsible open/closed default | `defaultOpen` prop on `CollapsibleSection` in relevant page file |
+| Add a new page | `src/app/<route>/page.tsx`, update `src/components/layout/navigation.tsx`, update CLAUDE.md page table |
+| Change localStorage schema | `src/lib/schemas.ts` (Zod field + default), `src/lib/migration.ts` (new migration), `src/types/index.ts` (type), `src/lib/__tests__/migration.test.ts` |
+| Change dashboard section order | `src/app/page.tsx` — CollapsibleSection blocks |
+| Change collapsible open/closed default | `defaultOpen` prop on `CollapsibleSection` in the relevant page file |
+| Add a person field | `src/types/index.ts` (Person type), `src/lib/schemas.ts` (PersonSchema + default), `src/lib/migration.ts` (migratePersonDefaults), settings UI in `src/app/settings/components/household-tab.tsx` |
+| Add an account type | `AccountType` union in `src/types/index.ts`, `AccountTypeSchema` in `src/lib/schemas.ts`, `getAccountTaxWrapper()` mapping, `ACCOUNT_TYPE_LABELS` |
+
+### Patterns to follow
+- **Pure lib functions**: all calculations in `src/lib/`, pages import and call them
+- **Zod schemas with defaults**: new optional fields get `.default(value)` in schemas.ts so old localStorage data validates without migration
+- **Migration sequence**: each migration is numbered, idempotent, and called in `migrateHouseholdData()`; add at the bottom
+- **CollapsibleSection**: wrap every content group — `defaultOpen` for high-value sections, closed for detail sections
+- **formatCurrency / formatCurrencyCompact**: always format money through `src/lib/format.ts`
+- **Test first for bugs**: write the failing test before fixing the bug
+
+### Anti-patterns (never do these)
+- Financial arithmetic inline in JSX, `useMemo`, or render functions
+- Hardcoded tax rates or allowance amounts outside `tax-constants.ts`
+- `// @ts-ignore` or `as unknown as X` casts to work around type errors — fix the type instead
+- Editing localStorage keys directly — always go through `updateHousehold()` / `updateSnapshots()`
+- Adding a new `HeroMetricType` without adding a migration to handle old localStorage that won't have it
+
+### Post-change checklist
+Before committing, verify:
+- [ ] `npm run test` — all tests pass
+- [ ] `npm run build` — TypeScript compiles, no type errors
+- [ ] CLAUDE.md updated if you added/renamed/removed files, functions, or types
+- [ ] New financial logic has a test in `src/lib/__tests__/`
+- [ ] Schema changes have a migration if old localStorage data would fail validation
 
 ## Project Overview
 

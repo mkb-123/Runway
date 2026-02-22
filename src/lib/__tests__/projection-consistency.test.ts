@@ -65,7 +65,7 @@ function makeHousehold(overrides: Partial<HouseholdData> = {}): HouseholdData {
     iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
     children: [],
     committedOutgoings: [],
-    dashboardConfig: { heroMetrics: ["net_worth", "cash_position", "retirement_countdown"] },
+    dashboardConfig: { heroMetrics: ["projected_retirement_income", "cash_position", "retirement_countdown"] },
     ...overrides,
   };
 }

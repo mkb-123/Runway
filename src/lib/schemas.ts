@@ -176,7 +176,6 @@ export const CommittedOutgoingSchema = z.object({
 // --- Dashboard Configuration ---
 
 export const HeroMetricTypeSchema = z.enum([
-  "net_worth",
   "cash_position",
   "retirement_countdown",
   "period_change",
@@ -250,7 +249,7 @@ export const HouseholdDataSchema = z.object({
   emergencyFund: EmergencyFundConfigSchema,
   committedOutgoings: z.array(CommittedOutgoingSchema).default([]),
   dashboardConfig: DashboardConfigSchema.default({
-    heroMetrics: ["net_worth", "period_change", "projected_retirement_income", "savings_rate", "retirement_countdown"],
+    heroMetrics: ["projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway"],
   }),
   iht: IHTConfigSchema,
 });

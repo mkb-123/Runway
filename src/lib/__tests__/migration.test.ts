@@ -147,7 +147,7 @@ describe("migrateHouseholdData", () => {
       const migrated = migrateHouseholdData(data);
       const dc = migrated.dashboardConfig as Record<string, unknown>;
       expect(dc.heroMetrics).toEqual([
-        "net_worth", "period_change", "projected_retirement_income", "savings_rate", "retirement_countdown",
+        "projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway",
       ]);
     });
   });
@@ -240,17 +240,17 @@ describe("migrateHouseholdData", () => {
       const dc = migrated.dashboardConfig as Record<string, unknown>;
       const metrics = dc.heroMetrics as string[];
       expect(metrics).toHaveLength(5);
-      // Existing selections preserved in slots 0–2
-      expect(metrics[0]).toBe("net_worth");
+      // net_worth replaced → projected_retirement_income in slot 0
+      expect(metrics[0]).toBe("projected_retirement_income");
       expect(metrics[1]).toBe("cash_position");
       expect(metrics[2]).toBe("retirement_countdown");
       // Slots 3–4 filled with non-duplicate additions
       expect(metrics[3]).toBe("period_change");
-      expect(metrics[4]).toBe("projected_retirement_income");
+      expect(metrics[4]).toBe("savings_rate");
     });
 
     it("is idempotent — 5-item arrays are not modified", () => {
-      const existing = ["net_worth", "period_change", "projected_retirement_income", "savings_rate", "retirement_countdown"];
+      const existing = ["projected_retirement_income", "period_change", "savings_rate", "retirement_countdown", "cash_runway"];
       const data = {
         contributions: [],
         emergencyFund: { monthlyEssentialExpenses: 0, targetMonths: 6 },

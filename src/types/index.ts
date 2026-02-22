@@ -260,7 +260,6 @@ export function annualiseOutgoing(amount: number, frequency: OutgoingFrequency):
 // --- Dashboard Configuration ---
 
 export type HeroMetricType =
-  | "net_worth"
   | "cash_position"
   | "retirement_countdown"
   | "period_change"
@@ -276,7 +275,6 @@ export type HeroMetricType =
   | "iht_liability";
 
 export const HERO_METRIC_LABELS: Record<HeroMetricType, string> = {
-  net_worth: "Total Net Worth",
   cash_position: "Cash Position",
   retirement_countdown: "Retirement Countdown",
   period_change: "Period Change",
