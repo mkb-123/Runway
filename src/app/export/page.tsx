@@ -167,7 +167,7 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
       .filter((o) => o.category === "mortgage")
       .reduce((s, o) => s + annualiseOutgoing(o.amount, o.frequency), 0);
     const mortgageFromProp = household.properties.reduce((s, p) => s + getAnnualMortgagePayment(p), 0);
-    const annualMortg = mortgageFromOutgoings > 0 ? mortgageFromOutgoings : mortgageFromProp;
+    const annualMortg = Math.max(mortgageFromOutgoings, mortgageFromProp);
     const otherComm = household.committedOutgoings
       .filter((o) => !o.linkedChildId && o.category !== "mortgage")
       .reduce((s, o) => s + annualiseOutgoing(o.amount, o.frequency), 0);
@@ -277,7 +277,7 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
   }));
 
   // Track row positions for SUM formulas (data starts at row 2 = index 1 in Excel)
-  const accountDataRows = household.accounts.length; // rows 2..N+1
+
   const subtotalRows: number[] = [];
 
   // Add person subtotals with SUM formulas
@@ -966,7 +966,6 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
     const totalOutCol = hasMortgageCol ? "I" : "H";
     const netCashCol = hasMortgageCol ? "J" : "I";
     const runBalCol = hasMortgageCol ? "K" : "J";
-    const outgoingRange = hasMortgageCol ? "F:H" : "F:G";
     const lastDataCol = runBalCol;
 
     // Inject formulas per row
@@ -1177,8 +1176,11 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
     const annualMortgageFromProperty = household.properties.reduce(
       (s, p) => s + getAnnualMortgagePayment(p), 0
     );
-    const annualMortgage = annualMortgageFromOutgoings > 0 ? annualMortgageFromOutgoings : annualMortgageFromProperty;
-    const mortgageSource = annualMortgageFromOutgoings > 0 ? "from committed outgoings" : "from property data";
+    // Use the higher of committed outgoings vs property-derived to avoid under-counting multi-property mortgages
+    const annualMortgage = Math.max(annualMortgageFromOutgoings, annualMortgageFromProperty);
+    const mortgageSource = annualMortgageFromOutgoings > 0
+      ? (annualMortgageFromProperty > annualMortgageFromOutgoings ? "property data (exceeds committed)" : "from committed outgoings")
+      : "from property data";
     const annualOtherCommitted = otherOutgoings.reduce(
       (s, o) => s + annualiseOutgoing(o.amount, o.frequency), 0
     );
@@ -1369,8 +1371,6 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
 
     // Combined household pension projection with gap-to-target
     if (household.persons.length > 0) {
-      // Use the latest retirement age as the household planning horizon
-      const maxRetAge = Math.max(...household.persons.map((p) => p.plannedRetirementAge));
       let combinedProjected = 0;
 
       for (const person of household.persons) {
@@ -1399,9 +1399,10 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
       );
       const gap = requiredPot - combinedProjected;
 
+      const retAges = household.persons.map((p) => `${p.name} at ${p.plannedRetirementAge}`).join(", ");
       projRows.push(
         { Item: "--- Combined Household Pension ---", "Value": "" },
-        { Item: "Combined Projected Pension at Retirement", "Value": curr(combinedProjected) },
+        { Item: `Combined Projected Pension at Retirement (${retAges})`, "Value": curr(combinedProjected) },
         { Item: "Required Pot (from Retirement config)", "Value": curr(requiredPot) },
         { Item: gap > 0 ? "Shortfall" : "Surplus", "Value": curr(Math.abs(gap)) },
         { Item: "", "Value": "" },
@@ -1589,6 +1590,7 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
           { Item: "", "Value": "" },
           { Item: "Note", "Value": "Allowance headroom decreases as earlier tranches are deployed." },
           { Item: "Note", "Value": "Tax estimates use cumulative marginal rates — tranches vesting in the same month are stacked on top of salary." },
+          { Item: "Note", "Value": "Cash buffer projection does not account for monthly outgoings between vesting dates — review actual balance before acting." },
         );
       }
 
