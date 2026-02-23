@@ -23,7 +23,7 @@ import { calculateSchoolYearsRemaining, calculateTotalSchoolFeeCost, calculateSc
 import {
   calculateIncomeTax,
   calculateNI,
-  calculateTakeHomePay,
+  calculateTakeHomePayWithStudentLoan,
   calculateStudentLoan,
 } from "@/lib/tax";
 import {
@@ -137,26 +137,18 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
       .reduce((s, a) => s + a.currentValue, 0);
     const emergTarget = household.emergencyFund.monthlyEssentialExpenses * household.emergencyFund.targetMonths;
 
-    // Annual income — use take-home (net) income, not gross
+    // Annual income — use take-home (net) income including bonus and student loan
     const hhGrossIncome = getHouseholdGrossIncome(household.income, household.bonusStructures);
     let hhNetIncome = 0;
-    for (const inc of household.income) {
-      const th = calculateTakeHomePay(inc);
+    for (const person of household.persons) {
+      const inc = household.income.find((i) => i.personId === person.id);
+      if (!inc) continue;
+      const bonus = household.bonusStructures.find((b) => b.personId === person.id);
+      const cashBonus = bonus?.cashBonusAnnual ?? 0;
+      const totalGross = inc.grossSalary + cashBonus;
+      const incWithBonus = { ...inc, grossSalary: totalGross };
+      const th = calculateTakeHomePayWithStudentLoan(incWithBonus, person.studentLoanPlan);
       hhNetIncome += th.takeHome;
-    }
-    // Add net cash bonus (after marginal tax)
-    for (const bonus of household.bonusStructures) {
-      const cashBonus = bonus.cashBonusAnnual;
-      if (cashBonus > 0) {
-        const inc = household.income.find((i) => i.personId === bonus.personId);
-        if (inc) {
-          const taxWithout = calculateIncomeTax(inc.grossSalary, inc.employeePensionContribution, inc.pensionContributionMethod).tax;
-          const niWithout = calculateNI(inc.grossSalary, inc.employeePensionContribution, inc.pensionContributionMethod).ni;
-          const taxWith = calculateIncomeTax(inc.grossSalary + cashBonus, inc.employeePensionContribution, inc.pensionContributionMethod).tax;
-          const niWith = calculateNI(inc.grossSalary + cashBonus, inc.employeePensionContribution, inc.pensionContributionMethod).ni;
-          hhNetIncome += cashBonus - (taxWith - taxWithout) - (niWith - niWithout);
-        }
-      }
     }
 
     // Annual commitments
@@ -383,7 +375,8 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
     const niResult = calculateNI(totalGross, inc.employeePensionContribution, inc.pensionContributionMethod);
     const slGross = inc.pensionContributionMethod === "salary_sacrifice" ? totalGross - inc.employeePensionContribution : totalGross;
     const studentLoan = calculateStudentLoan(slGross, person.studentLoanPlan);
-    const takeHome = calculateTakeHomePay(inc);
+    const incWithBonus = { ...inc, grossSalary: totalGross };
+    const takeHome = calculateTakeHomePayWithStudentLoan(incWithBonus, person.studentLoanPlan);
 
     incomeRows.push(
       { Person: person.name, Item: "Gross Salary", "Value (£)": curr(inc.grossSalary) },
@@ -430,7 +423,8 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
       const totalGross = inc.grossSalary + cashBonus;
       const taxResult = calculateIncomeTax(totalGross, inc.employeePensionContribution, inc.pensionContributionMethod);
       const niResult = calculateNI(totalGross, inc.employeePensionContribution, inc.pensionContributionMethod);
-      const takeHome = calculateTakeHomePay(inc);
+      const incWithBonus = { ...inc, grossSalary: totalGross };
+      const takeHome = calculateTakeHomePayWithStudentLoan(incWithBonus, person.studentLoanPlan);
 
       hhGross += totalGross;
       hhTax += taxResult.tax;
@@ -693,7 +687,7 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
   );
 
   const ihtRows: Record<string, string | number>[] = [
-    { Item: "Total Net Worth", "Value (£)": curr(grandTotal) },
+    { Item: "Investable Net Worth (excl. property)", "Value (£)": curr(grandTotal) },
     { Item: "Property Value", "Value (£)": curr(propertyValue) },
     ...(mortgageBalance > 0 ? [{ Item: "Mortgage Balance", "Value (£)": curr(-mortgageBalance) }] : []),
     { Item: "Pension (Outside Estate)", "Value (£)": curr(pensionValue) },
@@ -770,7 +764,6 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
     Frequency: o.frequency as string,
     "Annual (£)": curr(annualiseOutgoing(o.amount, o.frequency)),
   }));
-  const totalOutgoings = outgoingItems.reduce((s, r) => s + r["Annual (£)"], 0);
   const outgoingDataCount = outgoingItems.length;
   const outgoingRows = [
     ...outgoingItems,
