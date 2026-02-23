@@ -437,10 +437,15 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
       hhNI += niResult.ni;
       hhTakeHome += takeHome.takeHome;
 
-      // Determine adjusted net income for PA taper check
-      const adjustedNet = inc.pensionContributionMethod === "salary_sacrifice"
-        ? totalGross - inc.employeePensionContribution
-        : totalGross;
+      // Determine adjusted net income for PA taper check (matches tax.ts logic)
+      let adjustedNet: number;
+      if (inc.pensionContributionMethod === "salary_sacrifice" || inc.pensionContributionMethod === "net_pay") {
+        adjustedNet = totalGross - inc.employeePensionContribution;
+      } else if (inc.pensionContributionMethod === "relief_at_source") {
+        adjustedNet = totalGross - (inc.employeePensionContribution / 0.8);
+      } else {
+        adjustedNet = totalGross;
+      }
       const paThreshold = UK_TAX_CONSTANTS.personalAllowanceTaperThreshold;
       const fullPA = UK_TAX_CONSTANTS.personalAllowance;
       let paStatus = "Full";
@@ -451,13 +456,15 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
         paStatus = `Tapered (£${reduced.toLocaleString()})`;
       }
 
-      // Marginal rate: determine which band the next £1 falls into
-      const topBand = taxResult.breakdown.length > 0
-        ? taxResult.breakdown[taxResult.breakdown.length - 1]
-        : null;
-      const marginalRate = topBand
-        ? formatPercent(topBand.rate)
-        : "0%";
+      // Marginal rate: compute empirically (handles PA taper 60% trap)
+      const taxOnGross = taxResult.tax + niResult.ni;
+      const taxOnGrossPlusOne = calculateIncomeTax(totalGross + 1, inc.employeePensionContribution, inc.pensionContributionMethod).tax
+        + calculateNI(totalGross + 1, inc.employeePensionContribution, inc.pensionContributionMethod).ni;
+      const empiricalMarginal = taxOnGrossPlusOne - taxOnGross;
+      const inTaperZone = adjustedNet > paThreshold && adjustedNet <= paThreshold + fullPA * 2;
+      const marginalRate = inTaperZone
+        ? `${formatPercent(empiricalMarginal)} (incl. PA taper)`
+        : formatPercent(empiricalMarginal);
 
       perPersonSummary.push({ name: person.name, gross: totalGross, marginalRate, paStatus });
     }
@@ -1043,6 +1050,7 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
       const deferred = getDeferredBonus(bonus);
       if (deferred <= 0) continue;
       const personName = getPersonName(bonus.personId);
+      const person = household.persons.find((p) => p.id === bonus.personId);
       const tranches = generateDeferredTranches(bonus);
       const totalProjected = totalProjectedDeferredValue(bonus);
       const inc = household.income.find((i) => i.personId === bonus.personId);
@@ -1084,18 +1092,27 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
         }));
         const combinedGross = projected.reduce((s, p) => s + p.gross, 0);
 
-        // Calculate marginal tax on combined gross (not per-tranche independently)
+        // Calculate marginal tax on combined gross (grown salary + student loan)
         let combinedTax = 0;
         let combinedNet = combinedGross;
         if (inc) {
-          const baseSalary = inc.grossSalary;
+          // Grow salary to vesting date for accurate marginal rate
+          const vestDate = new Date(monthTranches[0].vestingDate);
+          const yearsToVest = Math.max(0, (vestDate.getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000));
+          const baseSalary = inc.grossSalary * Math.pow(1 + (inc.salaryGrowthRate ?? 0), yearsToVest);
           const pensionContrib = inc.employeePensionContribution;
           const pensionMethod = inc.pensionContributionMethod;
           const taxOnBase = calculateIncomeTax(baseSalary, pensionContrib, pensionMethod).tax;
           const niOnBase = calculateNI(baseSalary, pensionContrib, pensionMethod).ni;
           const taxOnCombined = calculateIncomeTax(baseSalary + combinedGross, pensionContrib, pensionMethod).tax;
           const niOnCombined = calculateNI(baseSalary + combinedGross, pensionContrib, pensionMethod).ni;
-          combinedTax = (taxOnCombined - taxOnBase) + (niOnCombined - niOnBase);
+          // Include marginal student loan deduction
+          const studentLoanPlan = person?.studentLoanPlan ?? "none";
+          const slGross = pensionMethod === "salary_sacrifice" ? baseSalary - pensionContrib : baseSalary;
+          const slOnBase = calculateStudentLoan(slGross, studentLoanPlan);
+          const slOnCombined = calculateStudentLoan(slGross + combinedGross, studentLoanPlan);
+          const marginalSL = slOnCombined - slOnBase;
+          combinedTax = (taxOnCombined - taxOnBase) + (niOnCombined - niOnBase) + marginalSL;
           combinedNet = Math.max(0, combinedGross - combinedTax);
         }
 
@@ -1184,7 +1201,7 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
       { Item: `Valuation Date: ${reportDate}`, "Value (£)": "" },
       { Item: "", "Value (£)": "" },
       { Item: "--- Liquid Position ---", "Value (£)": "" },
-      { Item: "Cash & Premium Bonds", "Value (£)": curr(cashAccounts) },
+      { Item: "Liquid Cash (Cash + Cash ISA + Premium Bonds)", "Value (£)": curr(cashAccounts) },
       { Item: "Accessible Wealth (non-pension)", "Value (£)": curr(accessibleWealth) },
       { Item: "Total Net Worth (incl. property)", "Value (£)": curr(totalNetWorthWithProperty) },
       { Item: "", "Value (£)": "" },
@@ -1493,14 +1510,22 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
           }
 
           // Marginal tax on this tranche, stacked on prior tranches this month
+          // Grow salary to vesting date for accurate marginal rate
           let netValue = grossValue;
           if (inc) {
-            const baseWithPrior = grossSalary + cumulativeGrossThisMonth;
+            const yearsToVest = Math.max(0, (vest.getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000));
+            const grownSalary = grossSalary * Math.pow(1 + (inc.salaryGrowthRate ?? 0), yearsToVest);
+            const baseWithPrior = grownSalary + cumulativeGrossThisMonth;
             const taxOnPrior = calculateIncomeTax(baseWithPrior, inc.employeePensionContribution, inc.pensionContributionMethod).tax;
             const niOnPrior = calculateNI(baseWithPrior, inc.employeePensionContribution, inc.pensionContributionMethod).ni;
             const taxOnCombined = calculateIncomeTax(baseWithPrior + grossValue, inc.employeePensionContribution, inc.pensionContributionMethod).tax;
             const niOnCombined = calculateNI(baseWithPrior + grossValue, inc.employeePensionContribution, inc.pensionContributionMethod).ni;
-            netValue = Math.max(0, grossValue - (taxOnCombined - taxOnPrior) - (niOnCombined - niOnPrior));
+            // Include marginal student loan
+            const slGross = inc.pensionContributionMethod === "salary_sacrifice" ? baseWithPrior - inc.employeePensionContribution : baseWithPrior;
+            const slOnPrior = calculateStudentLoan(slGross, person.studentLoanPlan);
+            const slOnCombined = calculateStudentLoan(slGross + grossValue, person.studentLoanPlan);
+            const marginalSL = slOnCombined - slOnPrior;
+            netValue = Math.max(0, grossValue - (taxOnCombined - taxOnPrior) - (niOnCombined - niOnPrior) - marginalSL);
           }
           cumulativeGrossThisMonth += grossValue;
 
