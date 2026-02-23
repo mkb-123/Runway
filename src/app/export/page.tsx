@@ -64,7 +64,7 @@ function curr(n: number): number {
 
 /** Inject an Excel formula into a worksheet cell */
 function setFormula(ws: XLSX.WorkSheet, ref: string, formula: string): void {
-  ws[ref] = { t: "s", f: formula };
+  ws[ref] = { t: "n", f: formula };
 }
 
 /** Project gross value of a deferred tranche at vesting, accounting for growth */
@@ -390,7 +390,7 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
       { Person: "", Item: "Cash Bonus", "Value (£)": curr(cashBonus) },
       { Person: "", Item: "Deferred Bonus (Annual)", "Value (£)": curr(deferredBonus) },
       ...(bonus && bonus.vestingYears > 0 ? [{ Person: "" as string, Item: "  Vesting Period", "Value (£)": `${bonus.vestingYears} years` as string | number }] : []),
-      { Person: "", Item: "Total Gross", "Value (£)": curr(totalGross) },
+      { Person: "", Item: "Total Gross (excl. deferred — taxed on vesting)", "Value (£)": curr(totalGross) },
       { Person: "", Item: "Employee Pension", "Value (£)": curr(inc.employeePensionContribution) },
       { Person: "", Item: "Employer Pension", "Value (£)": curr(inc.employerPensionContribution) },
       { Person: "", Item: `Pension Method`, "Value (£)": inc.pensionContributionMethod as string },
@@ -541,8 +541,7 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
       { Person: "", Item: "Discretionary Pension", "Value (£)": curr(discretionary.pensionContribution) },
       { Person: "", Item: "TOTAL Pension Used", "Value (£)": curr(totalPensionUsed) },
       { Person: "", Item: "Standard Annual Allowance", "Value (£)": curr(pensionAllowance) },
-      { Person: "", Item: "Tapered Annual Allowance", "Value (£)": curr(effectiveAllowance) },
-      { Person: "", Item: "Effective Allowance", "Value (£)": curr(effectiveAllowance) },
+      { Person: "", Item: "Effective Allowance (after taper)", "Value (£)": curr(effectiveAllowance) },
       { Person: "", Item: "Remaining Headroom", "Value (£)": curr(Math.max(0, effectiveAllowance - totalPensionUsed)) },
       { Person: "", Item: "", "Value (£)": "" },
       { Person: "", Item: "ISA Used", "Value (£)": curr(discretionary.isaContribution) },
@@ -939,9 +938,9 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
 
     const cfRows = cashFlowMonths.map((m) => ({
       Month: m.month,
-      "Salary (£)": curr(m.salary),
-      "Bonus (£)": curr(m.bonus),
-      "Deferred Vesting (£)": curr(m.deferredVesting),
+      "Salary Net (£)": curr(m.salary),
+      "Bonus Net (£)": curr(m.bonus),
+      "Vesting Net (£)": curr(m.deferredVesting),
       "Total Income (£)": 0 as number, // formula
       "Committed Outgoings (£)": curr(m.committedOutgoings),
       "Lifestyle (£)": curr(m.lifestyleSpending),
@@ -1278,12 +1277,12 @@ function buildFullWorkbook(household: HouseholdData, snapshots?: SnapshotsData):
     if (lastFeeYear) {
       const yearsUntilFeesEnd = Math.max(0, lastFeeYear - new Date().getFullYear());
       const feeSavingsRecovered = household.children.reduce(
-        (s, c) => s + c.schoolFeeAnnual, 0
+        (s, c) => s + c.schoolFeeAnnual * Math.pow(1 + (c.feeInflationRate ?? 0), yearsUntilFeesEnd), 0
       );
       projRows.push({ Item: "", "Value": "" });
       projRows.push({ Item: "--- Post-School-Fees Inflection ---", "Value": "" });
       projRows.push({ Item: "School fees end in", "Value": `${yearsUntilFeesEnd} years (${lastFeeYear})` });
-      projRows.push({ Item: "Annual savings recovered", "Value": curr(feeSavingsRecovered) });
+      projRows.push({ Item: "Annual savings recovered (inflation-adjusted)", "Value": curr(feeSavingsRecovered) });
       projRows.push({ Item: "Contributions after fees end", "Value": curr(totalAnnualContribs + feeSavingsRecovered) });
 
       // Projected pot at fee-end, then 5 years after with boosted savings
