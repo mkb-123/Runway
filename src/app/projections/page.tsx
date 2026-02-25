@@ -16,13 +16,18 @@ import { usePersonView } from "@/context/person-view-context";
 import { PersonToggle } from "@/components/person-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { Wallet2, PiggyBank, Target } from "lucide-react";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/format";
 import { getHouseholdGrossIncome } from "@/types";
-import { projectScenarios, projectScenariosWithGrowth, calculateAdjustedRequiredPot, calculateAge } from "@/lib/projections";
+import { projectScenarios, projectScenariosWithGrowth, calculateAdjustedRequiredPot, calculateAge, getMidScenarioRate } from "@/lib/projections";
 import { calculateTotalAnnualContributions, calculateHouseholdStatePension } from "@/lib/aggregations";
+import { runMonteCarloSimulation, computeSuccessProbability } from "@/lib/monte-carlo";
+import { calculateSensitivity } from "@/lib/sensitivity";
 import { ScenarioDelta } from "@/components/scenario-delta";
 import { ProjectionChart } from "@/components/charts/projection-chart";
+import { MonteCarloChart } from "@/components/charts/monte-carlo-chart";
+import { SensitivityChart } from "@/components/charts/sensitivity-chart";
 import { SettingsBar } from "@/components/settings-bar";
 
 const PROJECTION_YEARS = 30;
@@ -160,6 +165,47 @@ export default function ProjectionsPage() {
     [baseHousehold.retirement, baseTotalStatePensionAnnual]
   );
 
+  // Mid scenario rate for Monte Carlo
+  const midRate = useMemo(
+    () => getMidScenarioRate(retirement.scenarioRates),
+    [retirement.scenarioRates]
+  );
+
+  // Monte Carlo simulation
+  const monteCarloResult = useMemo(
+    () => runMonteCarloSimulation({
+      currentValue: currentPot,
+      annualContribution: totalAnnualContributions,
+      expectedReturn: midRate,
+      volatility: 0.15,
+      years: PROJECTION_YEARS,
+      runs: 1000,
+      percentiles: [10, 25, 50, 75, 90],
+    }),
+    [currentPot, totalAnnualContributions, midRate]
+  );
+
+  // Success probability
+  const successProbability = useMemo(
+    () => computeSuccessProbability(
+      {
+        currentValue: currentPot,
+        annualContribution: totalAnnualContributions,
+        expectedReturn: midRate,
+        volatility: 0.15,
+        years: Math.min(yearsToRetirement, PROJECTION_YEARS),
+      },
+      requiredPot
+    ),
+    [currentPot, totalAnnualContributions, midRate, yearsToRetirement, requiredPot]
+  );
+
+  // Sensitivity analysis
+  const sensitivityResult = useMemo(
+    () => calculateSensitivity(household),
+    [household]
+  );
+
   // Run projections — use growth-aware version if salary growth is configured
   // Contributions stop at retirement age; investment growth continues for the full period
   const scenarios = useMemo(
@@ -278,68 +324,125 @@ export default function ProjectionsPage() {
         </CardContent>
       </Card>
 
-      {/* Sensitivity Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sensitivity Analysis</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Return Rate</TableHead>
-                  {SNAPSHOT_INTERVALS.map((year) => (
-                    <TableHead key={year} className="text-right">
-                      Year {year}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {scenarios.map((scenario) => (
-                  <TableRow key={scenario.rate}>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {formatPercent(scenario.rate)}
-                      </Badge>
-                    </TableCell>
-                    {SNAPSHOT_INTERVALS.map((year) => {
-                      const projection = scenario.projections.find(
-                        (p) => p.year === year
-                      );
-                      const value = projection?.value ?? 0;
-                      const meetsTarget = value >= requiredPot;
-                      return (
-                        <TableCell
-                          key={year}
-                          className={`text-right font-mono ${
-                            meetsTarget
-                              ? "text-green-600 dark:text-green-400"
-                              : ""
-                          }`}
-                        >
-                          {formatCurrencyCompact(value)}
-                        </TableCell>
-                      );
-                    })}
+      {/* Monte Carlo Probability Bands */}
+      <CollapsibleSection
+        title="Monte Carlo Simulation"
+        summary={`${Math.round(successProbability * 100)}% probability of reaching target`}
+        storageKey="projections-monte-carlo"
+        defaultOpen
+      >
+        <Card className="border-t border-t-primary/20">
+          <CardHeader>
+            <div className="flex items-baseline justify-between">
+              <CardTitle>Probability Bands</CardTitle>
+              <Badge
+                variant={successProbability >= 0.75 ? "default" : successProbability >= 0.5 ? "secondary" : "destructive"}
+                className="text-xs"
+              >
+                {Math.round(successProbability * 100)}% success
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              1,000 stochastic simulations at {formatPercent(midRate)} expected return with 15% volatility.
+              Shaded bands show 10th&ndash;90th and 25th&ndash;75th percentile ranges.
+            </p>
+            <MonteCarloChart result={monteCarloResult} targetPot={requiredPot} />
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
+
+      {/* What Moves the Needle — Sensitivity Analysis */}
+      <CollapsibleSection
+        title="What Moves the Needle"
+        summary="Which inputs have the biggest impact on your projected pot"
+        storageKey="projections-sensitivity"
+        defaultOpen
+      >
+        <Card>
+          <CardHeader>
+            <div className="flex items-baseline justify-between">
+              <CardTitle>Input Sensitivity</CardTitle>
+              <span className="text-xs text-muted-foreground">
+                Baseline: {formatCurrencyCompact(sensitivityResult.baselineValue)}
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              How each input changes your projected pot at retirement when varied by a small amount (+10% for amounts, +1pp for rates, +1 year for age).
+            </p>
+            <SensitivityChart result={sensitivityResult} />
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
+
+      {/* Rate Sensitivity Table */}
+      <CollapsibleSection
+        title="Rate Sensitivity Table"
+        summary="Pot values across return rates and time horizons"
+        storageKey="projections-sensitivity-table"
+      >
+        <Card>
+          <CardContent className="pt-6">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Return Rate</TableHead>
+                    {SNAPSHOT_INTERVALS.map((year) => (
+                      <TableHead key={year} className="text-right">
+                        Year {year}
+                      </TableHead>
+                    ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <p className="text-xs text-muted-foreground mt-4">
-            Values highlighted in green indicate the projected pot exceeds the required pot of{" "}
-            {formatCurrencyCompact(requiredPot)}.
-            {hasGrowthRate && (
-              <> Projections assume contributions grow at {formatPercent(weightedContributionGrowthRate)}/yr (weighted salary growth).</>
-            )}
-          </p>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {scenarios.map((scenario) => (
+                    <TableRow key={scenario.rate}>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {formatPercent(scenario.rate)}
+                        </Badge>
+                      </TableCell>
+                      {SNAPSHOT_INTERVALS.map((year) => {
+                        const projection = scenario.projections.find(
+                          (p) => p.year === year
+                        );
+                        const value = projection?.value ?? 0;
+                        const meetsTarget = value >= requiredPot;
+                        return (
+                          <TableCell
+                            key={year}
+                            className={`text-right font-mono ${
+                              meetsTarget
+                                ? "text-green-600 dark:text-green-400"
+                                : ""
+                            }`}
+                          >
+                            {formatCurrencyCompact(value)}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <p className="text-xs text-muted-foreground mt-4">
+              Values highlighted in green indicate the projected pot exceeds the required pot of{" "}
+              {formatCurrencyCompact(requiredPot)}.
+              {hasGrowthRate && (
+                <> Projections assume contributions grow at {formatPercent(weightedContributionGrowthRate)}/yr (weighted salary growth).</>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
 
       <p className="text-xs text-muted-foreground italic">
-        Capital at risk — projections are illustrative only and do not constitute financial advice. Past performance does not predict future returns.
+        Capital at risk — projections are illustrative only and do not constitute financial advice. Past performance does not predict future returns. Monte Carlo simulations use log-normal returns and a seeded PRNG for consistency.
       </p>
     </div>
   );

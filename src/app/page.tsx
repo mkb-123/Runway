@@ -21,6 +21,7 @@ import {
   CalendarDays,
   Users,
   ChevronDown,
+  Camera,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -242,7 +243,7 @@ const statusColorClasses = {
 // ============================================================
 
 export default function Home() {
-  const { snapshots: snapshotsData } = useData();
+  const { snapshots: snapshotsData, takeSnapshot } = useData();
   const { isScenarioMode, savedScenarios } = useScenario();
   const scenarioData = useScenarioData();
   const household = scenarioData.household;
@@ -641,40 +642,7 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* REC-B: School fee funding strip for school-fee households */}
-                {showSchoolFeeStrip && heroData.schoolFeeYearsRemaining > 0 && (
-                  <div className="mt-5 pt-4 border-t border-primary/10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <GraduationCap className="size-3.5 text-muted-foreground" />
-                        <span className="text-xs font-medium text-muted-foreground">School Fee Commitment</span>
-                      </div>
-                      <span className="text-xs font-bold tabular-nums">
-                        {heroData.schoolFeeYearsRemaining}yr remaining
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* REC-G: Couples snapshot for multi-person households */}
-                {household.persons.length >= 2 && selectedView === "household" && (
-                  <div className="mt-4 pt-3 border-t border-primary/10">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Users className="size-3.5 text-muted-foreground" />
-                      <span className="text-xs font-medium text-muted-foreground">At a Glance</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {heroData.perPersonRetirement.map((p) => (
-                        <div key={p.name} className="rounded-md bg-muted/40 px-3 py-2">
-                          <span className="text-xs font-medium">{p.name}</span>
-                          <span className="ml-2 text-xs tabular-nums text-muted-foreground">
-                            {p.years === 0 && p.months === 0 ? "Retired" : `${p.years}y ${p.months}m to retirement`}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* School fee strip and couples snapshot moved to dedicated sections below */}
               </CardContent>
             </Card>
 
@@ -878,12 +846,32 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          {snapshots.length > 1 && (
-            <Card className="border-t border-t-primary/20">
-              <CardHeader>
-                <CardTitle>Net Worth History</CardTitle>
-              </CardHeader>
-              <CardContent>
+          <Card className="border-t border-t-primary/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Net Worth History</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {snapshots.length === 0
+                      ? "No snapshots yet. Take your first one to start tracking."
+                      : snapshots.length === 1
+                        ? "1 snapshot. Take another next month to see trends."
+                        : `${snapshots.length} snapshots. Auto-captured monthly on each visit.`}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 shrink-0"
+                  onClick={takeSnapshot}
+                >
+                  <Camera className="size-3.5" />
+                  <span className="hidden sm:inline">Snapshot</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {snapshots.length > 1 ? (
                 <NetWorthHistoryChart
                   snapshots={snapshots}
                   propertyAddedDate={
@@ -892,9 +880,21 @@ export default function Home() {
                       : undefined
                   }
                 />
-              </CardContent>
-            </Card>
-          )}
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Camera className="size-10 text-muted-foreground/40 mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    {snapshots.length === 0
+                      ? "Take your first snapshot to start tracking net worth over time."
+                      : "Come back next month and take another snapshot to see your progress."}
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    Snapshots capture your current account balances by wrapper type.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card className="border-t border-t-primary/20">
             <CardHeader>

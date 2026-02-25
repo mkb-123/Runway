@@ -84,6 +84,8 @@ interface DataContextValue {
   dismissSaveError: () => void;
   updateHousehold: (data: HouseholdData) => void;
   updateSnapshots: (data: SnapshotsData) => void;
+  takeSnapshot: () => void;
+  deleteSnapshot: (date: string) => void;
   resetToDefaults: () => void;
   clearAllData: () => void;
   loadExampleData: () => void;
@@ -151,7 +153,7 @@ function removeFromLocalStorage(key: string): void {
 
 // --- Auto-snapshot helper ---
 
-function createAutoSnapshot(household: HouseholdData, date: Date): NetWorthSnapshot {
+export function createAutoSnapshot(household: HouseholdData, date: Date): NetWorthSnapshot {
   const isoDate = date.toISOString().slice(0, 10);
   const totalNetWorth = roundPence(household.accounts.reduce((sum, a) => sum + a.currentValue, 0));
 
@@ -233,6 +235,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setHousehold(data);
     const error = saveToLocalStorage(LS_KEY_HOUSEHOLD, data);
     if (error) setSaveError(error);
+
+    // Auto-snapshot: update today's snapshot when account data changes
+    if (data.accounts.length > 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      setSnapshots((prev) => {
+        // Replace any existing snapshot for today, or append
+        const filtered = prev.snapshots.filter((s) => s.date !== today);
+        const snapshot = createAutoSnapshot(data, new Date());
+        const updated = { snapshots: [...filtered, snapshot] };
+        saveToLocalStorage(LS_KEY_SNAPSHOTS, updated);
+        return updated;
+      });
+    }
   }, []);
 
   const updateSnapshots = useCallback((data: SnapshotsData) => {
@@ -261,6 +276,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
     saveToLocalStorage(LS_KEY_HOUSEHOLD, defaultHousehold);
     saveToLocalStorage(LS_KEY_SNAPSHOTS, defaultSnapshots);
   }, []);
+
+  const takeSnapshot = useCallback(() => {
+    const now = new Date();
+    const snapshot = createAutoSnapshot(household, now);
+    const updatedSnapshots = { snapshots: [...snapshots.snapshots, snapshot] };
+    setSnapshots(updatedSnapshots);
+    const error = saveToLocalStorage(LS_KEY_SNAPSHOTS, updatedSnapshots);
+    if (error) setSaveError(error);
+  }, [household, snapshots]);
+
+  const deleteSnapshot = useCallback((date: string) => {
+    const updatedSnapshots = { snapshots: snapshots.snapshots.filter((s) => s.date !== date) };
+    setSnapshots(updatedSnapshots);
+    const error = saveToLocalStorage(LS_KEY_SNAPSHOTS, updatedSnapshots);
+    if (error) setSaveError(error);
+  }, [snapshots]);
 
   // --- Computed helpers ---
 
@@ -316,6 +347,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dismissSaveError,
       updateHousehold,
       updateSnapshots,
+      takeSnapshot,
+      deleteSnapshot,
       resetToDefaults,
       clearAllData,
       loadExampleData,
@@ -335,6 +368,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dismissSaveError,
       updateHousehold,
       updateSnapshots,
+      takeSnapshot,
+      deleteSnapshot,
       resetToDefaults,
       clearAllData,
       loadExampleData,
