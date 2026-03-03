@@ -419,6 +419,8 @@ export interface HouseholdData {
   iht: IHTConfig;
   committedOutgoings: CommittedOutgoing[];
   dashboardConfig: DashboardConfig;
+  riskProfile?: RiskProfile;
+  insurancePolicies: InsurancePolicy[];
 }
 
 export interface SnapshotsData {
@@ -475,7 +477,7 @@ export const TAX_WRAPPER_LABELS: Record<TaxWrapper, string> = {
 
 // --- Financial Independence Diagnostic ---
 
-/** The 8 dimensions scored in the FI diagnostic (MVP) */
+/** The 10 dimensions scored in the FI diagnostic */
 export type DiagnosticDimension =
   | "retirement_readiness"
   | "tax_efficiency"
@@ -484,7 +486,9 @@ export type DiagnosticDimension =
   | "iht_exposure"
   | "portfolio_diversification"
   | "cash_flow_health"
-  | "pension_adequacy";
+  | "pension_adequacy"
+  | "risk_alignment"
+  | "insurance_protection";
 
 /** RAG rating for each diagnostic dimension */
 export type DiagnosticRating = "green" | "amber" | "red" | "insufficient_data";
@@ -528,6 +532,8 @@ export const DIAGNOSTIC_DIMENSION_LABELS: Record<DiagnosticDimension, string> = 
   portfolio_diversification: "Portfolio Diversification",
   cash_flow_health: "Cash Flow Health",
   pension_adequacy: "Pension Adequacy",
+  risk_alignment: "Risk Alignment",
+  insurance_protection: "Insurance & Protection",
 };
 
 // --- Phase 2: Risk Profile (scaffolding) ---

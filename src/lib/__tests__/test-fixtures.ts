@@ -13,6 +13,7 @@ import type {
   Contribution,
   Property,
   NetWorthSnapshot,
+  InsurancePolicy,
 } from "@/types";
 
 // ============================================================
@@ -98,6 +99,23 @@ export function makeProperty(overrides: Partial<Property> = {}): Property {
 }
 
 // ============================================================
+// Insurance policy factories
+// ============================================================
+
+export function makeInsurancePolicy(overrides: Partial<InsurancePolicy> = {}): InsurancePolicy {
+  return {
+    id: `ins-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    personId: "p1",
+    type: "life",
+    provider: "Aviva",
+    coverageAmount: 500000,
+    annualPremium: 600,
+    inflationLinked: false,
+    ...overrides,
+  };
+}
+
+// ============================================================
 // Main household factory
 // ============================================================
 
@@ -173,6 +191,7 @@ export function makeTestHousehold(overrides: Partial<HouseholdData> = {}): House
     dashboardConfig: {
       heroMetrics: ["projected_retirement_income", "cash_position", "retirement_countdown"],
     },
+    insurancePolicies: [],
     ...overrides,
   };
 }
@@ -195,6 +214,7 @@ export function makeEmptyHousehold(overrides: Partial<HouseholdData> = {}): Hous
     iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
     committedOutgoings: [],
     dashboardConfig: { heroMetrics: ["projected_retirement_income"] },
+    insurancePolicies: [],
     ...overrides,
   };
 }

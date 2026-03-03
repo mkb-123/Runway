@@ -10,6 +10,7 @@ import {
   Receipt,
   GraduationCap,
   Home,
+  Umbrella,
   CheckCircle2,
   Circle,
   Download,
@@ -51,6 +52,7 @@ import { IhtTab } from "./components/iht-tab";
 import { PropertyTab } from "./components/property-tab";
 import { CommitmentsTab } from "./components/commitments-tab";
 import { ChildrenTab } from "./components/children-tab";
+import { ProtectionTab } from "./components/protection-tab";
 import { SettingsSummaryBar } from "./components/settings-summary-bar";
 import { EmmaImportDialog } from "./components/emma-import-dialog";
 
@@ -79,7 +81,7 @@ function SettingsPageInner() {
   } = useData();
 
   const searchParams = useSearchParams();
-  const validTabs = ["household", "accounts", "property", "planning", "children", "commitments", "iht"];
+  const validTabs = ["household", "accounts", "property", "planning", "children", "commitments", "iht", "protection"];
   const tabFromUrl = searchParams.get("tab");
   const urlTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : null;
   const [localTab, setLocalTab] = useState(urlTab ?? "household");
@@ -293,6 +295,11 @@ function SettingsPageInner() {
             <Shield className="size-3.5" />
             IHT
           </TabsTrigger>
+          <TabsTrigger value="protection" className="gap-1.5 shrink-0">
+            <Umbrella className="size-3.5" />
+            <span className="hidden sm:inline">Protection</span>
+            <span className="sm:hidden">Cover</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="household">
@@ -339,6 +346,13 @@ function SettingsPageInner() {
 
         <TabsContent value="iht">
           <IhtTab
+            household={household}
+            updateHousehold={updateHousehold}
+          />
+        </TabsContent>
+
+        <TabsContent value="protection">
+          <ProtectionTab
             household={household}
             updateHousehold={updateHousehold}
           />

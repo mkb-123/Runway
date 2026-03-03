@@ -15,6 +15,8 @@
 // 6. Portfolio Diversification — wrapper concentration + accessibility
 // 7. Cash Flow Health — committed outgoings vs income
 // 8. Pension Adequacy — pension contributions vs allowance, bridge gap
+// 9. Risk Alignment — portfolio composition vs risk tolerance
+// 10. Insurance & Protection — life, CI, income protection coverage gaps
 
 import type {
   HouseholdData,
@@ -32,6 +34,7 @@ import {
   getPersonContributionTotals,
   getTotalPropertyEquity,
   getTotalPropertyValue,
+  getTotalMortgageBalance,
 } from "@/types";
 import {
   calculateAdjustedRequiredPot,
@@ -761,19 +764,274 @@ export function scorePensionAdequacy(household: HouseholdData): DiagnosticScore 
 }
 
 // ============================================================
+// 9. Risk Alignment
+// ============================================================
+
+export function scoreRiskAlignment(household: HouseholdData): DiagnosticScore {
+  const { riskProfile, accounts } = household;
+  const details: string[] = [];
+
+  if (!riskProfile || riskProfile.answers.length === 0) {
+    return {
+      dimension: "risk_alignment",
+      rating: "insufficient_data",
+      score: 0,
+      summary: "Complete the risk profile questionnaire to assess portfolio alignment.",
+      details: ["Go to Settings > Protection to complete the risk questionnaire."],
+      actionUrl: "/settings?tab=protection",
+    };
+  }
+
+  if (accounts.length === 0) {
+    return {
+      dimension: "risk_alignment",
+      rating: "insufficient_data",
+      score: 0,
+      summary: "No accounts to assess against risk profile.",
+      details: ["Add accounts to enable risk alignment scoring."],
+      actionUrl: "/settings?tab=accounts",
+    };
+  }
+
+  const totalNW = accounts.reduce((s, a) => s + a.currentValue, 0);
+  if (totalNW <= 0) {
+    return {
+      dimension: "risk_alignment",
+      rating: "insufficient_data",
+      score: 0,
+      summary: "No account values to assess.",
+      details: [],
+      actionUrl: "/settings?tab=accounts",
+    };
+  }
+
+  details.push(`Risk tolerance: ${riskProfile.tolerance} (score: ${riskProfile.overallScore}/100)`);
+  details.push(`Max drawdown tolerance: ${(riskProfile.maxDrawdownTolerance * 100).toFixed(0)}%`);
+
+  // Classify accounts into growth (equity-like) vs defensive (cash-like)
+  // Pensions excluded from alignment check as they are long-term by nature
+  let growthAssets = 0;
+  let defensiveAssets = 0;
+  let pensionAssets = 0;
+  for (const acc of accounts) {
+    const wrapper = getAccountTaxWrapper(acc.type);
+    if (wrapper === "pension") {
+      pensionAssets += acc.currentValue;
+    } else if (acc.type === "cash_savings" || acc.type === "cash_isa" || acc.type === "premium_bonds") {
+      defensiveAssets += acc.currentValue;
+    } else {
+      // stocks_and_shares_isa, gia, lifetime_isa → assumed equity/growth
+      growthAssets += acc.currentValue;
+    }
+  }
+
+  const nonPensionTotal = growthAssets + defensiveAssets;
+  const growthPct = nonPensionTotal > 0 ? (growthAssets / nonPensionTotal) * 100 : 0;
+  const defensivePct = nonPensionTotal > 0 ? (defensiveAssets / nonPensionTotal) * 100 : 0;
+
+  details.push(`Growth assets (non-pension): ${formatCurrency(growthAssets)} (${growthPct.toFixed(0)}%)`);
+  details.push(`Defensive assets: ${formatCurrency(defensiveAssets)} (${defensivePct.toFixed(0)}%)`);
+  details.push(`Pension (excluded): ${formatCurrency(pensionAssets)}`);
+
+  // Define ideal growth allocation ranges by tolerance
+  const idealRanges: Record<string, { min: number; max: number }> = {
+    conservative: { min: 20, max: 50 },
+    moderate: { min: 40, max: 75 },
+    aggressive: { min: 60, max: 95 },
+  };
+
+  const range = idealRanges[riskProfile.tolerance];
+  const midpoint = (range.min + range.max) / 2;
+
+  let score: number;
+  let recommendation: string | undefined;
+
+  if (nonPensionTotal <= 0) {
+    // All assets in pension — can't assess alignment meaningfully
+    score = 70;
+    details.push("All non-pension assets are £0 — alignment check limited to pension.");
+  } else if (growthPct >= range.min && growthPct <= range.max) {
+    // Within ideal range
+    const distanceFromMid = Math.abs(growthPct - midpoint);
+    const rangeHalf = (range.max - range.min) / 2;
+    score = 100 - (distanceFromMid / rangeHalf) * 15; // 85-100 within range
+    details.push(`Growth allocation within ideal range for ${riskProfile.tolerance} profile (${range.min}–${range.max}%).`);
+  } else {
+    // Outside ideal range — calculate how far
+    const overshoot = growthPct > range.max
+      ? growthPct - range.max
+      : range.min - growthPct;
+
+    score = Math.max(0, 75 - overshoot * 2);
+
+    if (growthPct > range.max) {
+      recommendation = `Portfolio is ${(growthPct - range.max).toFixed(0)}% more growth-oriented than your ${riskProfile.tolerance} risk profile suggests. Consider moving ${formatCurrency(Math.round((growthPct - midpoint) / 100 * nonPensionTotal))} to defensive assets.`;
+    } else {
+      recommendation = `Portfolio is ${(range.min - growthPct).toFixed(0)}% more defensive than your ${riskProfile.tolerance} risk profile suggests. You may be leaving returns on the table — consider increasing equity exposure.`;
+    }
+  }
+
+  return {
+    dimension: "risk_alignment",
+    rating: scoreToRating(clampScore(score)),
+    score: clampScore(score),
+    summary: `${riskProfile.tolerance.charAt(0).toUpperCase() + riskProfile.tolerance.slice(1)} risk profile with ${growthPct.toFixed(0)}% growth allocation.`,
+    details,
+    actionUrl: "/settings?tab=protection",
+    recommendation,
+  };
+}
+
+// ============================================================
+// 10. Insurance & Protection
+// ============================================================
+
+export function scoreInsuranceProtection(household: HouseholdData): DiagnosticScore {
+  const { persons, income, bonusStructures, insurancePolicies, properties, children } = household;
+  const details: string[] = [];
+
+  if (persons.length === 0 || income.length === 0) {
+    return {
+      dimension: "insurance_protection",
+      rating: "insufficient_data",
+      score: 0,
+      summary: "No persons or income data to assess insurance needs.",
+      details: ["Add persons and income to enable insurance assessment."],
+      actionUrl: "/settings?tab=household",
+    };
+  }
+
+  const grossIncome = getHouseholdGrossIncome(income, bonusStructures);
+  const totalMortgage = getTotalMortgageBalance(properties);
+  const hasDependents = children.length > 0 || persons.length >= 2;
+
+  details.push(`Household gross income: ${formatCurrency(grossIncome)}`);
+  details.push(`Outstanding mortgage: ${formatCurrency(totalMortgage)}`);
+  details.push(`Dependents: ${hasDependents ? "Yes" : "No"} (${children.length} children, ${persons.length} persons)`);
+
+  // Aggregate insurance coverage by type
+  const lifeCover = insurancePolicies
+    .filter((p) => p.type === "life")
+    .reduce((s, p) => s + p.coverageAmount, 0);
+  const ciCover = insurancePolicies
+    .filter((p) => p.type === "critical_illness")
+    .reduce((s, p) => s + p.coverageAmount, 0);
+  const ipCover = insurancePolicies
+    .filter((p) => p.type === "income_protection")
+    .reduce((s, p) => s + p.coverageAmount, 0);
+
+  details.push(`Life insurance cover: ${formatCurrency(lifeCover)}`);
+  details.push(`Critical illness cover: ${formatCurrency(ciCover)}`);
+  details.push(`Income protection cover: ${formatCurrency(ipCover)}/yr`);
+
+  // Determine need level based on dependents and mortgage
+  const needsLifeInsurance = hasDependents || totalMortgage > 0;
+  const needsIncomeProtection = grossIncome > 0;
+
+  // Life insurance benchmark: mortgage + 10x salary for dependents, mortgage only if no dependents
+  const lifeTarget = needsLifeInsurance
+    ? totalMortgage + (hasDependents ? grossIncome * 10 : 0)
+    : 0;
+
+  // Income protection benchmark: 60% of gross salary
+  const ipTarget = grossIncome * 0.6;
+
+  if (lifeTarget > 0) {
+    const lifePct = (lifeCover / lifeTarget) * 100;
+    details.push(`Life cover target: ${formatCurrency(lifeTarget)} (mortgage + ${hasDependents ? "10x" : "0x"} salary)`);
+    details.push(`Life cover ratio: ${lifePct.toFixed(0)}% of target`);
+  }
+
+  if (ipTarget > 0) {
+    const ipPct = (ipCover / ipTarget) * 100;
+    details.push(`Income protection target: ${formatCurrency(ipTarget)}/yr (60% of gross)`);
+    details.push(`Income protection ratio: ${ipPct.toFixed(0)}% of target`);
+  }
+
+  // Scoring:
+  // If no insurance needed (single, no dependents, no mortgage) → baseline 80
+  // Life insurance: 40% weight
+  // Income protection: 35% weight
+  // Critical illness: 25% weight (bonus — not essential)
+
+  let score: number;
+  let recommendation: string | undefined;
+
+  if (!needsLifeInsurance && !needsIncomeProtection) {
+    score = 80;
+    details.push("Low insurance needs — no dependents, no mortgage.");
+  } else {
+    // Life cover score
+    let lifeScore: number;
+    if (!needsLifeInsurance) {
+      lifeScore = 80;
+    } else if (lifeTarget <= 0) {
+      lifeScore = 80;
+    } else {
+      const lifePct = (lifeCover / lifeTarget) * 100;
+      lifeScore = lifePct >= 100 ? 100
+        : lifePct >= 75 ? 75 + (lifePct - 75)
+          : lifePct >= 50 ? 50 + (lifePct - 50)
+            : lifePct * 1;
+    }
+
+    // Income protection score
+    let ipScore: number;
+    if (ipTarget <= 0) {
+      ipScore = 80;
+    } else {
+      const ipPct = (ipCover / ipTarget) * 100;
+      ipScore = ipPct >= 100 ? 100
+        : ipPct >= 60 ? 60 + (ipPct - 60) * 1
+          : ipPct * 1;
+    }
+
+    // Critical illness score (bonus — having any is good)
+    const ciScore = ciCover > 0 ? Math.min(100, 60 + (ciCover / grossIncome) * 40) : 30;
+
+    score = lifeScore * 0.4 + ipScore * 0.35 + ciScore * 0.25;
+
+    // Generate recommendation
+    if (needsLifeInsurance && lifeCover < lifeTarget * 0.5) {
+      recommendation = `Life insurance cover of ${formatCurrency(lifeCover)} is significantly below the ${formatCurrency(lifeTarget)} target. ${hasDependents ? "With dependents, adequate life cover is essential." : "Consider covering your outstanding mortgage at minimum."}`;
+    } else if (ipCover < ipTarget * 0.3) {
+      recommendation = `No or minimal income protection. If unable to work, ${formatCurrency(ipTarget)}/yr would maintain 60% of income. This is often the most overlooked protection.`;
+    } else if (ciCover <= 0) {
+      recommendation = "No critical illness cover. A lump sum payout on diagnosis can cover costs during recovery and reduce financial stress.";
+    }
+  }
+
+  return {
+    dimension: "insurance_protection",
+    rating: scoreToRating(clampScore(score)),
+    score: clampScore(score),
+    summary: insurancePolicies.length > 0
+      ? `${insurancePolicies.length} protection policies in place covering ${formatCurrency(lifeCover + ciCover)} lump sum + ${formatCurrency(ipCover)}/yr income.`
+      : needsLifeInsurance
+        ? "No insurance policies recorded — protection gaps likely."
+        : "No insurance policies recorded.",
+    details,
+    actionUrl: "/settings?tab=protection",
+    recommendation,
+  };
+}
+
+// ============================================================
 // Orchestrator — generate full diagnostic report
 // ============================================================
 
 /** Dimension weights for the overall score */
 const DIMENSION_WEIGHTS: Record<DiagnosticDimension, number> = {
-  retirement_readiness: 0.25,
-  tax_efficiency: 0.15,
+  retirement_readiness: 0.22,
+  tax_efficiency: 0.13,
+  savings_rate: 0.13,
   emergency_fund: 0.10,
-  savings_rate: 0.15,
-  iht_exposure: 0.10,
-  portfolio_diversification: 0.10,
-  cash_flow_health: 0.10,
+  iht_exposure: 0.09,
+  portfolio_diversification: 0.09,
+  cash_flow_health: 0.09,
   pension_adequacy: 0.05,
+  risk_alignment: 0.05,
+  insurance_protection: 0.05,
 };
 
 /** All dimension scorers in evaluation order */
@@ -786,6 +1044,8 @@ const SCORERS: Array<(household: HouseholdData) => DiagnosticScore> = [
   scorePortfolioDiversification,
   scoreCashFlowHealth,
   scorePensionAdequacy,
+  scoreRiskAlignment,
+  scoreInsuranceProtection,
 ];
 
 /**

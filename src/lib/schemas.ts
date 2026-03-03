@@ -251,6 +251,38 @@ export const NetWorthSnapshotSchema = z.object({
   byWrapper: z.array(SnapshotByWrapperSchema),
 });
 
+// --- Risk Profile ---
+
+export const RiskToleranceLevelSchema = z.enum(["conservative", "moderate", "aggressive"]);
+
+export const RiskProfileAnswerSchema = z.object({
+  questionId: z.string().min(1),
+  answer: z.number().int().min(1).max(5),
+});
+
+export const RiskProfileSchema = z.object({
+  answers: z.array(RiskProfileAnswerSchema),
+  overallScore: z.number().min(0).max(100),
+  tolerance: RiskToleranceLevelSchema,
+  maxDrawdownTolerance: z.number().min(0).max(1),
+  lastUpdated: z.string(),
+});
+
+// --- Insurance & Protection ---
+
+export const InsurancePolicyTypeSchema = z.enum(["life", "critical_illness", "income_protection"]);
+
+export const InsurancePolicySchema = z.object({
+  id: z.string().min(1),
+  personId: z.string().min(1),
+  type: InsurancePolicyTypeSchema,
+  provider: z.string(),
+  coverageAmount: z.number().min(0),
+  annualPremium: z.number().min(0),
+  endDate: z.string().optional(),
+  inflationLinked: z.boolean().default(false),
+});
+
 // --- Top-Level Data Files ---
 
 export const HouseholdDataSchema = z.object({
@@ -268,6 +300,8 @@ export const HouseholdDataSchema = z.object({
     heroMetrics: ["projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway"],
   }),
   iht: IHTConfigSchema,
+  riskProfile: RiskProfileSchema.optional(),
+  insurancePolicies: z.array(InsurancePolicySchema).default([]),
 });
 
 export const SnapshotsDataSchema = z.object({

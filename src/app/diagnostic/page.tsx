@@ -16,6 +16,8 @@ import {
   AlertTriangle,
   XCircle,
   HelpCircle,
+  Compass,
+  Umbrella,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -45,6 +47,8 @@ const DIMENSION_ICONS: Record<DiagnosticDimension, LucideIcon> = {
   portfolio_diversification: BarChart3,
   cash_flow_health: Wallet,
   pension_adequacy: Target,
+  risk_alignment: Compass,
+  insurance_protection: Umbrella,
 };
 
 const RATING_CONFIG: Record<
@@ -263,7 +267,7 @@ export default function DiagnosticPage() {
     <main className="min-h-screen space-y-6 px-4 py-6 sm:px-6 lg:px-8 pb-20">
       <PageHeader
         title="Financial Independence Diagnostic"
-        description="Institutional-quality assessment of your household's financial health across 8 key dimensions."
+        description="Institutional-quality assessment of your household's financial health across 10 key dimensions."
       />
 
       {/* Overall Score */}
@@ -377,14 +381,16 @@ export default function DiagnosticPage() {
             <div>
               <h3 className="font-semibold text-foreground mb-1">Dimension Weights</h3>
               <ul className="space-y-0.5">
-                <li>Retirement Readiness: 25%</li>
-                <li>Tax Efficiency: 15%</li>
-                <li>Savings Rate: 15%</li>
+                <li>Retirement Readiness: 22%</li>
+                <li>Tax Efficiency: 13%</li>
+                <li>Savings Rate: 13%</li>
                 <li>Emergency Fund: 10%</li>
-                <li>IHT Exposure: 10%</li>
-                <li>Portfolio Diversification: 10%</li>
-                <li>Cash Flow Health: 10%</li>
+                <li>IHT Exposure: 9%</li>
+                <li>Portfolio Diversification: 9%</li>
+                <li>Cash Flow Health: 9%</li>
                 <li>Pension Adequacy: 5%</li>
+                <li>Risk Alignment: 5%</li>
+                <li>Insurance & Protection: 5%</li>
               </ul>
             </div>
             <div>

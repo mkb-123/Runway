@@ -66,6 +66,7 @@ const emptyHousehold: HouseholdData = {
   iht: { estimatedPropertyValue: 0, passingToDirectDescendants: false, gifts: [] },
   committedOutgoings: [],
   dashboardConfig: { heroMetrics: ["projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway"] },
+  insurancePolicies: [],
 };
 const emptySnapshots: SnapshotsData = { snapshots: [] };
 

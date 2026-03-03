@@ -348,4 +348,46 @@ describe("migrateHouseholdData", () => {
       expect(properties[0].mortgageBalance).toBe(200000);
     });
   });
+
+  describe("migration 12: insurancePolicies default", () => {
+    it("creates insurancePolicies[] when missing", () => {
+      const data = {
+        persons: [{ id: "p1", name: "Alice" }],
+        accounts: [],
+        income: [],
+        bonusStructures: [],
+        contributions: [],
+        retirement: { targetAnnualIncome: 60000, withdrawalRate: 0.04, includeStatePension: true, scenarioRates: [0.07] },
+        emergencyFund: { monthlyEssentialExpenses: 3000, targetMonths: 6, monthlyLifestyleSpending: 2000 },
+        properties: [],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: true, gifts: [] },
+        committedOutgoings: [],
+        dashboardConfig: { heroMetrics: ["projected_retirement_income", "cash_position", "retirement_countdown", "period_change", "cash_runway"] },
+      };
+
+      const migrated = migrateHouseholdData(data);
+      expect(migrated.insurancePolicies).toEqual([]);
+    });
+
+    it("is idempotent — preserves existing insurancePolicies", () => {
+      const existing = [{ id: "ins-1", personId: "p1", type: "life", provider: "Aviva", coverageAmount: 500000, annualPremium: 600, inflationLinked: false }];
+      const data = {
+        persons: [{ id: "p1", name: "Alice" }],
+        accounts: [],
+        income: [],
+        bonusStructures: [],
+        contributions: [],
+        retirement: { targetAnnualIncome: 60000, withdrawalRate: 0.04, includeStatePension: true, scenarioRates: [0.07] },
+        emergencyFund: { monthlyEssentialExpenses: 3000, targetMonths: 6, monthlyLifestyleSpending: 2000 },
+        properties: [],
+        iht: { estimatedPropertyValue: 0, passingToDirectDescendants: true, gifts: [] },
+        committedOutgoings: [],
+        dashboardConfig: { heroMetrics: ["projected_retirement_income", "cash_position", "retirement_countdown", "period_change", "cash_runway"] },
+        insurancePolicies: existing,
+      };
+
+      const migrated = migrateHouseholdData(data);
+      expect(migrated.insurancePolicies).toEqual(existing);
+    });
+  });
 });

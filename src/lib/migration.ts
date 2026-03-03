@@ -39,6 +39,7 @@ export function migrateHouseholdData(raw: Record<string, unknown>): Record<strin
   data = migrateBonusTotalModel(data);
   data = migrateHeroMetricsFiveSlots(data);
   data = migratePropertyFirstClass(data);
+  data = migrateInsurancePoliciesDefault(data);
   return data;
 }
 
@@ -413,4 +414,14 @@ function migratePropertyFirstClass(data: Record<string, unknown>): Record<string
 
   // No old property value — just ensure the array exists
   return { ...data, properties: [] };
+}
+
+/**
+ * Migration 12: Ensure insurancePolicies array exists.
+ * riskProfile is optional (undefined until the questionnaire is completed),
+ * so it does not need a default — Zod handles it with .optional().
+ */
+function migrateInsurancePoliciesDefault(data: Record<string, unknown>): Record<string, unknown> {
+  if (Array.isArray(data.insurancePolicies)) return data;
+  return { ...data, insurancePolicies: [] };
 }

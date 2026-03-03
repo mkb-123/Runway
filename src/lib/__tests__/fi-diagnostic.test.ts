@@ -12,10 +12,13 @@ import {
   scorePortfolioDiversification,
   scoreCashFlowHealth,
   scorePensionAdequacy,
+  scoreRiskAlignment,
+  scoreInsuranceProtection,
   generateDiagnosticReport,
 } from "@/lib/fi-diagnostic";
-import { makeTestHousehold, makeEmptyHousehold, makePerson, makeAccount, makeIncome, makeProperty } from "./test-fixtures";
-import type { HouseholdData } from "@/types";
+import { makeTestHousehold, makeEmptyHousehold, makePerson, makeAccount, makeIncome, makeProperty, makeInsurancePolicy } from "./test-fixtures";
+import { buildRiskProfile, calculateRiskScore, RISK_PROFILE_QUESTIONS } from "@/lib/risk-profile";
+import type { HouseholdData, RiskProfile, RiskProfileAnswer } from "@/types";
 
 // ============================================================
 // 1. Retirement Readiness
@@ -502,10 +505,10 @@ describe("scorePensionAdequacy", () => {
 // ============================================================
 
 describe("generateDiagnosticReport", () => {
-  it("produces report with all 8 dimensions", () => {
+  it("produces report with all 10 dimensions", () => {
     const h = makeTestHousehold();
     const report = generateDiagnosticReport(h);
-    expect(report.scores).toHaveLength(8);
+    expect(report.scores).toHaveLength(10);
     expect(report.scores.map((s) => s.dimension)).toEqual([
       "retirement_readiness",
       "tax_efficiency",
@@ -515,6 +518,8 @@ describe("generateDiagnosticReport", () => {
       "portfolio_diversification",
       "cash_flow_health",
       "pension_adequacy",
+      "risk_alignment",
+      "insurance_protection",
     ]);
   });
 
@@ -531,19 +536,19 @@ describe("generateDiagnosticReport", () => {
     expect(["green", "amber", "red"]).toContain(report.overallRating);
   });
 
-  it("rating counts sum to 8", () => {
+  it("rating counts sum to 10", () => {
     const h = makeTestHousehold();
     const report = generateDiagnosticReport(h);
     const total = report.ratingCounts.green + report.ratingCounts.amber + report.ratingCounts.red + report.ratingCounts.insufficient_data;
-    expect(total).toBe(8);
+    expect(total).toBe(10);
   });
 
   it("handles empty household without crashing", () => {
     const h = makeEmptyHousehold();
     const report = generateDiagnosticReport(h);
-    expect(report.scores).toHaveLength(8);
+    expect(report.scores).toHaveLength(10);
     // All should be insufficient_data
-    expect(report.ratingCounts.insufficient_data).toBe(8);
+    expect(report.ratingCounts.insufficient_data).toBe(10);
     expect(report.overallScore).toBe(0);
   });
 
@@ -595,12 +600,251 @@ describe("generateDiagnosticReport", () => {
       retirement: { targetAnnualIncome: 75_000, withdrawalRate: 0.04, includeStatePension: true, scenarioRates: [0.04, 0.06, 0.08] },
     });
     const report = generateDiagnosticReport(h);
-    expect(report.scores).toHaveLength(8);
+    expect(report.scores).toHaveLength(10);
 
     // IHT should be red for Eleanor (single, no RNRB, ~3M estate)
     const ihtScore = report.scores.find((s) => s.dimension === "iht_exposure");
     expect(ihtScore?.rating).toBe("red");
     // Verify single person is noted
     expect(ihtScore?.details.some((d) => d.includes("single"))).toBe(true);
+  });
+});
+
+// ============================================================
+// 9. Risk Alignment
+// ============================================================
+
+function makeConservativeProfile(): RiskProfile {
+  const answers: RiskProfileAnswer[] = RISK_PROFILE_QUESTIONS.map((q) => ({
+    questionId: q.id,
+    answer: 1,
+  }));
+  return buildRiskProfile(answers);
+}
+
+function makeAggressiveProfile(): RiskProfile {
+  const answers: RiskProfileAnswer[] = RISK_PROFILE_QUESTIONS.map((q) => ({
+    questionId: q.id,
+    answer: 5,
+  }));
+  return buildRiskProfile(answers);
+}
+
+function makeModerateProfile(): RiskProfile {
+  const answers: RiskProfileAnswer[] = RISK_PROFILE_QUESTIONS.map((q) => ({
+    questionId: q.id,
+    answer: 3,
+  }));
+  return buildRiskProfile(answers);
+}
+
+describe("scoreRiskAlignment", () => {
+  it("returns insufficient_data when no risk profile", () => {
+    const h = makeTestHousehold();
+    const result = scoreRiskAlignment(h);
+    expect(result.rating).toBe("insufficient_data");
+    expect(result.dimension).toBe("risk_alignment");
+  });
+
+  it("returns insufficient_data when no accounts", () => {
+    const h = makeEmptyHousehold({ riskProfile: makeModerateProfile() });
+    const result = scoreRiskAlignment(h);
+    expect(result.rating).toBe("insufficient_data");
+  });
+
+  it("scores high for aligned moderate profile with balanced portfolio", () => {
+    const h = makeTestHousehold({
+      riskProfile: makeModerateProfile(),
+      accounts: [
+        makeAccount({ id: "a1", personId: "p1", type: "stocks_and_shares_isa", currentValue: 200_000 }),
+        makeAccount({ id: "a2", personId: "p1", type: "cash_savings", currentValue: 100_000 }),
+        makeAccount({ id: "a3", personId: "p1", type: "sipp", currentValue: 300_000 }),
+      ],
+    });
+    const result = scoreRiskAlignment(h);
+    // Moderate profile, 67% growth / 33% defensive (non-pension) → within range
+    expect(result.score).toBeGreaterThanOrEqual(70);
+  });
+
+  it("scores low for conservative profile with all-equity portfolio", () => {
+    const h = makeTestHousehold({
+      riskProfile: makeConservativeProfile(),
+      accounts: [
+        makeAccount({ id: "a1", personId: "p1", type: "stocks_and_shares_isa", currentValue: 300_000 }),
+        makeAccount({ id: "a2", personId: "p1", type: "gia", currentValue: 200_000 }),
+        makeAccount({ id: "a3", personId: "p1", type: "cash_savings", currentValue: 10_000 }),
+      ],
+    });
+    const result = scoreRiskAlignment(h);
+    // Conservative profile but 98%+ in growth → misalignment
+    expect(result.score).toBeLessThan(70);
+    expect(result.recommendation).toBeDefined();
+  });
+
+  it("scores low for aggressive profile with all-cash portfolio", () => {
+    const h = makeTestHousehold({
+      riskProfile: makeAggressiveProfile(),
+      accounts: [
+        makeAccount({ id: "a1", personId: "p1", type: "cash_savings", currentValue: 300_000 }),
+        makeAccount({ id: "a2", personId: "p1", type: "premium_bonds", currentValue: 50_000 }),
+      ],
+    });
+    const result = scoreRiskAlignment(h);
+    // Aggressive profile but all defensive → misalignment
+    expect(result.score).toBeLessThan(60);
+    expect(result.recommendation).toContain("defensive");
+  });
+
+  it("includes tolerance level in details", () => {
+    const h = makeTestHousehold({
+      riskProfile: makeModerateProfile(),
+    });
+    const result = scoreRiskAlignment(h);
+    expect(result.details.some((d) => d.includes("moderate"))).toBe(true);
+  });
+});
+
+// ============================================================
+// 10. Insurance & Protection
+// ============================================================
+
+describe("scoreInsuranceProtection", () => {
+  it("returns insufficient_data for empty household", () => {
+    const h = makeEmptyHousehold();
+    const result = scoreInsuranceProtection(h);
+    expect(result.rating).toBe("insufficient_data");
+    expect(result.dimension).toBe("insurance_protection");
+  });
+
+  it("scores well with comprehensive coverage", () => {
+    const h = makeTestHousehold({
+      properties: [makeProperty({ mortgageBalance: 300_000 })],
+      children: [{ id: "c1", name: "Child", dateOfBirth: "2020-01-01", schoolFeeAnnual: 0, feeInflationRate: 0.05, schoolStartAge: 4, schoolEndAge: 18 }],
+      insurancePolicies: [
+        makeInsurancePolicy({ id: "ins1", personId: "p1", type: "life", coverageAmount: 2_000_000 }),
+        makeInsurancePolicy({ id: "ins2", personId: "p1", type: "critical_illness", coverageAmount: 300_000 }),
+        makeInsurancePolicy({ id: "ins3", personId: "p1", type: "income_protection", coverageAmount: 72_000 }),
+      ],
+    });
+    const result = scoreInsuranceProtection(h);
+    expect(result.score).toBeGreaterThanOrEqual(60);
+  });
+
+  it("scores low with no insurance and dependents", () => {
+    const h = makeTestHousehold({
+      properties: [makeProperty({ mortgageBalance: 300_000 })],
+      children: [{ id: "c1", name: "Child", dateOfBirth: "2020-01-01", schoolFeeAnnual: 0, feeInflationRate: 0.05, schoolStartAge: 4, schoolEndAge: 18 }],
+      insurancePolicies: [],
+    });
+    const result = scoreInsuranceProtection(h);
+    // No insurance, has dependents and mortgage → red
+    expect(result.rating).toBe("red");
+    expect(result.recommendation).toBeDefined();
+  });
+
+  it("gives higher baseline for no dependents / no mortgage", () => {
+    const h = makeTestHousehold({
+      persons: [makePerson({ id: "p1" })],
+      income: [makeIncome({ personId: "p1" })],
+      bonusStructures: [],
+      children: [],
+      properties: [],
+      insurancePolicies: [],
+    });
+    const result = scoreInsuranceProtection(h);
+    // Single person, no dependents, no mortgage — lower need
+    // But still has income to protect, so score is moderate
+    expect(result.score).toBeGreaterThan(20);
+  });
+
+  it("includes coverage breakdown in details", () => {
+    const h = makeTestHousehold({
+      insurancePolicies: [
+        makeInsurancePolicy({ id: "ins1", type: "life", coverageAmount: 500_000 }),
+      ],
+    });
+    const result = scoreInsuranceProtection(h);
+    expect(result.details.some((d) => d.includes("Life insurance cover"))).toBe(true);
+    expect(result.details.some((d) => d.includes("Income protection cover"))).toBe(true);
+  });
+
+  it("values income protection highly", () => {
+    const h = makeTestHousehold({
+      properties: [makeProperty({ mortgageBalance: 200_000 })],
+      insurancePolicies: [
+        makeInsurancePolicy({ id: "ins1", type: "income_protection", coverageAmount: 80_000, personId: "p1" }),
+      ],
+    });
+    const result = scoreInsuranceProtection(h);
+    // Has income protection, but missing life and CI
+    expect(result.score).toBeGreaterThan(20);
+  });
+});
+
+// ============================================================
+// Risk Profile Scoring
+// ============================================================
+
+describe("calculateRiskScore", () => {
+  it("returns 0 score for empty answers", () => {
+    const result = calculateRiskScore([]);
+    expect(result.overallScore).toBe(0);
+    expect(result.tolerance).toBe("moderate");
+  });
+
+  it("returns conservative for all-1 answers", () => {
+    const answers: RiskProfileAnswer[] = RISK_PROFILE_QUESTIONS.map((q) => ({
+      questionId: q.id,
+      answer: 1,
+    }));
+    const result = calculateRiskScore(answers);
+    expect(result.tolerance).toBe("conservative");
+    expect(result.overallScore).toBe(20); // 6/30 * 100 = 20
+    expect(result.maxDrawdownTolerance).toBe(0.05);
+  });
+
+  it("returns aggressive for all-5 answers", () => {
+    const answers: RiskProfileAnswer[] = RISK_PROFILE_QUESTIONS.map((q) => ({
+      questionId: q.id,
+      answer: 5,
+    }));
+    const result = calculateRiskScore(answers);
+    expect(result.tolerance).toBe("aggressive");
+    expect(result.overallScore).toBe(100);
+    expect(result.maxDrawdownTolerance).toBe(0.40);
+  });
+
+  it("returns moderate for all-3 answers", () => {
+    const answers: RiskProfileAnswer[] = RISK_PROFILE_QUESTIONS.map((q) => ({
+      questionId: q.id,
+      answer: 3,
+    }));
+    const result = calculateRiskScore(answers);
+    expect(result.tolerance).toBe("moderate");
+    expect(result.overallScore).toBe(60); // 18/30 * 100 = 60
+    expect(result.maxDrawdownTolerance).toBe(0.20);
+  });
+
+  it("correctly identifies max drawdown from specific question", () => {
+    const answers: RiskProfileAnswer[] = RISK_PROFILE_QUESTIONS.map((q) => ({
+      questionId: q.id,
+      answer: q.id === "max_drawdown" ? 4 : 3,
+    }));
+    const result = calculateRiskScore(answers);
+    expect(result.maxDrawdownTolerance).toBe(0.30);
+  });
+});
+
+describe("buildRiskProfile", () => {
+  it("builds a complete profile from answers", () => {
+    const answers: RiskProfileAnswer[] = RISK_PROFILE_QUESTIONS.map((q) => ({
+      questionId: q.id,
+      answer: 3,
+    }));
+    const profile = buildRiskProfile(answers);
+    expect(profile.answers).toHaveLength(6);
+    expect(profile.overallScore).toBe(60);
+    expect(profile.tolerance).toBe("moderate");
+    expect(profile.lastUpdated).toBeTruthy();
   });
 });

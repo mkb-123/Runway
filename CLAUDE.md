@@ -24,6 +24,8 @@ HouseholdData {
   properties[]       — id, label, estimatedValue, ownerPersonIds[], mortgageBalance
   iht                — passingToDirectDescendants, gifts[] (estimatedPropertyValue deprecated → use properties[])
   dashboardConfig    — heroMetrics: HeroMetricType[] (max 5; index 0 = primary)
+  riskProfile?       — answers[], overallScore, tolerance (conservative|moderate|aggressive), maxDrawdownTolerance, lastUpdated
+  insurancePolicies[] — id, personId, type (life|critical_illness|income_protection), provider, coverageAmount, annualPremium, endDate?, inflationLinked
 }
 ```
 
@@ -148,7 +150,7 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (747 tests)
+- **Testing:** Vitest + Testing Library (767 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
@@ -396,7 +398,7 @@ Single source of truth. Never hardcode rates elsewhere.
 - Types: `DrawdownStrategy`, `AccountPot`, `DrawdownYearResult`, `DrawdownPlan`
 
 #### `fi-diagnostic.ts` — Financial Independence Diagnostic Engine
-- `generateDiagnosticReport(household) → DiagnosticReport` — orchestrates all 8 dimension scorers into a weighted report
+- `generateDiagnosticReport(household) → DiagnosticReport` — orchestrates all 10 dimension scorers into a weighted report
 - `scoreRetirementReadiness(household) → DiagnosticScore` — FIRE progress + projected pot vs target
 - `scoreTaxEfficiency(household) → DiagnosticScore` — wrapper placement + ISA/pension allowance usage
 - `scoreEmergencyFund(household) → DiagnosticScore` — months of essential expenses covered
@@ -405,7 +407,16 @@ Single source of truth. Never hardcode rates elsewhere.
 - `scorePortfolioDiversification(household) → DiagnosticScore` — wrapper/provider/concentration analysis
 - `scoreCashFlowHealth(household) → DiagnosticScore` — committed ratio vs income
 - `scorePensionAdequacy(household) → DiagnosticScore` — pension projection + bridge gap
+- `scoreRiskAlignment(household) → DiagnosticScore` — portfolio composition vs risk tolerance profile
+- `scoreInsuranceProtection(household) → DiagnosticScore` — life, CI, income protection coverage gaps
 - Types: `DiagnosticScore`, `DiagnosticReport`, `DiagnosticDimension`, `DiagnosticRating`
+
+#### `risk-profile.ts` — Risk Profile Questionnaire & Scoring
+- `calculateRiskScore(answers) → { overallScore, tolerance, maxDrawdownTolerance }` — composite score from questionnaire
+- `buildRiskProfile(answers) → RiskProfile` — builds complete profile from answers
+- `RISK_PROFILE_QUESTIONS` — 6 risk tolerance questions with 1-5 scale options
+- `RISK_TOLERANCE_LABELS` — display labels for tolerance levels
+- Types: `RiskProfileQuestion`, `RiskProfileQuestionOption`
 
 #### `recommendations.ts` — Actionable Financial Recommendations
 - `generateRecommendations(household) → Recommendation[]` — master function calling 10+ analyzers
@@ -431,10 +442,10 @@ Single source of truth. Never hardcode rates elsewhere.
 
 #### `schemas.ts` — Zod Runtime Validation
 - `HouseholdDataSchema`, `SnapshotsDataSchema` — top-level
-- Per-entity: `PersonSchema`, `AccountSchema`, `PersonIncomeSchema`, `BonusStructureSchema`, `ContributionSchema`, `RetirementConfigSchema`, `EmergencyFundConfigSchema`, `CommittedOutgoingSchema`, `ChildSchema`, `GiftSchema`, `IHTConfigSchema`, `DashboardConfigSchema`
+- Per-entity: `PersonSchema`, `AccountSchema`, `PersonIncomeSchema`, `BonusStructureSchema`, `ContributionSchema`, `RetirementConfigSchema`, `EmergencyFundConfigSchema`, `CommittedOutgoingSchema`, `ChildSchema`, `GiftSchema`, `IHTConfigSchema`, `DashboardConfigSchema`, `RiskProfileSchema`, `InsurancePolicySchema`
 
 #### `migration.ts` — localStorage Schema Migrations
-- `migrateHouseholdData(raw) → record` — 11 idempotent migrations:
+- `migrateHouseholdData(raw) → record` — 12 idempotent migrations:
   1. `annualContributions → contributions`
   2. `estimatedAnnualExpenses → monthlyLifestyleSpending`
   3. Ensure `monthlyLifestyleSpending` in emergencyFund
@@ -446,6 +457,7 @@ Single source of truth. Never hardcode rates elsewhere.
   9. `deferredBonusAnnual → totalBonusAnnual` (total model)
   10. Expand `heroMetrics` from old 3-slot tuple to 5-slot array (adds `period_change`, `projected_retirement_income`)
   11. Promote property from `iht.estimatedPropertyValue` scalar to first-class `properties[]` array (creates property entry, zeros old field)
+  12. Default `insurancePolicies[]` (riskProfile is optional, handled by Zod)
 
 #### `utils.ts` — Tailwind Utilities
 - `cn(...inputs)` — clsx + twMerge
@@ -466,7 +478,7 @@ Single source of truth. Never hardcode rates elsewhere.
 - `EmergencyFundConfig` — monthlyEssentialExpenses, targetMonths, monthlyLifestyleSpending
 - `Child` — id, name, dateOfBirth, schoolFeeAnnual, feeInflationRate, schoolStartAge, schoolEndAge
 - `CommittedOutgoing` — id, category, label, amount, frequency, startDate?, endDate?, inflationRate?, linkedChildId?
-- `Gift`, `IHTConfig`, `DashboardConfig` (`heroMetrics: HeroMetricType[]` — index 0 primary, max 5), `NetWorthSnapshot`, `HouseholdData`, `SnapshotsData`
+- `Gift`, `IHTConfig`, `DashboardConfig` (`heroMetrics: HeroMetricType[]` — index 0 primary, max 5), `RiskProfile`, `RiskProfileAnswer`, `InsurancePolicy`, `NetWorthSnapshot`, `HouseholdData`, `SnapshotsData`
 
 **Helper functions:**
 - `getPropertyEquity(property) → number` — estimatedValue - mortgageBalance (floored at 0)
@@ -498,7 +510,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | Route | File | Purpose | Key lib dependencies |
 |-------|------|---------|---------------------|
 | `/` (Dashboard) | `page.tsx` | Hero metrics, recommendations, net worth breakdown, school fee timeline, retirement countdown, committed outgoings list | `recommendations.ts`, `projections.ts`, `school-fees.ts`, `format.ts` |
-| `/diagnostic` | `diagnostic/page.tsx` | FI diagnostic scorecard: 8-dimension RAG-rated assessment with overall score | `fi-diagnostic.ts`, `format.ts` |
+| `/diagnostic` | `diagnostic/page.tsx` | FI diagnostic scorecard: 10-dimension RAG-rated assessment with overall score | `fi-diagnostic.ts`, `risk-profile.ts`, `format.ts` |
 | `/accounts` | `accounts/page.tsx` | Account register by person & type, add/edit/delete, cost basis | `format.ts` |
 | `/income` | `income/page.tsx` | Salary, tax, NI, student loan, deferred bonus, 24-month cash flow, school fees, income trajectory | `tax.ts`, `cash-flow.ts`, `deferred-bonus.ts`, `school-fees.ts`, `format.ts` |
 | `/retirement` | `retirement/page.tsx` | Retirement countdown, pension bridge, FIRE metrics, income timeline, scenario controls | `projections.ts`, `format.ts` |
@@ -519,6 +531,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | `commitments-tab.tsx` | Commitments | Committed outgoings (category, label, amount, frequency, dates), auto-synced school fees |
 | `property-tab.tsx` | Property | Properties with CRUD, mortgage details (rate/term/start), appreciation rate, owner toggles |
 | `iht-tab.tsx` | IHT | Direct descendants toggle, gifts register (property summary links to Property tab) |
+| `protection-tab.tsx` | Protection | Risk profile questionnaire (6 questions, 1-5 scale), insurance policies CRUD (life, CI, income protection) |
 | `accounts-tab.tsx` | (inline) | Account type, provider, name, balance, cost basis |
 | `emma-import-dialog.tsx` | — | Emma CSV import dialog: upload, review spending analysis, apply outgoings |
 | `field-helpers.tsx` | — | Shared form input components (currency, date, percentage fields) |
@@ -605,8 +618,8 @@ Single source of truth. Never hardcode rates elsewhere.
 | `scenario.test.ts` | Scenario override merging (income, contributions, retirement, accounts, market shock), savings rate scaling, impact calculation, avoid-taper preset, target income override integration, combined integration |
 | `format.test.ts` | Currency, percentage, date, number formatting |
 | `cash-flow.test.ts` | 24-month timeline: salary growth, bonus months, deferred vesting, term fees |
-| `migration.test.ts` | All 11 data migrations: old formats → current schema |
-| `test-fixtures.ts` | Shared test fixture factories: `makeTestHousehold`, `makeEmptyHousehold`, `makePerson`, `makeProperty`, `makeAccount`, `makeIncome`, `makeSnapshot` — single source of truth for HouseholdData test objects |
+| `migration.test.ts` | All 12 data migrations: old formats → current schema |
+| `test-fixtures.ts` | Shared test fixture factories: `makeTestHousehold`, `makeEmptyHousehold`, `makePerson`, `makeProperty`, `makeAccount`, `makeIncome`, `makeInsurancePolicy`, `makeSnapshot` — single source of truth for HouseholdData test objects |
 | `tax-constants.test.ts` | Constants structure validation |
 | `property.test.ts` | Property equity, mortgage balance, net worth with property, per-person split |
 | `property-projections.test.ts` | Property appreciation, mortgage amortization, payoff calculation, IHT integration with property growth |
@@ -615,7 +628,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | `monte-carlo.test.ts` | Monte Carlo simulation: timeline shape, percentile ordering, determinism, contribution impact, success probability |
 | `sensitivity.test.ts` | Sensitivity analysis: input ranking, growth rate impact, retirement age impact, empty household |
 | `drawdown.test.ts` | Drawdown sequencing: tax-optimal order (GIA→ISA→pension), state pension offset, strategy comparison |
-| `fi-diagnostic.test.ts` | FI diagnostic: 8 dimension scorers (retirement, tax, emergency fund, savings rate, IHT, diversification, cash flow, pension), overall report, empty/single-person/Eleanor scenarios |
+| `fi-diagnostic.test.ts` | FI diagnostic: 10 dimension scorers (retirement, tax, emergency fund, savings rate, IHT, diversification, cash flow, pension, risk alignment, insurance), risk profile scoring, overall report, empty/single-person/Eleanor scenarios |
 
 ### Key Data Flows
 

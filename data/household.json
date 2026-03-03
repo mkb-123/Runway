@@ -263,5 +263,6 @@
   ],
   "dashboardConfig": {
     "heroMetrics": ["projected_retirement_income", "retirement_countdown", "fire_progress", "period_change", "cash_runway"]
-  }
+  },
+  "insurancePolicies": []
 }
