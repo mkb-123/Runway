@@ -473,3 +473,107 @@ export const TAX_WRAPPER_LABELS: Record<TaxWrapper, string> = {
   premium_bonds: "Premium Bonds",
 };
 
+// --- Financial Independence Diagnostic ---
+
+/** The 8 dimensions scored in the FI diagnostic (MVP) */
+export type DiagnosticDimension =
+  | "retirement_readiness"
+  | "tax_efficiency"
+  | "emergency_fund"
+  | "savings_rate"
+  | "iht_exposure"
+  | "portfolio_diversification"
+  | "cash_flow_health"
+  | "pension_adequacy";
+
+/** RAG rating for each diagnostic dimension */
+export type DiagnosticRating = "green" | "amber" | "red" | "insufficient_data";
+
+/** Score result for a single diagnostic dimension */
+export interface DiagnosticScore {
+  dimension: DiagnosticDimension;
+  rating: DiagnosticRating;
+  /** 0-100 score for the dimension */
+  score: number;
+  /** Human-readable summary of the finding */
+  summary: string;
+  /** The key numbers behind the score */
+  details: string[];
+  /** Link to the relevant page for more detail */
+  actionUrl: string;
+  /** Top recommendation to improve this dimension */
+  recommendation?: string;
+}
+
+/** Complete diagnostic report */
+export interface DiagnosticReport {
+  /** ISO date when the diagnostic was generated */
+  generatedAt: string;
+  /** Overall score (weighted average of dimensions) */
+  overallScore: number;
+  /** Overall RAG rating */
+  overallRating: DiagnosticRating;
+  /** Per-dimension scores */
+  scores: DiagnosticScore[];
+  /** Count of dimensions by rating */
+  ratingCounts: Record<DiagnosticRating, number>;
+}
+
+export const DIAGNOSTIC_DIMENSION_LABELS: Record<DiagnosticDimension, string> = {
+  retirement_readiness: "Retirement Readiness",
+  tax_efficiency: "Tax Efficiency",
+  emergency_fund: "Emergency Fund",
+  savings_rate: "Savings Rate",
+  iht_exposure: "IHT Exposure",
+  portfolio_diversification: "Portfolio Diversification",
+  cash_flow_health: "Cash Flow Health",
+  pension_adequacy: "Pension Adequacy",
+};
+
+// --- Phase 2: Risk Profile (scaffolding) ---
+
+export type RiskToleranceLevel = "conservative" | "moderate" | "aggressive";
+
+export interface RiskProfileAnswer {
+  questionId: string;
+  answer: number; // 1-5 scale
+}
+
+export interface RiskProfile {
+  /** Completed questionnaire answers */
+  answers: RiskProfileAnswer[];
+  /** Computed overall risk score (0-100) */
+  overallScore: number;
+  /** Derived risk tolerance category */
+  tolerance: RiskToleranceLevel;
+  /** Maximum tolerable portfolio drawdown as a percentage (e.g. 0.3 for 30%) */
+  maxDrawdownTolerance: number;
+  /** Date the profile was last updated */
+  lastUpdated: string;
+}
+
+// --- Phase 2: Insurance & Protection (scaffolding) ---
+
+export type InsurancePolicyType = "life" | "critical_illness" | "income_protection";
+
+export interface InsurancePolicy {
+  id: string;
+  personId: string;
+  type: InsurancePolicyType;
+  provider: string;
+  /** Coverage amount (lump sum for life/CI, annual for income protection) */
+  coverageAmount: number;
+  /** Annual premium */
+  annualPremium: number;
+  /** End date of cover (ISO date) */
+  endDate?: string;
+  /** Whether cover is inflation-linked */
+  inflationLinked: boolean;
+}
+
+export const INSURANCE_TYPE_LABELS: Record<InsurancePolicyType, string> = {
+  life: "Life Insurance",
+  critical_illness: "Critical Illness",
+  income_protection: "Income Protection",
+};
+

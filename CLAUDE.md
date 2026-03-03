@@ -102,6 +102,7 @@ To **remove** a hero metric: reverse the above + add replacement mapping in migr
 | Add a hero metric type | `src/types/index.ts` (union + labels), `src/app/page.tsx` (resolveMetric), `src/lib/dashboard.ts` (computeHeroData + HeroMetricData), `src/lib/__tests__/dashboard.test.ts` |
 | Remove a hero metric type | Same as above (reverse) + migration 10 in `src/lib/migration.ts` (add replacement mapping) |
 | Add a recommendation analyzer | `src/lib/recommendations.ts` (add fn + call in generateRecommendations), `src/lib/__tests__/recommendations.test.ts` |
+| Add a diagnostic dimension | `src/types/index.ts` (DiagnosticDimension + DIAGNOSTIC_DIMENSION_LABELS), `src/lib/fi-diagnostic.ts` (scorer fn + add to SCORERS + DIMENSION_WEIGHTS), `src/lib/__tests__/fi-diagnostic.test.ts` |
 | Change a tax rate or threshold | `src/lib/tax-constants.ts` only, then update `src/lib/__tests__/tax-constants.test.ts` |
 | Add a new page | `src/app/<route>/page.tsx`, update `src/components/layout/navigation.tsx`, update CLAUDE.md page table |
 | Change localStorage schema | `src/lib/schemas.ts` (Zod field + default), `src/lib/migration.ts` (new migration), `src/types/index.ts` (type), `src/lib/__tests__/migration.test.ts`, update `src/lib/__tests__/test-fixtures.ts` |
@@ -147,12 +148,12 @@ Runway is a comprehensive UK household net worth tracking and financial planning
 - **UI:** shadcn/ui + Radix UI + Tailwind CSS 4
 - **Charts:** Recharts 3.7
 - **Validation:** Zod 4
-- **Testing:** Vitest + Testing Library (690 tests)
+- **Testing:** Vitest + Testing Library (747 tests)
 - **Export:** SheetJS (xlsx)
 
 ## Key Directories
 
-- `src/app/` — Pages: dashboard, accounts, projections, retirement, income, tax-planning, iht, cashflow, export, settings
+- `src/app/` — Pages: dashboard, diagnostic, accounts, projections, retirement, income, tax-planning, iht, cashflow, export, settings
 - `src/components/ui/` — 17 shadcn/ui components
 - `src/components/charts/` — 15 financial visualization charts (Recharts)
 - `src/components/layout/` — Navigation
@@ -394,6 +395,18 @@ Single source of truth. Never hardcode rates elsewhere.
 - `compareDrawdownStrategies(pots, ...) → { optimalTaxPaid, proportionalTaxPaid, taxSaving }` — tax comparison between strategies
 - Types: `DrawdownStrategy`, `AccountPot`, `DrawdownYearResult`, `DrawdownPlan`
 
+#### `fi-diagnostic.ts` — Financial Independence Diagnostic Engine
+- `generateDiagnosticReport(household) → DiagnosticReport` — orchestrates all 8 dimension scorers into a weighted report
+- `scoreRetirementReadiness(household) → DiagnosticScore` — FIRE progress + projected pot vs target
+- `scoreTaxEfficiency(household) → DiagnosticScore` — wrapper placement + ISA/pension allowance usage
+- `scoreEmergencyFund(household) → DiagnosticScore` — months of essential expenses covered
+- `scoreSavingsRate(household) → DiagnosticScore` — gross savings rate vs benchmarks
+- `scoreIHTExposure(household) → DiagnosticScore` — estate liability (single/couple, RNRB-aware)
+- `scorePortfolioDiversification(household) → DiagnosticScore` — wrapper/provider/concentration analysis
+- `scoreCashFlowHealth(household) → DiagnosticScore` — committed ratio vs income
+- `scorePensionAdequacy(household) → DiagnosticScore` — pension projection + bridge gap
+- Types: `DiagnosticScore`, `DiagnosticReport`, `DiagnosticDimension`, `DiagnosticRating`
+
 #### `recommendations.ts` — Actionable Financial Recommendations
 - `generateRecommendations(household) → Recommendation[]` — master function calling 10+ analyzers
 - Individual analyzers: `analyzeSalaryTaper`, `analyzePensionAllowance` (taper), `analyzeSalaryContribution`, `analyzePensionDeficit`, `analyzeISA`, `analyzeGIA`, `analyzeBedAndISA`, `analyzeCGTAllowance`, `analyzeStudentLoan`, `analyzeEmergencyFund`
@@ -439,7 +452,7 @@ Single source of truth. Never hardcode rates elsewhere.
 
 ### src/types/index.ts — Domain Type Definitions
 
-**Enums:** `AccountType`, `TaxWrapper`, `StudentLoanPlan`, `PensionContributionMethod`, `OutgoingFrequency`, `CommittedOutgoingCategory`, `ContributionTarget`, `HeroMetricType` (includes `projected_retirement_income`, `investable_net_worth`)
+**Enums:** `AccountType`, `TaxWrapper`, `StudentLoanPlan`, `PensionContributionMethod`, `OutgoingFrequency`, `CommittedOutgoingCategory`, `ContributionTarget`, `HeroMetricType` (includes `projected_retirement_income`, `investable_net_worth`), `DiagnosticDimension`, `DiagnosticRating`, `RiskToleranceLevel`, `InsurancePolicyType`
 
 **Core types:**
 - `Person` — id, name, relationship, dateOfBirth, plannedRetirementAge, pensionAccessAge, stateRetirementAge, niQualifyingYears, studentLoanPlan
@@ -485,6 +498,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | Route | File | Purpose | Key lib dependencies |
 |-------|------|---------|---------------------|
 | `/` (Dashboard) | `page.tsx` | Hero metrics, recommendations, net worth breakdown, school fee timeline, retirement countdown, committed outgoings list | `recommendations.ts`, `projections.ts`, `school-fees.ts`, `format.ts` |
+| `/diagnostic` | `diagnostic/page.tsx` | FI diagnostic scorecard: 8-dimension RAG-rated assessment with overall score | `fi-diagnostic.ts`, `format.ts` |
 | `/accounts` | `accounts/page.tsx` | Account register by person & type, add/edit/delete, cost basis | `format.ts` |
 | `/income` | `income/page.tsx` | Salary, tax, NI, student loan, deferred bonus, 24-month cash flow, school fees, income trajectory | `tax.ts`, `cash-flow.ts`, `deferred-bonus.ts`, `school-fees.ts`, `format.ts` |
 | `/retirement` | `retirement/page.tsx` | Retirement countdown, pension bridge, FIRE metrics, income timeline, scenario controls | `projections.ts`, `format.ts` |
@@ -601,6 +615,7 @@ Single source of truth. Never hardcode rates elsewhere.
 | `monte-carlo.test.ts` | Monte Carlo simulation: timeline shape, percentile ordering, determinism, contribution impact, success probability |
 | `sensitivity.test.ts` | Sensitivity analysis: input ranking, growth rate impact, retirement age impact, empty household |
 | `drawdown.test.ts` | Drawdown sequencing: tax-optimal order (GIA→ISA→pension), state pension offset, strategy comparison |
+| `fi-diagnostic.test.ts` | FI diagnostic: 8 dimension scorers (retirement, tax, emergency fund, savings rate, IHT, diversification, cash flow, pension), overall report, empty/single-person/Eleanor scenarios |
 
 ### Key Data Flows
 

@@ -17,6 +17,7 @@ import {
   Eye,
   Target,
   BarChart3,
+  Stethoscope,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ const navGroups = [
     icon: Eye,
     links: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/diagnostic", label: "Diagnostic", icon: Stethoscope },
       { href: "/accounts", label: "Accounts", icon: Landmark },
       { href: "/income", label: "Income", icon: Wallet },
     ],
